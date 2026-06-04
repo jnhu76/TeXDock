@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1-labs
 # --------------------------------------------------
 # Overleaf Base Image (sharelatex/sharelatex-base)
 # --------------------------------------------------
@@ -17,33 +18,24 @@ ENV REBUILT_AFTER="2026-05-21"
 ARG UBUNTU_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/ubuntu
 ARG NODESOURCE_MIRROR=https://repo.huaweicloud.com/nodesource
 ARG NPM_REGISTRY=https://registry.npmmirror.com
-ARG TEXLIVE_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
 
 # Install dependencies
 # --------------------
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     set -eux; \
-    \
-    # Enable apt package cache
     rm -f /etc/apt/apt.conf.d/docker-clean; \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache; \
-    \
-    # Use China Ubuntu mirror.
-    # Ubuntu 24.04/noble commonly uses DEB822 format:
-    # /etc/apt/sources.list.d/ubuntu.sources
     if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
       cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.bak; \
-      cat > /etc/apt/sources.list.d/ubuntu.sources <<EOF
-Types: deb
-URIs: ${UBUNTU_MIRROR}
-Suites: noble noble-updates noble-backports noble-security
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-EOF
+      printf '%s\n' \
+        'Types: deb' \
+        "URIs: ${UBUNTU_MIRROR}" \
+        'Suites: noble noble-updates noble-backports noble-security' \
+        'Components: main restricted universe multiverse' \
+        'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+        > /etc/apt/sources.list.d/ubuntu.sources; \
     fi; \
-    \
-    # Fallback for old-style sources.list, if present.
     if [ -f /etc/apt/sources.list ]; then \
       cp /etc/apt/sources.list /etc/apt/sources.list.bak; \
       sed -i \
@@ -52,7 +44,6 @@ EOF
         -e "s|http://ports.ubuntu.com/ubuntu-ports|${UBUNTU_MIRROR}|g" \
         /etc/apt/sources.list; \
     fi; \
-    \
     apt-get update; \
     apt-get install -y \
       unattended-upgrades \
@@ -76,12 +67,7 @@ EOF
       curl \
       gnupg \
       qpdf; \
-    \
-    # Upgrade base-image packages after switching apt mirror.
     unattended-upgrade --verbose --no-minimal-upgrade-steps; \
-    \
-    # Install Node.js 22.x from domestic NodeSource mirror.
-    # The GPG key is still fetched from NodeSource official endpoint.
     mkdir -p /etc/apt/keyrings; \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
       | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
@@ -89,10 +75,59 @@ EOF
       > /etc/apt/sources.list.d/nodesource.list; \
     apt-get update; \
     apt-get install -y nodejs; \
-    \
-    # Use domestic npm registry.
     npm config set registry "${NPM_REGISTRY}"; \
-    \
     rm -rf \
       /etc/nginx/nginx.conf \
       /etc/nginx/sites-enabled/default
+
+
+# Install TexLive
+# ---------------
+# CTAN mirrors occasionally fail, in that case install TexLive using a
+# different server, for example https://ctan.crest.fr
+#
+# # docker build \
+#     --build-arg TEXLIVE_MIRROR=https://ctan.crest.fr/tex-archive/systems/texlive/tlnet \
+#     -f Dockerfile-base -t sharelatex/sharelatex-base .
+ARG TEXLIVE_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
+
+RUN mkdir /install-tl-unx \
+&&  wget --quiet https://tug.org/texlive/files/texlive.asc \
+&&  gpg --import texlive.asc \
+&&  rm texlive.asc \
+&&  wget --quiet ${TEXLIVE_MIRROR}/install-tl-unx.tar.gz \
+&&  wget --quiet ${TEXLIVE_MIRROR}/install-tl-unx.tar.gz.sha512 \
+&&  wget --quiet ${TEXLIVE_MIRROR}/install-tl-unx.tar.gz.sha512.asc \
+&&  gpg --verify install-tl-unx.tar.gz.sha512.asc \
+&&  sha512sum -c install-tl-unx.tar.gz.sha512 \
+&&  tar -xz -C /install-tl-unx --strip-components=1 -f install-tl-unx.tar.gz \
+&&  rm install-tl-unx.tar.gz* \
+&&  echo "tlpdbopt_autobackup 0" >> /install-tl-unx/texlive.profile \
+&&  echo "tlpdbopt_install_docfiles 0" >> /install-tl-unx/texlive.profile \
+&&  echo "tlpdbopt_install_srcfiles 0" >> /install-tl-unx/texlive.profile \
+&&  echo "selected_scheme scheme-basic" >> /install-tl-unx/texlive.profile \
+    \
+&&  /install-tl-unx/install-tl \
+      -profile /install-tl-unx/texlive.profile \
+      -repository ${TEXLIVE_MIRROR} \
+    \
+&&  $(find /usr/local/texlive -name tlmgr) path add \
+&&  tlmgr install --repository ${TEXLIVE_MIRROR} \
+      latexmk \
+      texcount \
+      synctex \
+      etoolbox \
+      xetex \
+&&  tlmgr path add \
+&&  rm -rf /install-tl-unx
+
+
+# Set up overleaf user and home directory
+# -----------------------------------------
+RUN adduser --system --group --home /overleaf --no-create-home overleaf && \
+	mkdir -p /var/lib/overleaf && \
+	chown www-data:www-data /var/lib/overleaf && \
+	mkdir -p /var/log/overleaf && \
+	chown www-data:www-data /var/log/overleaf && \
+	mkdir -p /var/lib/overleaf/data/template_files && \
+	chown www-data:www-data /var/lib/overleaf/data/template_files
