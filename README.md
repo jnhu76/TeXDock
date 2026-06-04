@@ -175,3 +175,45 @@ git rebase reference-overleaf/main
 
 The runtime baseline comes from stable Docker image snapshots.
 
+## Extracting Service Source Code
+
+To extract the `/overleaf/services` directory from a ShareLaTeX/Overleaf Docker image:
+
+```bash
+./scripts/extract_services.sh sharelatex/sharelatex:5.5.8 ./extracted_services --force
+```
+
+Parameters:
+
+* `sharelatex/sharelatex:5.5.8` - Docker image tag (change to desired version)
+* `./extracted_services` - Output directory (change as needed)
+* `--force` - Force overwrite existing output directory (optional)
+
+Example with different version and output path:
+
+```bash
+./scripts/extract_services.sh sharelatex/sharelatex:6.0.0 /tmp/services_snapshot --force
+```
+
+The extracted services will be located at `./extracted_services/overleaf/services/`.
+
+## Checking Docker Image Runtime
+
+To inspect the Node.js runtime environment inside a ShareLaTeX/Overleaf Docker image:
+
+```bash
+./scripts/check-image-runtime.sh sharelatex/sharelatex:5.5.8
+```
+
+This script displays:
+
+* OS information
+* Node.js, npm, and yarn versions
+* Binary paths
+* PATH environment variable
+* Node binary details
+* Installed packages (via dpkg)
+* apt policy for nodejs
+
+This helps verify the runtime environment before extracting source code or planning compatibility changes.
+
