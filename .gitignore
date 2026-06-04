@@ -1,12 +1,12 @@
-# docker image build
-.dockerignore
-
 # user defined files
 .env
 docker-compose.override.yml
 
 # Generated build context
 .build/
+
+# Extracted services (bulk, use overlays/ instead)
+/extracted_services/
 
 # Local worktree, if accidentally created inside project
 /textdock-vendor/
