@@ -1,6 +1,9 @@
 # user defined files
 .env
 docker-compose.override.yml
+docker-compose.dev.yml
+docker-compose.dev.web.yml
+config/overleaf.env
 
 # Generated build context
 .build/

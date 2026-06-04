@@ -139,6 +139,24 @@ release/*
   Image build and release preparation branches.
 ```
 
+## Runtime Overlay Development
+
+TeXDock modifies the official runtime image via overlays.
+
+For small changes, extract and mount individual files:
+
+```bash
+./scripts/extract-runtime-file.sh /overleaf/services/web/app.js
+```
+
+For complex service work such as `services/web`, extract the full runtime service directory and mount that service directory during development:
+
+```bash
+./scripts/extract-runtime-service.sh web
+```
+
+See [docs/development-workflow.md](docs/development-workflow.md) for details.
+
 ## Directory Layout
 
 Recommended local layout:

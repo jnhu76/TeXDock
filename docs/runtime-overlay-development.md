@@ -115,14 +115,35 @@ git add overlays/overleaf/services/web/app.js
 git commit -m "feat: customize web service app entry"
 ```
 
-## 6. Legacy source-build files (paused)
+## 6. Deployment
 
-These files are preserved for reference but are **not** part of the current mainline:
+`docker-compose.yml` is a minimal runtime deployment compose for TeXDock.
+
+It runs:
+
+- `fred1653/sharelatex:0.2.0` (TeXDock runtime overlay image)
+- MongoDB 6.0 (with replica set)
+- Redis 7
+
+For production or advanced setup, the [Overleaf Toolkit](https://github.com/overleaf/overleaf-toolkit) may still be used externally. TeXDock does not vendor the whole Overleaf Toolkit.
+
+MongoDB replica set initialization is required on first run:
+
+```bash
+docker compose exec mongo mongosh --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] })"
+```
+
+This will be automated in a future TeXDock-owned init script.
+
+## 7. Legacy source-build files (removed)
+
+Previous source-build files have been removed from the repository:
 
 ```text
-server-ce/Dockerfile              # source-build experimental path (paused)
-server-ce/Dockerfile-base         # custom base-image rebuild (paused)
-scripts/prepare-build-context.sh  # source-build context assembly (paused)
+server-ce/Dockerfile              # removed (was source-build experimental)
+server-ce/Dockerfile-base         # removed (was base-image rebuild)
+scripts/prepare-build-context.sh  # removed (was build context assembly)
+.yarn/ .yarnrc.yml package.json yarn.lock libraries/ tools/ services/ bin/ build/ develop/ dockerfiles/
 
 server-ce/Dockerfile-runtime      # current mainline path
 ```
