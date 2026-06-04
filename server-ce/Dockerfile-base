@@ -16,8 +16,11 @@ ENV REBUILT_AFTER="2026-05-21"
 # China mirrors
 # -------------
 ARG UBUNTU_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/ubuntu
-ARG NODESOURCE_MIRROR=https://repo.huaweicloud.com/nodesource
+ARG NODE_DISTRO=linux-x64
+ARG NODE_MIRROR=https://npmmirror.com/mirrors/node
 ARG NPM_REGISTRY=https://registry.npmmirror.com
+ARG NODE_VERSION=22.15.1
+
 
 # Install dependencies
 # --------------------
@@ -66,15 +69,20 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       ca-certificates \
       curl \
       gnupg \
+      xz-utils \
       qpdf; \
     unattended-upgrade --verbose --no-minimal-upgrade-steps; \
-    mkdir -p /etc/apt/keyrings; \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-      | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] ${NODESOURCE_MIRROR}/node_22.x nodistro main" \
-      > /etc/apt/sources.list.d/nodesource.list; \
-    apt-get update; \
-    apt-get install -y nodejs; \
+    curl -fsSL "${NODE_MIRROR}/v${NODE_VERSION}/node-v${NODE_VERSION}-${NODE_DISTRO}.tar.xz" \
+      -o /tmp/node.tar.xz; \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner; \
+    rm -f /tmp/node.tar.xz; \
+    ln -sf /usr/local/bin/node /usr/bin/node; \
+    ln -sf /usr/local/bin/npm /usr/bin/npm; \
+    ln -sf /usr/local/bin/npx /usr/bin/npx; \
+    ln -sf /usr/local/bin/corepack /usr/bin/corepack; \
+    node -v; \
+    npm -v; \
+    node -v | grep -x "v${NODE_VERSION}"; \
     npm config set registry "${NPM_REGISTRY}"; \
     rm -rf \
       /etc/nginx/nginx.conf \
