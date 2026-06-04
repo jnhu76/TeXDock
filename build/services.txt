@@ -8,3 +8,4 @@ history-v1
 notifications
 project-history
 real-time
+web
