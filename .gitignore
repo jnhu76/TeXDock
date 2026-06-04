@@ -4,3 +4,12 @@
 # user defined files
 .env
 docker-compose.override.yml
+
+# Generated build context
+.build/
+
+# Local worktree, if accidentally created inside project
+/textdock-vendor/
+
+# Node dependencies
+node_modules/
