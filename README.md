@@ -1,5 +1,7 @@
 # TeXDock
 
+[中文文档](README.CN.md)
+
 TeXDock is a self-hosted LaTeX runtime management project based on stable ShareLaTeX / Overleaf Docker image snapshots.
 
 TeXDock does **not** treat `overleaf/overleaf` GitHub `main` as the runtime upstream.

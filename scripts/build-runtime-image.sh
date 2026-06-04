@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-IMAGE_NAME="${IMAGE_NAME:-fred1653/sharelatex}"
+IMAGE_NAME="${IMAGE_NAME:-{USERNAME}/sharelatex}"
 IMAGE_VERSION="${IMAGE_VERSION:-0.2.0}"
 BASE_IMAGE="${BASE_IMAGE:-sharelatex/sharelatex:5.5.8}"
 DOCKERFILE="${DOCKERFILE:-server-ce/Dockerfile-runtime}"

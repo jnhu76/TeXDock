@@ -1,6 +1,6 @@
 services:
   sharelatex:
-    image: fred1653/sharelatex:0.2.0
+    image: {USERNAME}/sharelatex:0.2.0
     container_name: texdock-sharelatex
     restart: unless-stopped
     depends_on:

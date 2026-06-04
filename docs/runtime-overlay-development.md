@@ -103,7 +103,7 @@ Environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
-| `IMAGE_NAME` | `fred1653/sharelatex` | Target image name |
+| `IMAGE_NAME` | `{USERNAME}/sharelatex` | Target image name |
 | `IMAGE_VERSION` | `0.2.0` | Target image tag |
 | `BASE_IMAGE` | `sharelatex/sharelatex:5.5.8` | Base image to overlay onto |
 | `DOCKERFILE` | `server-ce/Dockerfile-runtime` | Dockerfile to use |
@@ -121,7 +121,7 @@ git commit -m "feat: customize web service app entry"
 
 It runs:
 
-- `fred1653/sharelatex:0.2.0` (TeXDock runtime overlay image)
+- `{USERNAME}/sharelatex:0.2.0` (TeXDock runtime overlay image)
 - MongoDB 6.0 (with replica set)
 - Redis 7
 
