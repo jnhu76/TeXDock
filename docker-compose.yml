@@ -4,21 +4,12 @@ services:
     container_name: texdock-sharelatex
     restart: unless-stopped
     depends_on:
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - mongo
+      - redis
     ports:
-      - "8080:80"
-    stop_grace_period: 60s
-    environment:
-      SHARELATEX_APP_NAME: TeXDock
-      SHARELATEX_MONGO_URL: mongodb://mongo:27017/sharelatex
-      SHARELATEX_REDIS_HOST: redis
-      REDIS_HOST: redis
-      ENABLED_LINKED_FILE_TYPES: "project_file,project_output_file"
-      ENABLE_CONVERSIONS: "true"
-      EMAIL_CONFIRMATION_DISABLED: "true"
+      - "${TEXDOCK_HTTP_PORT:-8080}:80"
+    env_file:
+      - ./config/overleaf.env
     volumes:
       - sharelatex_data:/var/lib/overleaf
       - sharelatex_logs:/var/log/overleaf
@@ -30,13 +21,6 @@ services:
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     volumes:
       - mongo_data:/data/db
-    extra_hosts:
-      - mongo:127.0.0.1
-    healthcheck:
-      test: echo 'db.stats().ok' | mongosh localhost:27017/test --quiet
-      interval: 10s
-      timeout: 10s
-      retries: 5
 
   redis:
     image: redis:7
