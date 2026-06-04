@@ -99,3 +99,82 @@ echo "Build context ready: $BUILD_CONTEXT"
 echo
 echo "Services in build context:"
 find "$BUILD_CONTEXT/services" -maxdepth 1 -mindepth 1 -type d -printf '  %f\n' | sort
+
+echo
+echo "Normalizing local workspace dependencies..."
+
+python3 - "$BUILD_CONTEXT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+
+workspace_names = set()
+
+# Collect workspace package names.
+for base in ["libraries", "services", "tools"]:
+    base_dir = root / base
+    if not base_dir.exists():
+        continue
+
+    for package_json in base_dir.glob("*/package.json"):
+        try:
+            data = json.loads(package_json.read_text())
+        except Exception:
+            continue
+
+        name = data.get("name")
+        if name:
+            workspace_names.add(name)
+
+# Also handle known unscoped internal package names.
+# They should already be collected if their package.json is present.
+sections = [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+]
+
+changed_files = []
+
+for package_json in root.glob("**/package.json"):
+    if "node_modules" in package_json.parts:
+        continue
+
+    try:
+        data = json.loads(package_json.read_text())
+    except Exception as exc:
+        raise SystemExit(f"ERROR: failed to parse {package_json}: {exc}")
+
+    changed = False
+
+    for section in sections:
+        deps = data.get(section)
+        if not isinstance(deps, dict):
+            continue
+
+        for dep_name, dep_range in list(deps.items()):
+            if dep_name in workspace_names and dep_range == "*":
+                deps[dep_name] = "workspace:*"
+                changed = True
+
+    if changed:
+        package_json.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+        )
+        changed_files.append(str(package_json.relative_to(root)))
+
+print("Workspace packages:")
+for name in sorted(workspace_names):
+    print(f"  {name}")
+
+print()
+if changed_files:
+    print("Normalized package.json files:")
+    for path in changed_files:
+        print(f"  {path}")
+else:
+    print("No package.json files needed normalization.")
+PY
