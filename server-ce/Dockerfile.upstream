@@ -3,17 +3,10 @@
 # Overleaf Community Edition (overleaf/overleaf)
 # ---------------------------------------------
 
-ARG OVERLEAF_BASE_TAG=fred1653/sharelatex-base:latest
+ARG OVERLEAF_BASE_TAG=sharelatex/sharelatex-base:latest
 FROM $OVERLEAF_BASE_TAG
 
 WORKDIR /overleaf
-
-# China npm / yarn registry
-# -------------------------
-# The base image should already provide Node.js and npm.
-# This Dockerfile still uses Overleaf's original Yarn/Corepack build flow.
-ARG NPM_REGISTRY=https://registry.npmmirror.com
-ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
 
 # Add required source files for yarn install
 # -------------------------------------------
@@ -25,19 +18,7 @@ COPY server-ce/genScript.js server-ce/services.js /overleaf/
 # Corepack setup, shared between all the images.
 ENV PATH="/overleaf/node_modules/.bin:$PATH"
 ENV COREPACK_HOME=/opt/corepack
-
-RUN set -eux; \
-    npm config set registry "${NPM_REGISTRY}"; \
-    corepack enable; \
-    corepack install -g yarn@4.14.1; \
-    \
-    # Ensure Yarn Berry uses the domestic npm registry.
-    # If .yarnrc.yml already defines npmRegistryServer, keep the existing file
-    # untouched to avoid duplicated conflicting keys.
-    if ! grep -q '^npmRegistryServer:' /overleaf/.yarnrc.yml; then \
-      printf '\n%s\n' "npmRegistryServer: \"${NPM_REGISTRY}\"" >> /overleaf/.yarnrc.yml; \
-    fi
-
+RUN corepack enable && corepack install -g yarn@4.14.1
 ENV COREPACK_ENABLE_NETWORK=0
 
 # Install yarn dependencies
@@ -45,13 +26,11 @@ ENV COREPACK_ENABLE_NETWORK=0
 RUN --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/root/.yarn/berry/cache,id=server-ce-yarn-cache \
     --mount=type=cache,target=/usr/local/share/.cache/yarn,id=server-ce-yarn-fallback-cache \
-    --mount=type=tmpfs,target=/tmp \
-    node genScript install | bash
+    --mount=type=tmpfs,target=/tmp node genScript install | bash
 
 # Add the actual source files
 # ---------------------------
 COPY --parents libraries/ services/ tools/migrations/ /overleaf/
-
 RUN --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/root/.yarn/berry/cache,id=server-ce-yarn-cache \
     --mount=type=cache,target=/usr/local/share/.cache/yarn,id=server-ce-yarn-fallback-cache \
@@ -73,18 +52,17 @@ ADD server-ce/nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template
 ADD server-ce/nginx/overleaf.conf /etc/nginx/sites-enabled/overleaf.conf
 ADD server-ce/nginx/clsi-nginx.conf /etc/nginx/sites-enabled/clsi-nginx.conf
 
+
 # Configure log rotation
 # ----------------------
 ADD server-ce/logrotate/overleaf /etc/logrotate.d/overleaf
 RUN chmod 644 /etc/logrotate.d/overleaf
 
 # Configure cron tasks
-# --------------------
+# ----------------------
 ADD server-ce/cron /overleaf/cron
-
 ADD server-ce/config/crontab-history /etc/cron.d/crontab-history
 RUN chmod 600 /etc/cron.d/crontab-history
-
 ADD server-ce/config/crontab-deletion /etc/cron.d/crontab-deletion
 RUN chmod 600 /etc/cron.d/crontab-deletion
 
@@ -98,7 +76,7 @@ COPY server-ce/init_preshutdown_scripts/ /etc/my_init.pre_shutdown.d/
 COPY server-ce/config/settings.js /etc/overleaf/settings.js
 
 # Copy history-v1 files
-# ---------------------
+# -----------------------
 COPY server-ce/config/production.json /overleaf/services/history-v1/config/production.json
 COPY server-ce/config/custom-environment-variables.json /overleaf/services/history-v1/config/custom-environment-variables.json
 
@@ -111,12 +89,11 @@ RUN chmod +x /usr/local/bin/grunt
 # ---------------------------
 ADD server-ce/bin/flush-history-queues /overleaf/bin/flush-history-queues
 RUN chmod +x /overleaf/bin/flush-history-queues
-
 ADD server-ce/bin/force-history-resyncs /overleaf/bin/force-history-resyncs
 RUN chmod +x /overleaf/bin/force-history-resyncs
 
 # Copy Latexmkrc
-# --------------
+# -----------------------
 COPY server-ce/config/latexmkrc /usr/local/share/latexmk/LatexMk
 
 # File that controls open|closed status of the site
@@ -125,7 +102,7 @@ ENV SITE_MAINTENANCE_FILE="/etc/overleaf/site_status"
 RUN touch $SITE_MAINTENANCE_FILE
 
 # Set Environment Variables
-# -------------------------
+# --------------------------------
 ENV OVERLEAF_CONFIG=/etc/overleaf/settings.js
 
 ENV WEB_API_USER="overleaf"
@@ -143,6 +120,7 @@ ENV GRACEFUL_SHUTDOWN_DELAY_SECONDS=1
 
 ENV NODE_ENV="production"
 ENV LOG_LEVEL="info"
+
 
 EXPOSE 80
 
