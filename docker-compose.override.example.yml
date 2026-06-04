@@ -1,8 +1,6 @@
 services:
   sharelatex:
-    image: sharelatex/sharelatex:5.5.8
     volumes:
-      # Mount only the file you are actively editing.
+      # Mount only exact files or small directories being edited.
       # Do not mount ./overlays/overleaf:/overleaf
-      # because that hides the full /overleaf runtime provided by the image.
       - ./overlays/overleaf/services/web/app.js:/overleaf/services/web/app.js
