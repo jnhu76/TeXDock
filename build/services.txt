@@ -1,0 +1,10 @@
+chat
+clsi
+contacts
+docstore
+document-updater
+filestore
+history-v1
+notifications
+project-history
+real-time
