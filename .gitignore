@@ -1,18 +1,6 @@
+# docker image build
+.dockerignore
+
 # user defined files
 .env
 docker-compose.override.yml
-docker-compose.dev.yml
-docker-compose.dev.web.yml
-config/overleaf.env
-
-# Generated build context
-.build/
-
-# Extracted services (bulk, use overlays/ instead)
-/extracted_services/
-
-# Local worktree, if accidentally created inside project
-/textdock-vendor/
-
-# Node dependencies
-node_modules/

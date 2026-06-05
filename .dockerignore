@@ -1,8 +1,0 @@
-.git
-.build
-node_modules
-textdock-vendor
-texdock-vendor
-
-# Do not copy local placeholder files into /overleaf
-overlays/overleaf/.gitkeep

@@ -1,6 +1,0 @@
-services:
-  sharelatex:
-    volumes:
-      # Mount only exact files or small directories being edited.
-      # Do not mount ./overlays/overleaf:/overleaf
-      - ./overlays/overleaf/services/web/app.js:/overleaf/services/web/app.js

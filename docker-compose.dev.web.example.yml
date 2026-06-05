@@ -1,9 +1,0 @@
-services:
-  sharelatex:
-    volumes:
-      # Whole-service overlay for heavy web debugging.
-      # Before using this, run:
-      #   ./scripts/extract-runtime-service.sh web
-      #
-      # Do not mount ./overlays/overleaf:/overleaf
-      - ./overlays/overleaf/services/web:/overleaf/services/web
