@@ -14,10 +14,11 @@ import { withTestContainerErrorBoundary } from '../../../helpers/error-boundary'
 
 const TestContainerWithoutErrorBoundary: FC<{
   component: React.ReactNode
+  scope: Record<string, unknown>
   props: Record<string, unknown>
-}> = ({ component, props }) => {
+}> = ({ component, scope, props }) => {
   return (
-    <EditorProviders {...props}>
+    <EditorProviders scope={scope} {...props}>
       <HistoryProvider>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <div className="history-react">{component}</div>
@@ -33,12 +34,17 @@ const TestContainer = withTestContainerErrorBoundary(
 
 const mountWithEditorProviders = (
   component: React.ReactNode,
+  scope: Record<string, unknown> = {},
   props: Record<string, unknown> = {}
 ) => {
-  cy.mount(<TestContainer component={component} props={props} />)
+  cy.mount(<TestContainer component={component} scope={scope} props={props} />)
 }
 
-describe('change list', function () {
+describe('change list (Bootstrap 5)', function () {
+  const scope = {
+    ui: { view: 'history', pdfLayout: 'sideBySide', chatOpen: true },
+  }
+
   const waitForData = () => {
     cy.wait('@updates')
     cy.wait('@labels')
@@ -55,6 +61,9 @@ describe('change list', function () {
     cy.intercept('GET', '/project/*/filetree/diff*', {
       body: { diff: [{ pathname: 'main.tex' }, { pathname: 'name.tex' }] },
     }).as('diff')
+    window.metaAttributesCache.set('ol-inactiveTutorials', [
+      'react-history-buttons-tutorial',
+    ])
   })
 
   describe('toggle switch', function () {
@@ -92,8 +101,7 @@ describe('change list', function () {
 
   describe('tags', function () {
     it('renders tags', function () {
-      mountWithEditorProviders(<ChangeList />, {
-        layoutContext: { view: 'history' },
+      mountWithEditorProviders(<ChangeList />, scope, {
         user: {
           id: USER_ID,
           email: USER_EMAIL,
@@ -141,19 +149,7 @@ describe('change list', function () {
           cy.findByRole('button', { name: /delete/i }).should('not.exist')
         })
       )
-      cy.findByRole('complementary', {
-        name: /Project history and labels/i,
-      }).within(() => {
-        cy.findByRole('group', {
-          name: 'Show all of the project history or only labelled versions.',
-        }).within(() => {
-          cy.findByText(/Labels/i).click()
-        })
-        cy.findByRole('radio', { name: /Labels/i }).should('be.checked')
-        cy.findByRole('radio', { name: /All history/i }).should(
-          'not.be.checked'
-        )
-      })
+      cy.findByLabelText(/labels/i).click({ force: true })
       cy.findAllByTestId('history-version-details').as('details')
       // first details on labels is always "current version", start testing on second
       cy.get('@details').should('have.length', 3)
@@ -177,18 +173,13 @@ describe('change list', function () {
     })
 
     it('deletes tag', function () {
-      mountWithEditorProviders(
-        <ChangeList />,
-
-        {
-          layoutContext: { view: 'history' },
-          user: {
-            id: USER_ID,
-            email: USER_EMAIL,
-            isAdmin: true,
-          },
-        }
-      )
+      mountWithEditorProviders(<ChangeList />, scope, {
+        user: {
+          id: USER_ID,
+          email: USER_EMAIL,
+          isAdmin: true,
+        },
+      })
       waitForData()
 
       cy.findByLabelText(/all history/i).click({ force: true })
@@ -244,8 +235,7 @@ describe('change list', function () {
     })
 
     it('verifies that selecting the same list item will not trigger a new diff', function () {
-      mountWithEditorProviders(<ChangeList />, {
-        layoutContext: { view: 'history' },
+      mountWithEditorProviders(<ChangeList />, scope, {
         user: {
           id: USER_ID,
           email: USER_EMAIL,
@@ -267,18 +257,13 @@ describe('change list', function () {
 
   describe('all history', function () {
     beforeEach(function () {
-      mountWithEditorProviders(
-        <ChangeList />,
-
-        {
-          layoutContext: { view: 'history' },
-          user: {
-            id: USER_ID,
-            email: USER_EMAIL,
-            isAdmin: true,
-          },
-        }
-      )
+      mountWithEditorProviders(<ChangeList />, scope, {
+        user: {
+          id: USER_ID,
+          email: USER_EMAIL,
+          isAdmin: true,
+        },
+      })
       waitForData()
     })
 
@@ -333,32 +318,15 @@ describe('change list', function () {
 
   describe('labels only', function () {
     beforeEach(function () {
-      mountWithEditorProviders(
-        <ChangeList />,
-
-        {
-          layoutContext: { view: 'history' },
-          user: {
-            id: USER_ID,
-            email: USER_EMAIL,
-            isAdmin: true,
-          },
-        }
-      )
-      waitForData()
-      cy.findByRole('complementary', {
-        name: /Project history and labels/i,
-      }).within(() => {
-        cy.findByRole('group', {
-          name: 'Show all of the project history or only labelled versions.',
-        }).within(() => {
-          cy.findByText(/Labels/i).click()
-        })
-        cy.findByRole('radio', { name: /Labels/i }).should('be.checked')
-        cy.findByRole('radio', { name: /All history/i }).should(
-          'not.be.checked'
-        )
+      mountWithEditorProviders(<ChangeList />, scope, {
+        user: {
+          id: USER_ID,
+          email: USER_EMAIL,
+          isAdmin: true,
+        },
       })
+      waitForData()
+      cy.findByLabelText(/labels/i).click({ force: true })
     })
 
     it('shows the dropdown menu item for adding new labels', function () {
@@ -404,7 +372,7 @@ describe('change list', function () {
       cy.findAllByTestId('history-version-details')
         .eq(1)
         .within(() => {
-          cy.findByRole('button', { name: /compare/i }).click()
+          cy.get('[aria-label="Compare"]').click()
           cy.findByRole('menu').within(() => {
             cy.findByRole('menuitem', {
               name: /compare up to this version/i,
@@ -431,18 +399,13 @@ describe('change list', function () {
 
   describe('compare mode', function () {
     beforeEach(function () {
-      mountWithEditorProviders(
-        <ChangeList />,
-
-        {
-          layoutContext: { view: 'history' },
-          user: {
-            id: USER_ID,
-            email: USER_EMAIL,
-            isAdmin: true,
-          },
-        }
-      )
+      mountWithEditorProviders(<ChangeList />, scope, {
+        user: {
+          id: USER_ID,
+          email: USER_EMAIL,
+          isAdmin: true,
+        },
+      })
       waitForData()
     })
 
@@ -472,18 +435,13 @@ describe('change list', function () {
 
   describe('dropdown', function () {
     beforeEach(function () {
-      mountWithEditorProviders(
-        <ChangeList />,
-
-        {
-          layoutContext: { view: 'history' },
-          user: {
-            id: USER_ID,
-            email: USER_EMAIL,
-            isAdmin: true,
-          },
-        }
-      )
+      mountWithEditorProviders(<ChangeList />, scope, {
+        user: {
+          id: USER_ID,
+          email: USER_EMAIL,
+          isAdmin: true,
+        },
+      })
       waitForData()
     })
 
@@ -512,7 +470,7 @@ describe('change list', function () {
         cy.findByRole('heading', { name: /add label/i })
         cy.findByRole('button', { name: /cancel/i })
         cy.findByRole('button', { name: /add label/i }).should('be.disabled')
-        cy.findByLabelText(/New label name/i).as('input')
+        cy.findByPlaceholderText(/new label name/i).as('input')
         cy.get('@input').type(newLabel)
         cy.findByRole('button', { name: /add label/i }).should('be.enabled')
         cy.get('@input').type('{enter}')
@@ -652,18 +610,21 @@ describe('change list', function () {
     })
 
     it('shows non-owner paywall', function () {
-      mountWithEditorProviders(
-        <ChangeList />,
+      const scope = {
+        ui: {
+          view: 'history',
+          pdfLayout: 'sideBySide',
+          chatOpen: true,
+        },
+      }
 
-        {
-          layoutContext: { view: 'history' },
-          user: {
-            id: USER_ID,
-            email: USER_EMAIL,
-            isAdmin: false,
-          },
-        }
-      )
+      mountWithEditorProviders(<ChangeList />, scope, {
+        user: {
+          id: USER_ID,
+          email: USER_EMAIL,
+          isAdmin: false,
+        },
+      })
 
       waitForData()
 
@@ -673,8 +634,15 @@ describe('change list', function () {
     })
 
     it('shows owner paywall', function () {
-      mountWithEditorProviders(<ChangeList />, {
-        layoutContext: { view: 'history' },
+      const scope = {
+        ui: {
+          view: 'history',
+          pdfLayout: 'sideBySide',
+          chatOpen: true,
+        },
+      }
+
+      mountWithEditorProviders(<ChangeList />, scope, {
         user: {
           id: USER_ID,
           email: USER_EMAIL,
@@ -694,8 +662,15 @@ describe('change list', function () {
     })
 
     it('shows all labels in free tier', function () {
-      mountWithEditorProviders(<ChangeList />, {
-        layoutContext: { view: 'history' },
+      const scope = {
+        ui: {
+          view: 'history',
+          pdfLayout: 'sideBySide',
+          chatOpen: true,
+        },
+      }
+
+      mountWithEditorProviders(<ChangeList />, scope, {
         user: {
           id: USER_ID,
           email: USER_EMAIL,
@@ -709,19 +684,7 @@ describe('change list', function () {
 
       waitForData()
 
-      cy.findByRole('complementary', {
-        name: /Project history and labels/i,
-      }).within(() => {
-        cy.findByRole('group', {
-          name: 'Show all of the project history or only labelled versions.',
-        }).within(() => {
-          cy.findByText(/Labels/i).click()
-        })
-        cy.findByRole('radio', { name: /Labels/i }).should('be.checked')
-        cy.findByRole('radio', { name: /All history/i }).should(
-          'not.be.checked'
-        )
-      })
+      cy.findByLabelText(/labels/i).click({ force: true })
 
       // One pseudo-label for the current state, one for our label
       cy.get('.history-version-label').should('have.length', 2)

@@ -43,7 +43,6 @@ describe('GroupMembers', function () {
         win.metaAttributesCache.set('ol-groupName', 'My Awesome Team')
         win.metaAttributesCache.set('ol-groupSize', 10)
         win.metaAttributesCache.set('ol-users', [JOHN_DOE, BOBBY_LAPOINTE])
-        win.metaAttributesCache.set('ol-hasWriteAccess', true)
       })
 
       cy.mount(
@@ -92,8 +91,8 @@ describe('GroupMembers', function () {
         },
       })
 
-      cy.findByLabelText('Invite more members').type('someone.else@test.com')
-      cy.findByRole('button', { name: /invite/i }).click()
+      cy.get('.form-control').type('someone.else@test.com')
+      cy.get('.add-more-members-form button').click()
 
       cy.findByTestId('managed-entities-table')
         .find('tbody')
@@ -119,8 +118,8 @@ describe('GroupMembers', function () {
         },
       })
 
-      cy.findByLabelText('Invite more members').type('someone.else@test.com')
-      cy.findByRole('button', { name: /invite/i }).click()
+      cy.get('.form-control').type('someone.else@test.com')
+      cy.get('.add-more-members-form button').click()
       cy.findByRole('alert').contains('Error: User already added')
     })
 
@@ -244,7 +243,6 @@ describe('GroupMembers', function () {
         win.metaAttributesCache.set('ol-groupName', 'My Awesome Team')
         win.metaAttributesCache.set('ol-groupSize', 10)
         win.metaAttributesCache.set('ol-managedUsersActive', true)
-        win.metaAttributesCache.set('ol-hasWriteAccess', true)
       })
       mountGroupMembersProvider()
     })
@@ -297,8 +295,8 @@ describe('GroupMembers', function () {
         },
       })
 
-      cy.findByLabelText('Invite more members').type('someone.else@test.com')
-      cy.findByRole('button', { name: /invite/i }).click()
+      cy.get('.form-control').type('someone.else@test.com')
+      cy.get('.add-more-members-form button').click()
 
       cy.findByTestId('managed-entities-table')
         .find('tbody')
@@ -326,8 +324,8 @@ describe('GroupMembers', function () {
         },
       })
 
-      cy.findByLabelText('Invite more members').type('someone.else@test.com')
-      cy.findByRole('button', { name: /invite/i }).click()
+      cy.get('.form-control').type('someone.else@test.com')
+      cy.get('.add-more-members-form button').click()
       cy.findByRole('alert').contains('Error: User already added')
     })
 
@@ -516,7 +514,6 @@ describe('GroupMembers', function () {
         win.metaAttributesCache.set('ol-groupSize', 10)
         win.metaAttributesCache.set('ol-canUseFlexibleLicensing', true)
         win.metaAttributesCache.set('ol-canUseAddSeatsFeature', true)
-        win.metaAttributesCache.set('ol-hasWriteAccess', true)
       })
     })
 
@@ -535,7 +532,7 @@ describe('GroupMembers', function () {
       )
 
       cy.findByTestId('group-size-details').contains(
-        'You have allocated 2 licenses and your plan supports up to 10. Buy more licenses.'
+        'You have 2 licenses and your plan supports up to 10. Buy more licenses.'
       )
       cy.findByTestId('add-more-members-form').within(() => {
         cy.contains('Invite more members')
@@ -555,7 +552,7 @@ describe('GroupMembers', function () {
       )
 
       cy.findByTestId('group-size-details').contains(
-        'You have allocated 1 license and your plan supports up to 10. Buy more licenses.'
+        'You have 1 license and your plan supports up to 10. Buy more licenses.'
       )
     })
 
@@ -572,9 +569,7 @@ describe('GroupMembers', function () {
       )
 
       cy.findByTestId('group-size-details').within(() => {
-        cy.findByText(
-          /you have allocated \d+ license and your plan supports up to \d+/i
-        )
+        cy.findByText(/you have \d+ license and your plan supports up to \d+/i)
         cy.findByText(/buy more licenses/i).should('not.exist')
       })
     })

@@ -28,9 +28,7 @@ describe('Add affiliation widget', function () {
     renderWithProjectListContext(<AddAffiliation />)
 
     await fetchMock.callHistory.flush(true)
-    await waitFor(
-      () => expect(fetchMock.callHistory.called('/api/project')).to.be.true
-    )
+    await waitFor(() => expect(fetchMock.callHistory.called('/api/project')))
 
     await screen.findByText(/are you affiliated with an institution/i)
     const addAffiliationLink = screen.getByRole('link', {
@@ -46,9 +44,7 @@ describe('Add affiliation widget', function () {
     renderWithProjectListContext(<AddAffiliation />)
 
     await fetchMock.callHistory.flush(true)
-    await waitFor(
-      () => expect(fetchMock.callHistory.called('/api/project')).to.be.true
-    )
+    await waitFor(() => expect(fetchMock.callHistory.called('/api/project')))
 
     validateNonExistence()
   })
@@ -62,9 +58,7 @@ describe('Add affiliation widget', function () {
     })
 
     await fetchMock.callHistory.flush(true)
-    await waitFor(
-      () => expect(fetchMock.callHistory.called('/api/project')).to.be.true
-    )
+    await waitFor(() => expect(fetchMock.callHistory.called('/api/project')))
 
     validateNonExistence()
   })
@@ -76,9 +70,7 @@ describe('Add affiliation widget', function () {
     renderWithProjectListContext(<AddAffiliation />)
 
     await fetchMock.callHistory.flush(true)
-    await waitFor(
-      () => expect(fetchMock.callHistory.called('/api/project')).to.be.true
-    )
+    await waitFor(() => expect(fetchMock.callHistory.called('/api/project')))
 
     validateNonExistence()
   })

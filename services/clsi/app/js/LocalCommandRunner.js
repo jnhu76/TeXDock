@@ -11,21 +11,15 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { spawn } from 'node:child_process'
-import { promisify } from 'node:util'
-import Path from 'node:path'
-import _ from 'lodash'
-import logger from '@overleaf/logger'
 let CommandRunner
+const { spawn } = require('node:child_process')
+const { promisify } = require('node:util')
+const _ = require('lodash')
+const logger = require('@overleaf/logger')
 
 logger.debug('using standard command runner')
 
-// Track PIDs that have been intentionally killed so that the close handler
-// can detect termination even when the child exits with a numeric code instead
-// of being reported as killed by a signal (e.g. exit code 4 from latexmk).
-const killedPids = new Set()
-
-export default CommandRunner = {
+module.exports = CommandRunner = {
   run(
     projectId,
     command,
@@ -34,19 +28,14 @@ export default CommandRunner = {
     timeout,
     environment,
     compileGroup,
-    cwd,
     callback
   ) {
     let key, value
     callback = _.once(callback)
-    const spawnCwd = cwd ? Path.join(directory, cwd) : directory
     command = Array.from(command).map(arg =>
       arg.toString().replace('$COMPILE_DIR', directory)
     )
-    logger.debug(
-      { projectId, command, directory, cwd: spawnCwd },
-      'running command'
-    )
+    logger.debug({ projectId, command, directory }, 'running command')
     logger.warn('timeouts and sandboxing are not enabled with CommandRunner')
 
     // merge environment settings
@@ -62,7 +51,7 @@ export default CommandRunner = {
 
     // run command as detached process so it has its own process group (which can be killed if needed)
     const proc = spawn(command[0], command.slice(1), {
-      cwd: spawnCwd,
+      cwd: directory,
       env,
       stdio: ['pipe', 'pipe', 'ignore'],
       detached: true,
@@ -72,7 +61,6 @@ export default CommandRunner = {
     proc.stdout.setEncoding('utf8').on('data', data => (stdout += data))
 
     proc.on('error', function (err) {
-      killedPids.delete(proc.pid)
       logger.err(
         { err, projectId, command, directory },
         'error running command'
@@ -83,8 +71,8 @@ export default CommandRunner = {
     proc.on('close', function (code, signal) {
       let err
       logger.debug({ code, signal, projectId }, 'command exited')
-      const wasKilled = killedPids.delete(proc.pid)
-      if (signal === 'SIGTERM' || wasKilled) {
+      if (signal === 'SIGTERM') {
+        // signal from kill method below
         err = new Error('terminated')
         err.terminated = true
         return callback(err)
@@ -94,7 +82,7 @@ export default CommandRunner = {
         err.code = code
         return callback(err)
       } else {
-        return callback(null, { stdout, exitCode: code })
+        return callback(null, { stdout })
       }
     })
 
@@ -106,10 +94,8 @@ export default CommandRunner = {
       callback = function () {}
     }
     try {
-      killedPids.add(pid)
       process.kill(-pid) // kill all processes in group
     } catch (err) {
-      killedPids.delete(pid)
       return callback(err)
     }
     return callback()
@@ -120,7 +106,7 @@ export default CommandRunner = {
   },
 }
 
-CommandRunner.promises = {
+module.exports.promises = {
   run: promisify(CommandRunner.run),
   kill: promisify(CommandRunner.kill),
 }

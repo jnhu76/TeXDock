@@ -10,10 +10,10 @@ import {
 } from 'react'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
-import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
+import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
 import { getJSON, postJSON } from '@/infrastructure/fetch-json'
-import { debugConsole } from '@/utils/debugging'
 import { useOnlineUsersContext } from '@/features/ide-react/context/online-users-context'
+import { useEditorContext } from '@/shared/context/editor-context'
 import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
 import useEventListener from '@/shared/hooks/use-event-listener'
 import { useModalsContext } from '@/features/ide-react/context/modals-context'
@@ -49,11 +49,12 @@ export const MetadataContext = createContext<
 
 export const MetadataProvider: FC<React.PropsWithChildren> = ({ children }) => {
   const { t } = useTranslation()
-  const { eventEmitter, permissionsLevel, projectId } = useIdeReactContext()
+  const { eventEmitter, projectId } = useIdeReactContext()
   const { socket } = useConnectionContext()
   const { onlineUsersCount } = useOnlineUsersContext()
+  const { permissionsLevel } = useEditorContext()
   const permissions = usePermissionsContext()
-  const { currentDocument } = useEditorOpenDocContext()
+  const { currentDocument } = useEditorManagerContext()
   const { showGenericMessageModal } = useModalsContext()
 
   const [documents, setDocuments] = useState<DocumentsMetadata>({})
@@ -93,14 +94,14 @@ export const MetadataProvider: FC<React.PropsWithChildren> = ({ children }) => {
   }, [])
 
   const loadProjectMetaFromServer = useCallback(() => {
-    getJSON(`/project/${projectId}/metadata`)
-      .then((response: { projectMeta: DocumentsMetadata }) => {
+    getJSON(`/project/${projectId}/metadata`).then(
+      (response: { projectMeta: DocumentsMetadata }) => {
         const { projectMeta } = response
         if (projectMeta) {
           setDocuments(projectMeta)
         }
-      })
-      .catch(debugConsole.error)
+      }
+    )
   }, [projectId])
 
   const loadDocMetaFromServer = useCallback(
@@ -112,15 +113,13 @@ export const MetadataProvider: FC<React.PropsWithChildren> = ({ children }) => {
         body: {
           broadcast,
         },
+      }).then((response: DocMetadataResponse) => {
+        if (!broadcast && response) {
+          // handle the POST response like a broadcast event when there are no
+          // other users in the project.
+          onBroadcastDocMeta(response)
+        }
       })
-        .then((response: DocMetadataResponse) => {
-          if (!broadcast && response) {
-            // handle the POST response like a broadcast event when there are no
-            // other users in the project.
-            onBroadcastDocMeta(response)
-          }
-        })
-        .catch(debugConsole.error)
     },
     [onBroadcastDocMeta, onlineUsersCount, projectId]
   )

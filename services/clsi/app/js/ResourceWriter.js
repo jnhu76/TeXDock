@@ -12,25 +12,21 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { promisify } from 'node:util'
-import UrlCache from './UrlCache.js'
-import Path from 'node:path'
-import fs from 'node:fs'
-import async from 'async'
-import OutputFileFinder from './OutputFileFinder.js'
-import ResourceStateManager from './ResourceStateManager.js'
-import Metrics from '@overleaf/metrics'
-import logger from '@overleaf/logger'
-import settings from '@overleaf/settings'
-import ClsiMetrics from './Metrics.js'
-
-const { shouldSkipMetrics } = ClsiMetrics
-
 let ResourceWriter
+const { promisify } = require('node:util')
+const UrlCache = require('./UrlCache')
+const Path = require('node:path')
+const fs = require('node:fs')
+const async = require('async')
+const OutputFileFinder = require('./OutputFileFinder')
+const ResourceStateManager = require('./ResourceStateManager')
+const Metrics = require('./Metrics')
+const logger = require('@overleaf/logger')
+const settings = require('@overleaf/settings')
 
 const parallelFileDownloads = settings.parallelFileDownloads || 1
 
-export default ResourceWriter = {
+module.exports = ResourceWriter = {
   syncResourcesToDisk(request, basePath, callback) {
     if (callback == null) {
       callback = function () {}
@@ -197,7 +193,7 @@ export default ResourceWriter = {
       request.metricsOpts
     )
     const callback = function (error, ...result) {
-      if (!shouldSkipMetrics(request)) timer.done()
+      timer.done()
       return _callback(error, ...Array.from(result))
     }
 
@@ -252,7 +248,7 @@ export default ResourceWriter = {
     }
     if (
       path.match(/\.(pygtex|pygstyle)$/) ||
-      path.match(/(^|\/)_minted(-[^\/]+)?\//)
+      path.match(/(^|\/)_minted-[^\/]+\//)
     ) {
       // minted files/directory
       shouldDelete = false
@@ -378,7 +374,7 @@ export default ResourceWriter = {
   },
 }
 
-ResourceWriter.promises = {
+module.exports.promises = {
   syncResourcesToDisk: promisify(ResourceWriter.syncResourcesToDisk),
   saveIncrementalResourcesToDisk: promisify(
     ResourceWriter.saveIncrementalResourcesToDisk

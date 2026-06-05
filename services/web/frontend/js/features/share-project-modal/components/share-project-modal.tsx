@@ -9,16 +9,12 @@ import ShareProjectModalContent from './share-project-modal-content'
 import { useProjectContext } from '@/shared/context/project-context'
 import { useSplitTestContext } from '@/shared/context/split-test-context'
 import { sendMB } from '@/infrastructure/event-tracking'
+import { ProjectContextUpdateValue } from '@/shared/context/types/project-context'
 import { useEditorContext } from '@/shared/context/editor-context'
 import customLocalStorage from '@/infrastructure/local-storage'
 
-export type ProjectAccessType =
-  | 'linkSharing'
-  | 'onlyInvitedPeople'
-  | 'anyoneInXyzWithTheLink'
-  | 'anyoneWithTheLink'
-
-export type ShareProjectContextValue = {
+type ShareProjectContextValue = {
+  updateProject: (project: ProjectContextUpdateValue) => void
   monitorRequest: <T extends Promise<unknown>>(request: () => T) => T
   inFlight: boolean
   setInFlight: React.Dispatch<
@@ -27,14 +23,6 @@ export type ShareProjectContextValue = {
   error: string | undefined
   setError: React.Dispatch<
     React.SetStateAction<ShareProjectContextValue['error']>
-  >
-  successActionMessage: string | undefined
-  setSuccessActionMessage: React.Dispatch<
-    React.SetStateAction<string | undefined>
-  >
-  projectAccess: ProjectAccessType | undefined
-  setProjectAccess: React.Dispatch<
-    React.SetStateAction<ProjectAccessType | undefined>
   >
 }
 
@@ -72,28 +60,9 @@ const ShareProjectModal = React.memo(function ShareProjectModal({
   const [inFlight, setInFlight] =
     useState<ShareProjectContextValue['inFlight']>(false)
   const [error, setError] = useState<ShareProjectContextValue['error']>()
-  const [projectAccess, setProjectAccess] = useState<
-    ProjectAccessType | undefined
-  >()
-  const [successActionMessage, setSuccessActionMessage] = useState<
-    string | undefined
-  >()
 
-  const { project, projectId } = useProjectContext()
+  const project = useProjectContext()
   const { isProjectOwner } = useEditorContext()
-  const { publicAccessLevel } = project || {}
-
-  // TODO: handle initial state for projectAccess
-  useEffect(() => {
-    if (!projectAccess) {
-      if (publicAccessLevel === 'tokenBased') {
-        // consider a legacy link sharing is enabled
-        setProjectAccess('linkSharing')
-      } else {
-        setProjectAccess('onlyInvitedPeople')
-      }
-    }
-  }, [projectAccess, publicAccessLevel])
 
   const { splitTestVariants } = useSplitTestContext()
 
@@ -101,7 +70,7 @@ const ShareProjectModal = React.memo(function ShareProjectModal({
   // is over collaborator limit or has pending editors (once every 24 hours)
   useEffect(() => {
     const hasExceededCollaboratorLimit = () => {
-      if (!isProjectOwner || !project || !project.features) {
+      if (!isProjectOwner || !project.features) {
         return false
       }
 
@@ -119,7 +88,7 @@ const ShareProjectModal = React.memo(function ShareProjectModal({
     }
 
     if (hasExceededCollaboratorLimit()) {
-      const localStorageKey = `last-shown-share-modal.${projectId}`
+      const localStorageKey = `last-shown-share-modal.${project._id}`
       const lastShownShareModalTime =
         customLocalStorage.getItem(localStorageKey)
       if (
@@ -130,17 +99,17 @@ const ShareProjectModal = React.memo(function ShareProjectModal({
         customLocalStorage.setItem(localStorageKey, Date.now())
       }
     }
-  }, [project, isProjectOwner, handleOpen, projectId])
+  }, [project, isProjectOwner, handleOpen])
 
   // send tracking event when the modal is opened
   useEffect(() => {
     if (show) {
       sendMB('share-modal-opened', {
         splitTestVariant: splitTestVariants['null-test-share-modal'],
-        project_id: projectId,
+        project_id: project._id,
       })
     }
-  }, [splitTestVariants, projectId, show])
+  }, [splitTestVariants, project._id, show])
 
   // reset error when the modal is opened
   useEffect(() => {
@@ -153,14 +122,12 @@ const ShareProjectModal = React.memo(function ShareProjectModal({
   const cancel = useCallback(() => {
     if (!inFlight) {
       handleHide()
-      setSuccessActionMessage(undefined)
     }
   }, [handleHide, inFlight])
 
   // update `error` and `inFlight` while sending a request
   const monitorRequest = useCallback((request: () => any) => {
     setError(undefined)
-    setSuccessActionMessage(undefined)
     setInFlight(true)
 
     const promise = request()
@@ -180,6 +147,12 @@ const ShareProjectModal = React.memo(function ShareProjectModal({
     return promise
   }, [])
 
+  // merge the new data with the old project data
+  const updateProject = useCallback(
+    (data: ProjectContextUpdateValue) => Object.assign(project, data),
+    [project]
+  )
+
   if (!project) {
     return null
   }
@@ -187,15 +160,12 @@ const ShareProjectModal = React.memo(function ShareProjectModal({
   return (
     <ShareProjectContext.Provider
       value={{
+        updateProject,
         monitorRequest,
         inFlight,
         setInFlight,
         error,
         setError,
-        successActionMessage,
-        setSuccessActionMessage,
-        projectAccess,
-        setProjectAccess,
       }}
     >
       <ShareProjectModalContent
@@ -204,7 +174,6 @@ const ShareProjectModal = React.memo(function ShareProjectModal({
         error={error}
         inFlight={inFlight}
         show={show}
-        projectName={project.name}
       />
     </ShareProjectContext.Provider>
   )

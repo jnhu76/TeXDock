@@ -1,8 +1,8 @@
 import {
   db,
   READ_PREFERENCE_SECONDARY,
-} from '../app/src/infrastructure/mongodb.mjs'
-import UserSessionsManager from '../app/src/Features/User/UserSessionsManager.mjs'
+} from '../app/src/infrastructure/mongodb.js'
+import UserSessionsManager from '../app/src/Features/User/UserSessionsManager.js'
 import { scriptRunner } from './lib/ScriptRunner.mjs'
 
 const COMMIT = process.argv.includes('--commit')

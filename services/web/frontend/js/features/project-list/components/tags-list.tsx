@@ -8,13 +8,14 @@ import {
 import useTag from '../hooks/use-tag'
 import { sortBy } from 'lodash'
 import { Tag } from '../../../../../app/src/Features/Tags/types'
-import { DropdownItem } from '@/shared/components/dropdown/dropdown-menu'
+import { DropdownItem } from '@/features/ui/components/bootstrap-5/dropdown-menu'
 
 type TagsListProps = {
   onTagClick?: () => void
+  onEditClick?: () => void
 }
 
-function TagsList({ onTagClick }: TagsListProps) {
+function TagsList({ onTagClick, onEditClick }: TagsListProps) {
   const { t } = useTranslation()
   const { tags, untaggedProjectsCount, selectedTagId, selectTag } =
     useProjectListContext()

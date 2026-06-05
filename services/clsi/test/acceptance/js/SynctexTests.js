@@ -1,9 +1,22 @@
-import Client from './helpers/Client.js'
-import { expect } from 'chai'
-import ClsiApp from './helpers/ClsiApp.js'
+/* eslint-disable
+    no-unused-vars,
+*/
+// TODO: This file was created by bulk-decaffeinate.
+// Fix any style issues and re-enable lint.
+/*
+ * decaffeinate suggestions:
+ * DS102: Remove unnecessary code created because of implicit returns
+ * DS207: Consider shorter variations of null checks
+ * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
+ */
+const Client = require('./helpers/Client')
+const request = require('request')
+const { expect } = require('chai')
+const ClsiApp = require('./helpers/ClsiApp')
+const crypto = require('node:crypto')
 
 describe('Syncing', function () {
-  before(async function () {
+  before(function (done) {
     const content = `\
 \\documentclass{article}
 \\begin{document}
@@ -19,45 +32,67 @@ Hello world
       ],
     }
     this.project_id = Client.randomId()
-    await ClsiApp.ensureRunning()
-    this.body = await Client.compile(this.project_id, this.request)
+    return ClsiApp.ensureRunning(() => {
+      return Client.compile(
+        this.project_id,
+        this.request,
+        (error, res, body) => {
+          this.error = error
+          this.res = res
+          this.body = body
+          return done()
+        }
+      )
+    })
   })
 
   describe('from code to pdf', function () {
-    it('should return the correct location', async function () {
-      const pdfPositions = await Client.syncFromCode(
+    return it('should return the correct location', function (done) {
+      return Client.syncFromCode(
         this.project_id,
         'main.tex',
         3,
-        5
+        5,
+        (error, pdfPositions) => {
+          if (error != null) {
+            throw error
+          }
+          expect(pdfPositions).to.deep.equal({
+            pdf: [
+              {
+                page: 1,
+                h: 133.768356,
+                v: 134.764618,
+                height: 6.918498,
+                width: 343.71106,
+              },
+            ],
+            downloadedFromCache: false,
+          })
+          return done()
+        }
       )
-      expect(pdfPositions).to.deep.equal({
-        pdf: [
-          {
-            page: 1,
-            h: 133.768356,
-            v: 134.764618,
-            height: 6.918498,
-            width: 343.71106,
-          },
-        ],
-        downloadedFromCache: false,
-      })
     })
   })
 
   describe('from pdf to code', function () {
-    it('should return the correct location', async function () {
-      const codePositions = await Client.syncFromPdf(
+    return it('should return the correct location', function (done) {
+      return Client.syncFromPdf(
         this.project_id,
         1,
         100,
-        200
+        200,
+        (error, codePositions) => {
+          if (error != null) {
+            throw error
+          }
+          expect(codePositions).to.deep.equal({
+            code: [{ file: 'main.tex', line: 3, column: -1 }],
+            downloadedFromCache: false,
+          })
+          return done()
+        }
       )
-      expect(codePositions).to.deep.equal({
-        code: [{ file: 'main.tex', line: 3, column: -1 }],
-        downloadedFromCache: false,
-      })
     })
   })
 
@@ -66,29 +101,39 @@ Hello world
       this.other_project_id = Client.randomId()
     })
     describe('from code to pdf', function () {
-      it('should return a 404 response', async function () {
-        const rejects = () =>
-          expect(Client.syncFromCode(this.other_project_id, 'main.tex', 3, 5))
-            .to.eventually.be.rejected
-
-        await rejects().and.have.property('info').to.contain({ status: 404 })
-        await rejects().and.have.property('body', 'Not Found')
+      it('should return a 404 response', function (done) {
+        return Client.syncFromCode(
+          this.other_project_id,
+          'main.tex',
+          3,
+          5,
+          (error, body) => {
+            expect(String(error)).to.include('statusCode=404')
+            expect(body).to.equal('Not Found')
+            return done()
+          }
+        )
       })
     })
     describe('from pdf to code', function () {
-      it('should return a 404 response', async function () {
-        const rejects = () =>
-          expect(Client.syncFromPdf(this.other_project_id, 1, 100, 200)).to
-            .eventually.be.rejected
-
-        await rejects().and.have.property('info').to.contain({ status: 404 })
-        await rejects().and.have.property('body', 'Not Found')
+      it('should return a 404 response', function (done) {
+        return Client.syncFromPdf(
+          this.other_project_id,
+          1,
+          100,
+          200,
+          (error, body) => {
+            expect(String(error)).to.include('statusCode=404')
+            expect(body).to.equal('Not Found')
+            return done()
+          }
+        )
       })
     })
   })
 
   describe('when the synctex file is not available', function () {
-    before(async function () {
+    before(function (done) {
       this.broken_project_id = Client.randomId()
       const content = 'this is not valid tex' // not a valid tex file
       this.request = {
@@ -99,27 +144,46 @@ Hello world
           },
         ],
       }
-      this.body = await Client.compile(this.broken_project_id, this.request)
+      Client.compile(
+        this.broken_project_id,
+        this.request,
+        (error, res, body) => {
+          this.error = error
+          this.res = res
+          this.body = body
+          return done()
+        }
+      )
     })
 
     describe('from code to pdf', function () {
-      it('should return a 404 response', async function () {
-        const rejects = () =>
-          expect(Client.syncFromCode(this.broken_project_id, 'main.tex', 3, 5))
-            .to.eventually.be.rejected
-
-        await rejects().and.have.property('info').to.contain({ status: 404 })
-        await rejects().and.have.property('body', 'Not Found')
+      it('should return a 404 response', function (done) {
+        return Client.syncFromCode(
+          this.broken_project_id,
+          'main.tex',
+          3,
+          5,
+          (error, body) => {
+            expect(String(error)).to.include('statusCode=404')
+            expect(body).to.equal('Not Found')
+            return done()
+          }
+        )
       })
     })
     describe('from pdf to code', function () {
-      it('should return a 404 response', async function () {
-        const rejects = () =>
-          expect(Client.syncFromPdf(this.broken_project_id, 1, 100, 200)).to
-            .eventually.be.rejected
-
-        await rejects().and.have.property('info').to.contain({ status: 404 })
-        await rejects().and.have.property('body', 'Not Found')
+      it('should return a 404 response', function (done) {
+        return Client.syncFromPdf(
+          this.broken_project_id,
+          1,
+          100,
+          200,
+          (error, body) => {
+            expect(String(error)).to.include('statusCode=404')
+            expect(body).to.equal('Not Found')
+            return done()
+          }
+        )
       })
     })
   })

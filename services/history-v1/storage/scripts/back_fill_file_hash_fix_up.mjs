@@ -9,12 +9,15 @@ import { Blob } from 'overleaf-editor-core'
 import {
   BlobStore,
   getStringLengthOfFile,
+  GLOBAL_BLOBS,
   makeBlobForFile,
 } from '../lib/blob_store/index.js'
 import { db } from '../lib/mongodb.js'
 import commandLineArgs from 'command-line-args'
 import readline from 'node:readline'
+import { _blobIsBackedUp, backupBlob } from '../lib/backupBlob.mjs'
 import { NotFoundError } from '@overleaf/object-persistor/src/Errors.js'
+import filestorePersistor from '../lib/persistor.js'
 import { setTimeout } from 'node:timers/promises'
 
 // Silence warning.
@@ -49,11 +52,12 @@ ObjectId.cacheHexString = true
  */
 
 /**
- * @return {{FIX_NOT_FOUND: boolean, FIX_HASH_MISMATCH: boolean, FIX_MISSING_HASH: boolean, LOGS: string}}
+ * @return {{FIX_NOT_FOUND: boolean, FIX_HASH_MISMATCH: boolean, FIX_DELETE_PERMISSION: boolean, FIX_MISSING_HASH: boolean, LOGS: string}}
  */
 function parseArgs() {
   const args = commandLineArgs([
     { name: 'fixNotFound', type: String, defaultValue: 'true' },
+    { name: 'fixDeletePermission', type: String, defaultValue: 'true' },
     { name: 'fixHashMismatch', type: String, defaultValue: 'true' },
     { name: 'fixMissingHash', type: String, defaultValue: 'true' },
     { name: 'logs', type: String, defaultValue: '' },
@@ -70,13 +74,20 @@ function parseArgs() {
   }
   return {
     FIX_HASH_MISMATCH: boolVal('fixNotFound'),
+    FIX_DELETE_PERMISSION: boolVal('fixDeletePermission'),
     FIX_NOT_FOUND: boolVal('fixHashMismatch'),
     FIX_MISSING_HASH: boolVal('fixMissingHash'),
     LOGS: args.logs,
   }
 }
 
-const { FIX_HASH_MISMATCH, FIX_NOT_FOUND, FIX_MISSING_HASH, LOGS } = parseArgs()
+const {
+  FIX_HASH_MISMATCH,
+  FIX_DELETE_PERMISSION,
+  FIX_NOT_FOUND,
+  FIX_MISSING_HASH,
+  LOGS,
+} = parseArgs()
 if (!LOGS) {
   throw new Error('--logs parameter missing')
 }
@@ -93,37 +104,6 @@ const STREAM_HIGH_WATER_MARK = parseInt(
   10
 )
 const SLEEP_BEFORE_EXIT = parseInt(process.env.SLEEP_BEFORE_EXIT || '1000', 10)
-
-// Filestore endpoint location
-const FILESTORE_HOST = process.env.FILESTORE_HOST || '127.0.0.1'
-const FILESTORE_PORT = process.env.FILESTORE_PORT || '3009'
-
-async function fetchFromFilestore(projectId, fileId) {
-  const url = `http://${FILESTORE_HOST}:${FILESTORE_PORT}/project/${projectId}/file/${fileId}`
-  const response = await fetch(url)
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new NotFoundError('file not found in filestore', {
-        status: response.status,
-      })
-    }
-    const body = await response.text()
-    throw new OError('fetchFromFilestore failed', {
-      projectId,
-      fileId,
-      status: response.status,
-      body,
-    })
-  }
-  if (!response.body) {
-    throw new OError('fetchFromFilestore response has no body', {
-      projectId,
-      fileId,
-      status: response.status,
-    })
-  }
-  return response.body
-}
 
 /** @type {ProjectsCollection} */
 const projectsCollection = db.collection('projects')
@@ -322,16 +302,19 @@ async function setHashInMongo(projectId, fileId, hash) {
  * @return {Promise<void>}
  */
 async function importRestoredFilestoreFile(projectId, fileId, historyId) {
+  const filestoreKey = `${projectId}/${fileId}`
   const path = `${BUFFER_DIR}/${projectId}_${fileId}`
   try {
     let s
     try {
-      s = await fetchFromFilestore(projectId, fileId)
+      s = await filestorePersistor.getObjectStream(
+        USER_FILES_BUCKET_NAME,
+        filestoreKey
+      )
     } catch (err) {
       if (err instanceof NotFoundError) {
         throw new OError('missing blob, need to restore filestore file', {
-          projectId,
-          fileId,
+          filestoreKey,
         })
       }
       throw err
@@ -342,6 +325,7 @@ async function importRestoredFilestoreFile(projectId, fileId, historyId) {
     )
     const blobStore = new BlobStore(historyId)
     const blob = await blobStore.putFile(path)
+    await backupBlob(historyId, blob, path)
     await setHashInMongo(projectId, fileId, blob.getHash())
   } finally {
     await fs.promises.rm(path, { force: true })
@@ -355,9 +339,13 @@ async function importRestoredFilestoreFile(projectId, fileId, historyId) {
  * @return {Promise<Blob>}
  */
 async function bufferFilestoreFileToDisk(projectId, fileId, path) {
+  const filestoreKey = `${projectId}/${fileId}`
   try {
     await Stream.promises.pipeline(
-      await fetchFromFilestore(projectId, fileId),
+      await filestorePersistor.getObjectStream(
+        USER_FILES_BUCKET_NAME,
+        filestoreKey
+      ),
       fs.createWriteStream(path, { highWaterMark: STREAM_HIGH_WATER_MARK })
     )
     const blob = await makeBlobForFile(path)
@@ -368,8 +356,7 @@ async function bufferFilestoreFileToDisk(projectId, fileId, path) {
   } catch (err) {
     if (err instanceof NotFoundError) {
       throw new OError('missing blob, need to restore filestore file', {
-        projectId,
-        fileId,
+        filestoreKey,
       })
     }
     throw err
@@ -402,7 +389,7 @@ async function uploadFilestoreFile(projectId, fileId) {
     const blob = await bufferFilestoreFileToDisk(projectId, fileId, path)
     const hash = blob.getHash()
     try {
-      await ensureBlobExistsForFile(projectId, fileId, hash)
+      await ensureBlobExistsForFileAndUploadToAWS(projectId, fileId, hash)
     } catch (err) {
       if (!(err instanceof Blob.NotFoundError)) throw err
 
@@ -410,7 +397,7 @@ async function uploadFilestoreFile(projectId, fileId) {
       const historyId = project.overleaf.history.id.toString()
       const blobStore = new BlobStore(historyId)
       await blobStore.putBlob(path, blob)
-      await ensureBlobExistsForFile(projectId, fileId, hash)
+      await ensureBlobExistsForFileAndUploadToAWS(projectId, fileId, hash)
     }
   } finally {
     await fs.promises.rm(path, { force: true })
@@ -439,7 +426,11 @@ async function fixHashMismatch(line) {
     await importRestoredFilestoreFile(projectId, fileId, historyId)
     return true
   }
-  return await ensureBlobExistsForFile(projectId, fileId, computedHash)
+  return await ensureBlobExistsForFileAndUploadToAWS(
+    projectId,
+    fileId,
+    computedHash
+  )
 }
 
 /**
@@ -455,17 +446,28 @@ async function hashAlreadyUpdatedInFileTree(projectId, fileId, hash) {
 
 /**
  * @param {string} projectId
+ * @param {string} hash
+ * @return {Promise<boolean>}
+ */
+async function needsBackingUpToAWS(projectId, hash) {
+  if (GLOBAL_BLOBS.has(hash)) return false
+  return !(await _blobIsBackedUp(projectId, hash))
+}
+
+/**
+ * @param {string} projectId
  * @param {string} fileId
  * @param {string} hash
  * @return {Promise<boolean>}
  */
-async function ensureBlobExistsForFile(projectId, fileId, hash) {
+async function ensureBlobExistsForFileAndUploadToAWS(projectId, fileId, hash) {
   const { project } = await getProject(projectId)
   const historyId = project.overleaf.history.id.toString()
   const blobStore = new BlobStore(historyId)
   if (
     (await hashAlreadyUpdatedInFileTree(projectId, fileId, hash)) &&
-    (await blobStore.getBlob(hash))
+    (await blobStore.getBlob(hash)) &&
+    !(await needsBackingUpToAWS(projectId, hash))
   ) {
     return false // already processed
   }
@@ -486,7 +488,7 @@ async function ensureBlobExistsForFile(projectId, fileId, hash) {
     )
     if (writtenBlob.getHash() !== hash) {
       // Double check download, better safe than sorry.
-      throw new OError('blob corrupted', { writtenBlob, hash })
+      throw new OError('blob corrupted', { writtenBlob })
     }
 
     let blob = await blobStore.getBlob(hash)
@@ -495,11 +497,22 @@ async function ensureBlobExistsForFile(projectId, fileId, hash) {
       // HACK: Skip upload to GCS and finalize putBlob operation directly.
       await blobStore.backend.insertBlob(historyId, writtenBlob)
     }
+    await backupBlob(historyId, writtenBlob, path)
   } finally {
     await fs.promises.rm(path, { force: true })
   }
   await setHashInMongo(projectId, fileId, hash)
   return true
+}
+
+/**
+ * @param {string} line
+ * @return {Promise<boolean>}
+ */
+async function fixDeletePermission(line) {
+  let { projectId, fileId, hash } = JSON.parse(line)
+  if (!hash) hash = await computeFilestoreFileHash(projectId, fileId)
+  return await ensureBlobExistsForFileAndUploadToAWS(projectId, fileId, hash)
 }
 
 /**
@@ -513,7 +526,7 @@ async function fixMissingHash(line) {
   } = await findFile(projectId, fileId)
   if (hash) {
     // processed, double check
-    return await ensureBlobExistsForFile(projectId, fileId, hash)
+    return await ensureBlobExistsForFileAndUploadToAWS(projectId, fileId, hash)
   }
   await uploadFilestoreFile(projectId, fileId)
   return true
@@ -529,6 +542,11 @@ const CASES = {
     match: 'OError: hash mismatch',
     flag: FIX_HASH_MISMATCH,
     action: fixHashMismatch,
+  },
+  'delete permission': {
+    match: 'storage.objects.delete',
+    flag: FIX_DELETE_PERMISSION,
+    action: fixDeletePermission,
   },
   'missing file hash': {
     match: '"bad file hash"',

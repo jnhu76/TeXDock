@@ -14,7 +14,7 @@ describe('<UpgradeSubscription />', function () {
     this.preview = {
       change: {
         type: 'group-plan-upgrade',
-        prevPlan: { name: 'Standard group' },
+        prevPlan: { name: 'Overleaf Standard Group' },
       },
       currency: 'USD',
       immediateCharge: {
@@ -27,7 +27,7 @@ describe('<UpgradeSubscription />', function () {
       nextPlan: { annual: true },
       nextInvoice: {
         date: '2025-11-05T11:35:32.000Z',
-        plan: { name: 'Pro group', amount: 0 },
+        plan: { name: 'Overleaf Professional Group', amount: 0 },
         addOns: [
           {
             code: 'additional-license',

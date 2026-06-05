@@ -1,6 +1,6 @@
-import logger from '@overleaf/logger'
+const logger = require('@overleaf/logger')
 
-export default {
+module.exports = {
   startDrainTimeWindow(io, minsToDrain, callback) {
     const drainPerMin = io.sockets.clients().length / minsToDrain
     // enforce minimum drain rate

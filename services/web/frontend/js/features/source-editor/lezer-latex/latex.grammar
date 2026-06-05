@@ -58,7 +58,6 @@
     VerbCtrlSeq,
     LstInlineCtrlSeq,
     IncludeGraphicsCtrlSeq,
-    IncludeSvgCtrlSeq,
     CaptionCtrlSeq,
     DefCtrlSeq,
     LetCtrlSeq,
@@ -79,7 +78,6 @@
     SubParagraphCtrlSeq,
     InputCtrlSeq,
     IncludeCtrlSeq,
-    SubfileCtrlSeq,
     ItemCtrlSeq,
     NewTheoremCtrlSeq,
     TheoremStyleCtrlSeq,
@@ -298,10 +296,6 @@ KnownCommand<ArgumentType> {
         IncludeGraphicsCtrlSeq optionalWhitespace? OptionalArgument?
         IncludeGraphicsArgument { FilePathArgument }
     } |
-    IncludeSvg {
-        IncludeSvgCtrlSeq optionalWhitespace? OptionalArgument?
-        IncludeSvgArgument { FilePathArgument }
-    } |
     Caption {
         CaptionCtrlSeq "*"? optionalWhitespace? OptionalArgument? TextArgument
     } |
@@ -355,9 +349,6 @@ KnownCommand<ArgumentType> {
     } |
     Include {
         IncludeCtrlSeq IncludeArgument { FilePathArgument }
-    } |
-    Subfile {
-        SubfileCtrlSeq SubfileArgument { FilePathArgument }
     } |
     Centering {
         CenteringCtrlSeq

@@ -2,7 +2,7 @@ import moment from 'moment'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { User } from '../../../../../types/group-management/user'
-import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
+import OLFormCheckbox from '@/features/ui/components/ol/ol-form-checkbox'
 import MaterialIcon from '@/shared/components/material-icon'
 
 type GroupMemberRowProps = {
@@ -10,7 +10,6 @@ type GroupMemberRowProps = {
   selectUser: (user: User) => void
   unselectUser: (user: User) => void
   selected: boolean
-  hasWriteAccess: boolean
 }
 
 export default function UserRow({
@@ -18,7 +17,6 @@ export default function UserRow({
   selectUser,
   unselectUser,
   selected,
-  hasWriteAccess,
 }: GroupMemberRowProps) {
   const { t } = useTranslation()
 
@@ -36,15 +34,13 @@ export default function UserRow({
   return (
     <tr key={`user-${user.email}`} className="managed-entity-row">
       <td className="cell-checkbox">
-        {hasWriteAccess && (
-          <OLFormCheckbox
-            autoComplete="off"
-            checked={selected}
-            onChange={e => handleSelectUser(e, user)}
-            aria-label={t('select_user')}
-            data-testid="select-single-checkbox"
-          />
-        )}
+        <OLFormCheckbox
+          autoComplete="off"
+          checked={selected}
+          onChange={e => handleSelectUser(e, user)}
+          aria-label={t('select_user')}
+          data-testid="select-single-checkbox"
+        />
       </td>
       <td>{user.email}</td>
       <td className="cell-name">

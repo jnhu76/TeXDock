@@ -1,28 +1,18 @@
 import PasswordResetHandler from './PasswordResetHandler.mjs'
-import AuthenticationController from '../Authentication/AuthenticationController.mjs'
-import AuthenticationManager from '../Authentication/AuthenticationManager.mjs'
-import SessionManager from '../Authentication/SessionManager.mjs'
-import UserGetter from '../User/UserGetter.mjs'
-import UserUpdater from '../User/UserUpdater.mjs'
-import UserSessionsManager from '../User/UserSessionsManager.mjs'
+import AuthenticationController from '../Authentication/AuthenticationController.js'
+import AuthenticationManager from '../Authentication/AuthenticationManager.js'
+import SessionManager from '../Authentication/SessionManager.js'
+import UserGetter from '../User/UserGetter.js'
+import UserUpdater from '../User/UserUpdater.js'
+import UserSessionsManager from '../User/UserSessionsManager.js'
 import OError from '@overleaf/o-error'
-import EmailsHelper from '../Helpers/EmailHelper.mjs'
+import EmailsHelper from '../Helpers/EmailHelper.js'
 import { expressify } from '@overleaf/promise-utils'
-import { z, parseReq } from '../../infrastructure/Validation.mjs'
-import Features from '../../infrastructure/Features.mjs'
-
-const setNewUserPasswordSchema = z.object({
-  body: z.object({
-    email: z.string().optional(),
-    password: z.string(),
-    passwordResetToken: z.string(),
-  }),
-})
+import SplitTestHandler from '../SplitTests/SplitTestHandler.js'
 
 async function setNewUserPassword(req, res, next) {
   let user
-  const { body } = parseReq(req, setNewUserPasswordSchema)
-  let { passwordResetToken, password, email } = body
+  let { passwordResetToken, password, email } = req.body
   if (!passwordResetToken || !password) {
     return res.status(400).json({
       message: {
@@ -113,15 +103,8 @@ async function setNewUserPassword(req, res, next) {
   AuthenticationController.finishLogin(user, req, res, next)
 }
 
-const requestResetSchema = z.object({
-  body: z.object({
-    email: z.string(),
-  }),
-})
-
 async function requestReset(req, res, next) {
-  const { body } = parseReq(req, requestResetSchema)
-  const email = EmailsHelper.parseEmail(body.email)
+  const email = EmailsHelper.parseEmail(req.body.email)
   if (!email) {
     return res.status(400).json({
       message: req.i18n.translate('must_be_email_address'),
@@ -136,11 +119,7 @@ async function requestReset(req, res, next) {
     OError.tag(err, 'failed to generate and email password reset token', {
       email,
     })
-
-    if (
-      err.message ===
-      'user does not have one or more permissions within change-password'
-    ) {
+    if (err.message === 'user does not have permission for change-password') {
       return res.status(403).json({
         message: {
           key: 'no-password-allowed-due-to-sso',
@@ -165,38 +144,39 @@ async function requestReset(req, res, next) {
   }
 }
 
-const renderSetPasswordFormSchema = z.object({
-  query: z.object({
-    email: z.string(),
-    passwordResetToken: z.string().optional(),
-  }),
-})
-
 async function renderSetPasswordForm(req, res, next) {
-  const { query } = parseReq(req, renderSetPasswordFormSchema)
+  const { variant } = await SplitTestHandler.promises.getAssignment(
+    req,
+    res,
+    'bs5-auth-pages'
+  )
 
-  if (query.passwordResetToken != null) {
+  if (req.query.passwordResetToken != null) {
     try {
       const result =
         await PasswordResetHandler.promises.getUserForPasswordResetToken(
-          query.passwordResetToken
+          req.query.passwordResetToken
         )
 
       const { user, remainingPeeks } = result || {}
       if (!user || remainingPeeks <= 0) {
         return res.redirect('/user/password/reset?error=token_expired')
       }
-      req.session.resetToken = query.passwordResetToken
+      req.session.resetToken = req.query.passwordResetToken
+      if (variant === 'enabled') {
+        req.session.setPasswordBS5 = true
+      }
 
-      const params = new URLSearchParams()
-      if (typeof query.email === 'string') {
-        const email = EmailsHelper.parseEmail(query.email)
+      let emailQuery = ''
+
+      if (typeof req.query.email === 'string') {
+        const email = EmailsHelper.parseEmail(req.query.email)
         if (email) {
-          params.append('email', email)
+          emailQuery = `?email=${encodeURIComponent(email)}`
         }
       }
-      const queryString = params.toString() ? `?${params.toString()}` : ''
-      return res.redirect('/user/password/set' + queryString)
+
+      return res.redirect('/user/password/set' + emailQuery)
     } catch (err) {
       if (err.name === 'ForbiddenError') {
         return next(err)
@@ -209,45 +189,44 @@ async function renderSetPasswordForm(req, res, next) {
     return res.redirect('/user/password/reset')
   }
 
-  const email = EmailsHelper.parseEmail(query.email)
+  const email = EmailsHelper.parseEmail(req.query.email)
 
   // clean up to avoid leaking the token in the session object
   const passwordResetToken = req.session.resetToken
   delete req.session.resetToken
 
-  res.render(
-    Features.hasFeature('saas') ? 'user/setPasswordCiam' : 'user/setPassword',
-    {
-      title: 'set_password',
-      email,
-      passwordResetToken,
-    }
-  )
+  const template = req.session.setPasswordBS5
+    ? 'user/setPassword-bs5'
+    : 'user/setPassword'
+
+  delete req.session.setPasswordBS5
+
+  res.render(template, {
+    title: 'set_password',
+    email,
+    passwordResetToken,
+  })
 }
 
-const renderRequestResetFormSchema = z.object({
-  query: z.object({
-    error: z.string().optional(),
-  }),
-})
-
 async function renderRequestResetForm(req, res) {
-  const { query } = parseReq(req, renderRequestResetFormSchema)
-  const errorQuery = query.error
+  const errorQuery = req.query.error
   let error = null
   if (errorQuery === 'token_expired') {
     error = 'password_reset_token_expired'
   }
-
-  res.render(
-    Features.hasFeature('saas')
-      ? 'user/passwordResetCiam'
-      : 'user/passwordReset',
-    {
-      title: 'reset_password',
-      error,
-    }
+  const { variant } = await SplitTestHandler.promises.getAssignment(
+    req,
+    res,
+    'bs5-auth-pages'
   )
+
+  const template =
+    variant === 'enabled' ? 'user/passwordReset-bs5' : 'user/passwordReset'
+
+  res.render(template, {
+    title: 'reset_password',
+    error,
+  })
 }
 
 export default {

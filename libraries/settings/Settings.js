@@ -45,7 +45,7 @@ if (!settingsExist) {
   console.warn("No settings or defaults found. I'm flying blind.")
 }
 
-module.exports = /** @type {any} */ (settings)
+module.exports = settings
 
 function pathIfExists(path) {
   if (path && fs.existsSync(path)) {

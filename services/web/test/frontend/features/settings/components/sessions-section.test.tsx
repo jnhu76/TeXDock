@@ -8,7 +8,7 @@ describe('<SessionsSection />', function () {
     render(<SessionsSection />)
 
     const link = screen.getByRole('link', {
-      name: 'Manage sessions',
+      name: 'Manage Your Sessions',
     })
 
     expect(link.getAttribute('href')).to.equal('/user/sessions')

@@ -1,18 +1,26 @@
+// TODO: This file was created by bulk-decaffeinate.
+// Fix any style issues and re-enable lint.
+/*
+ * decaffeinate suggestions:
+ * DS101: Remove unnecessary use of Array.from
+ * DS102: Remove unnecessary code created because of implicit returns
+ * DS207: Consider shorter variations of null checks
+ * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
+ */
 const sinon = require('sinon')
-const { setTimeout } = require('node:timers/promises')
+const async = require('async')
 
 const MockWebApi = require('./helpers/MockWebApi')
 const DocUpdaterClient = require('./helpers/DocUpdaterClient')
 const DocUpdaterApp = require('./helpers/DocUpdaterApp')
 
 describe('Flushing a project', function () {
-  before(async function () {
+  before(function (done) {
+    let docId0, docId1
     this.project_id = DocUpdaterClient.randomId()
-    const docId0 = DocUpdaterClient.randomId()
-    const docId1 = DocUpdaterClient.randomId()
     this.docs = [
       {
-        id: docId0,
+        id: (docId0 = DocUpdaterClient.randomId()),
         lines: ['one', 'two', 'three'],
         update: {
           doc: docId0,
@@ -27,7 +35,7 @@ describe('Flushing a project', function () {
         updatedLines: ['one', 'one and a half', 'two', 'three'],
       },
       {
-        id: docId1,
+        id: (docId1 = DocUpdaterClient.randomId()),
         lines: ['four', 'five', 'six'],
         update: {
           doc: docId1,
@@ -42,51 +50,92 @@ describe('Flushing a project', function () {
         updatedLines: ['four', 'four and a half', 'five', 'six'],
       },
     ]
-    for (const doc of this.docs) {
+    for (const doc of Array.from(this.docs)) {
       MockWebApi.insertDoc(this.project_id, doc.id, {
         lines: doc.lines,
         version: doc.update.v,
       })
     }
-    await DocUpdaterApp.ensureRunning()
+    return DocUpdaterApp.ensureRunning(done)
   })
 
-  describe('with documents which have been updated', function () {
-    before(async function () {
+  return describe('with documents which have been updated', function () {
+    before(function (done) {
       sinon.spy(MockWebApi, 'setDocument')
-      for (const doc of this.docs) {
-        await DocUpdaterClient.preloadDoc(this.project_id, doc.id)
-        await DocUpdaterClient.sendUpdate(this.project_id, doc.id, doc.update)
-      }
-      await setTimeout(200)
-      const res = await DocUpdaterClient.flushProject(this.project_id)
-      this.statusCode = res.status
+
+      return async.series(
+        this.docs.map(doc => {
+          return callback => {
+            return DocUpdaterClient.preloadDoc(
+              this.project_id,
+              doc.id,
+              error => {
+                if (error != null) {
+                  return callback(error)
+                }
+                return DocUpdaterClient.sendUpdate(
+                  this.project_id,
+                  doc.id,
+                  doc.update,
+                  error => {
+                    return callback(error)
+                  }
+                )
+              }
+            )
+          }
+        }),
+        error => {
+          if (error != null) {
+            throw error
+          }
+          return setTimeout(() => {
+            return DocUpdaterClient.flushProject(
+              this.project_id,
+              (error, res, body) => {
+                if (error) return done(error)
+                this.statusCode = res.statusCode
+                return done()
+              }
+            )
+          }, 200)
+        }
+      )
     })
 
     after(function () {
-      MockWebApi.setDocument.restore()
+      return MockWebApi.setDocument.restore()
     })
 
     it('should return a 204 status code', function () {
-      this.statusCode.should.equal(204)
+      return this.statusCode.should.equal(204)
     })
 
     it('should send each document to the web api', function () {
-      for (const doc of this.docs) {
+      return Array.from(this.docs).map(doc =>
         MockWebApi.setDocument
           .calledWith(this.project_id, doc.id, doc.updatedLines)
           .should.equal(true)
-      }
+      )
     })
 
-    it('should update the lines in the doc updater', async function () {
-      for (const doc of this.docs) {
-        const returnedDoc = await DocUpdaterClient.getDoc(
-          this.project_id,
-          doc.id
-        )
-        returnedDoc.lines.should.deep.equal(doc.updatedLines)
-      }
+    return it('should update the lines in the doc updater', function (done) {
+      return async.series(
+        this.docs.map(doc => {
+          return callback => {
+            return DocUpdaterClient.getDoc(
+              this.project_id,
+              doc.id,
+              (error, res, returnedDoc) => {
+                if (error) return done(error)
+                returnedDoc.lines.should.deep.equal(doc.updatedLines)
+                return callback()
+              }
+            )
+          }
+        }),
+        done
+      )
     })
   })
 })

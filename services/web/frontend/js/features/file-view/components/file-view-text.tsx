@@ -3,6 +3,7 @@ import { useProjectContext } from '../../../shared/context/project-context'
 import { debugConsole } from '@/utils/debugging'
 import useAbortController from '../../../shared/hooks/use-abort-controller'
 import { BinaryFile } from '@/features/file-view/types/binary-file'
+import { fileUrl } from '../../utils/fileUrl'
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
@@ -15,7 +16,7 @@ export default function FileViewText({
   onLoad: () => void
   onError: () => void
 }) {
-  const { projectId } = useProjectContext()
+  const { _id: projectId } = useProjectContext()
 
   const [textPreview, setTextPreview] = useState('')
   const [shouldShowDots, setShouldShowDots] = useState(false)
@@ -28,7 +29,7 @@ export default function FileViewText({
     if (inFlight) {
       return
     }
-    const path = `/project/${projectId}/blob/${file.hash}`
+    const path = fileUrl(projectId, file.id, file.hash)
     const fetchContentLengthTimeout = setTimeout(
       () => fetchContentLengthController.abort(),
       10000

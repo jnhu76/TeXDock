@@ -24,14 +24,10 @@ export const StubSnapshotUtils = {
       throw new Error('not implemented')
     }
   },
-  // unused vars kept to document the interface
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   buildFileTree(snapshot: Snapshot): Folder {
     throw new Error('not implemented')
   },
-  // unused vars kept to document the interface
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  createFolder(id: string, name: string): Folder {
+  createFolder(_id: string, name: string): Folder {
     throw new Error('not implemented')
   },
 }
@@ -55,7 +51,7 @@ export const SnapshotContext = createContext<
 >(undefined)
 
 export const SnapshotProvider: FC<React.PropsWithChildren> = ({ children }) => {
-  const { projectId } = useProjectContext()
+  const { _id: projectId } = useProjectContext()
   const [snapshotLoadingState, setSnapshotLoadingState] =
     useState<SnapshotLoadingState>('')
   const [snapshotUpdater] = useState(() => new SnapshotUpdater(projectId))

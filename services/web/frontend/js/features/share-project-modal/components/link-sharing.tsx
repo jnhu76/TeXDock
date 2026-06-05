@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShareProjectContext } from './share-project-modal'
-import { setPublicAccessLevel } from '../utils/api'
+import { setProjectAccessLevel } from '../utils/api'
 import { CopyToClipboard } from '@/shared/components/copy-to-clipboard'
 import { useProjectContext } from '@/shared/context/project-context'
 import * as eventTracking from '../../../infrastructure/event-tracking'
@@ -11,12 +11,11 @@ import { getJSON } from '../../../infrastructure/fetch-json'
 import useAbortController from '@/shared/hooks/use-abort-controller'
 import { debugConsole } from '@/utils/debugging'
 import getMeta from '@/utils/meta'
-import OLRow from '@/shared/components/ol/ol-row'
-import OLCol from '@/shared/components/ol/ol-col'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import OLRow from '@/features/ui/components/ol/ol-row'
+import OLCol from '@/features/ui/components/ol/ol-col'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
 import MaterialIcon from '@/shared/components/material-icon'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
 
 type Tokens = {
   readAndWrite: string
@@ -29,16 +28,12 @@ type Tokens = {
 type AccessLevel = 'private' | 'tokenBased' | 'readAndWrite' | 'readOnly'
 
 export default function LinkSharing() {
-  const isSharingUpdatesEnabled = useFeatureFlag('sharing-updates')
   const [inflight, setInflight] = useState(false)
   const [showLinks, setShowLinks] = useState(true)
-  const linkSharingEnabled =
-    getMeta('ol-capabilities')?.includes('link-sharing')
 
-  const { monitorRequest, projectAccess } = useShareProjectContext()
+  const { monitorRequest } = useShareProjectContext()
 
-  const { projectId, project } = useProjectContext()
-  const { publicAccessLevel } = project || {}
+  const { _id: projectId, publicAccessLevel } = useProjectContext()
 
   // set the access level of a project
   const setAccessLevel = useCallback(
@@ -48,7 +43,7 @@ export default function LinkSharing() {
         project_id: projectId,
       })
       monitorRequest(() =>
-        setPublicAccessLevel(projectId, newPublicAccessLevel)
+        setProjectAccessLevel(projectId, newPublicAccessLevel)
       )
         .then(() => {
           // NOTE: not calling `updateProject` here as it receives data via
@@ -61,17 +56,6 @@ export default function LinkSharing() {
     },
     [monitorRequest, projectId]
   )
-
-  if (!linkSharingEnabled) {
-    return null
-  }
-
-  if (isSharingUpdatesEnabled) {
-    if (projectAccess === 'linkSharing') {
-      return <ReadAndWriteTokenLinks />
-    }
-    return null
-  }
 
   switch (publicAccessLevel) {
     // Private (with token-access available)
@@ -149,20 +133,6 @@ function PrivateSharing({
   )
 }
 
-function useProjectTokens() {
-  const { projectId } = useProjectContext()
-  const [tokens, setTokens] = useState<Tokens | null>(null)
-  const { signal } = useAbortController()
-
-  useEffect(() => {
-    getJSON(`/project/${projectId}/tokens`, { signal })
-      .then(data => setTokens(data))
-      .catch(debugConsole.error)
-  }, [projectId, signal])
-
-  return tokens
-}
-
 function TokenBasedSharing({
   setAccessLevel,
   inflight,
@@ -175,7 +145,17 @@ function TokenBasedSharing({
   showLinks: boolean
 }) {
   const { t } = useTranslation()
-  const tokens = useProjectTokens()
+  const { _id: projectId } = useProjectContext()
+
+  const [tokens, setTokens] = useState<Tokens | null>(null)
+
+  const { signal } = useAbortController()
+
+  useEffect(() => {
+    getJSON(`/project/${projectId}/tokens`, { signal })
+      .then(data => setTokens(data))
+      .catch(debugConsole.error)
+  }, [projectId, signal])
 
   return (
     <OLRow className="public-access-level">
@@ -204,8 +184,24 @@ function TokenBasedSharing({
       </OLCol>
       {showLinks && (
         <OLCol xs={12} className="access-token-display-area">
-          <AccessTokenEditDisplayArea tokens={tokens} />
-          <AccessTokenViewDisplayArea tokens={tokens} />
+          <div className="access-token-wrapper">
+            <strong>{t('anyone_with_link_can_edit')}</strong>
+            <AccessToken
+              token={tokens?.readAndWrite}
+              tokenHashPrefix={tokens?.readAndWriteHashPrefix}
+              path="/"
+              tooltipId="tooltip-copy-link-rw"
+            />
+          </div>
+          <div className="access-token-wrapper">
+            <strong>{t('anyone_with_link_can_view')}</strong>
+            <AccessToken
+              token={tokens?.readOnly}
+              tokenHashPrefix={tokens?.readOnlyHashPrefix}
+              path="/read/"
+              tooltipId="tooltip-copy-link-ro"
+            />
+          </div>
         </OLCol>
       )}
     </OLRow>
@@ -246,26 +242,32 @@ function LegacySharing({
   )
 }
 
-export function ReadAndWriteTokenLinks() {
-  const tokens = useProjectTokens()
-
-  return (
-    <OLRow className="public-access-level">
-      <OLCol className="access-token-display-area">
-        <AccessTokenEditDisplayArea tokens={tokens} />
-        <AccessTokenViewDisplayArea tokens={tokens} />
-      </OLCol>
-    </OLRow>
-  )
-}
-
 export function ReadOnlyTokenLink() {
-  const tokens = useProjectTokens()
+  const { t } = useTranslation()
+  const { _id: projectId } = useProjectContext()
+
+  const [tokens, setTokens] = useState<Tokens | null>(null)
+
+  const { signal } = useAbortController()
+
+  useEffect(() => {
+    getJSON(`/project/${projectId}/tokens`, { signal })
+      .then(data => setTokens(data))
+      .catch(debugConsole.error)
+  }, [projectId, signal])
 
   return (
     <OLRow className="public-access-level">
       <OLCol className="access-token-display-area">
-        <AccessTokenViewDisplayArea tokens={tokens} />
+        <div className="access-token-wrapper">
+          <strong>{t('anyone_with_link_can_view')}</strong>
+          <AccessToken
+            token={tokens?.readOnly}
+            tokenHashPrefix={tokens?.readOnlyHashPrefix}
+            path="/read/"
+            tooltipId="tooltip-copy-link-ro"
+          />
+        </div>
       </OLCol>
     </OLRow>
   )
@@ -304,7 +306,7 @@ function AccessToken({
   return (
     <div className="access-token">
       <code>{link}</code>
-      <CopyToClipboard content={link} tooltipId={tooltipId} kind="button" />
+      <CopyToClipboard content={link} tooltipId={tooltipId} />
     </div>
   )
 }
@@ -325,41 +327,5 @@ function LinkSharingInfo() {
         <MaterialIcon type="help" className="align-middle" />
       </a>
     </OLTooltip>
-  )
-}
-
-function AccessTokenEditDisplayArea({ tokens }: { tokens: Tokens | null }) {
-  const { t } = useTranslation()
-
-  return (
-    <div className="access-token-wrapper">
-      <strong className="access-token-wrapper-title">
-        {t('anyone_with_link_can_edit')}
-      </strong>
-      <AccessToken
-        token={tokens?.readAndWrite}
-        tokenHashPrefix={tokens?.readAndWriteHashPrefix}
-        path="/"
-        tooltipId="tooltip-copy-link-rw"
-      />
-    </div>
-  )
-}
-
-function AccessTokenViewDisplayArea({ tokens }: { tokens: Tokens | null }) {
-  const { t } = useTranslation()
-
-  return (
-    <div className="access-token-wrapper">
-      <strong className="access-token-wrapper-title">
-        {t('anyone_with_link_can_view')}
-      </strong>
-      <AccessToken
-        token={tokens?.readOnly}
-        tokenHashPrefix={tokens?.readOnlyHashPrefix}
-        path="/read/"
-        tooltipId="tooltip-copy-link-ro"
-      />
-    </div>
   )
 }

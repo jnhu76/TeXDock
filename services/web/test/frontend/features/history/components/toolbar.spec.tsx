@@ -5,18 +5,17 @@ import { Diff } from '../../../../../frontend/js/features/history/services/types
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { FC } from 'react'
 import { withTestContainerErrorBoundary } from '../../../helpers/error-boundary'
-import { LayoutContextValue } from '@/shared/context/layout-context'
 
 const TestContainerWithoutErrorBoundary: FC<{
-  layoutContext: LayoutContextValue
+  scope: Record<string, unknown>
   diff: Diff
   selection: HistoryContextValue['selection']
-}> = ({ diff, selection, layoutContext }) => {
+}> = ({ scope, diff, selection }) => {
   return (
-    <EditorProviders layoutContext={layoutContext}>
+    <EditorProviders scope={scope}>
       <HistoryProvider>
         <div className="history-react">
-          <Toolbar diff={diff} selection={selection} isCurrentVersion={false} />
+          <Toolbar diff={diff} selection={selection} />
         </div>
       </HistoryProvider>
     </EditorProviders>
@@ -28,6 +27,10 @@ const TestContainer = withTestContainerErrorBoundary(
 )
 
 describe('history toolbar', function () {
+  const editorProvidersScope = {
+    ui: { view: 'history', pdfLayout: 'sideBySide', chatOpen: true },
+  }
+
   const diff: Diff = {
     binary: false,
     docDiff: {
@@ -78,7 +81,7 @@ describe('history toolbar', function () {
 
     cy.mount(
       <TestContainer
-        layoutContext={{ view: 'history' }}
+        scope={editorProvidersScope}
         diff={diff}
         selection={selection}
       />
@@ -126,7 +129,7 @@ describe('history toolbar', function () {
 
     cy.mount(
       <TestContainer
-        layoutContext={{ view: 'history' }}
+        scope={editorProvidersScope}
         diff={diff}
         selection={selection}
       />

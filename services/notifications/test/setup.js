@@ -1,27 +1,30 @@
-import { afterEach, chai, vi } from 'vitest'
-import mongodb from 'mongodb-legacy'
-import chaiAsPromised from 'chai-as-promised'
+const chai = require('chai')
+const SandboxedModule = require('sandboxed-module')
 
 // Chai configuration
 chai.should()
-chai.use(chaiAsPromised)
 
 // ensure every ObjectId has the id string as a property for correct comparisons
-mongodb.ObjectId.cacheHexString = true
+require('mongodb-legacy').ObjectId.cacheHexString = true
 
-vi.mock('@overleaf/logger', () => ({
-  default: {
-    debug: vi.fn(),
-    log: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    err: vi.fn(),
-    error: vi.fn(),
-    fatal: vi.fn(),
+// SandboxedModule configuration
+SandboxedModule.configure({
+  requires: {
+    '@overleaf/logger': {
+      debug() {},
+      log() {},
+      info() {},
+      warn() {},
+      err() {},
+      error() {},
+      fatal() {},
+    },
+    'mongodb-legacy': require('mongodb-legacy'), // for ObjectId comparisons
   },
-}))
-
-afterEach(() => {
-  vi.restoreAllMocks()
-  vi.resetModules()
+  globals: { Buffer, JSON, console, process },
+  sourceTransformers: {
+    removeNodePrefix: function (source) {
+      return source.replace(/require\(['"]node:/g, "require('")
+    },
+  },
 })

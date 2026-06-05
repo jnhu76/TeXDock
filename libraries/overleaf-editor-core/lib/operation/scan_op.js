@@ -175,7 +175,7 @@ class InsertOp extends ScanOp {
       return false
     }
     if (this.tracking) {
-      if (!other.tracking || !this.tracking.canMergeWith(other.tracking)) {
+      if (!this.tracking.equals(other.tracking)) {
         return false
       }
     } else if (other.tracking) {
@@ -198,10 +198,7 @@ class InsertOp extends ScanOp {
       throw new Error('Cannot merge with incompatible operation')
     }
     this.insertion += other.insertion
-    if (this.tracking != null && other.tracking != null) {
-      this.tracking = this.tracking.mergeWith(other.tracking)
-    }
-    // We already have the same commentIds
+    // We already have the same tracking info and commentIds
   }
 
   /**
@@ -309,13 +306,9 @@ class RetainOp extends ScanOp {
       return false
     }
     if (this.tracking) {
-      if (!other.tracking || !this.tracking.canMergeWith(other.tracking)) {
-        return false
-      }
-    } else if (other.tracking) {
-      return false
+      return this.tracking.equals(other.tracking)
     }
-    return true
+    return !other.tracking
   }
 
   /**
@@ -326,9 +319,6 @@ class RetainOp extends ScanOp {
       throw new Error('Cannot merge with incompatible operation')
     }
     this.length += other.length
-    if (this.tracking != null && other.tracking != null) {
-      this.tracking = this.tracking.mergeWith(other.tracking)
-    }
   }
 
   /**

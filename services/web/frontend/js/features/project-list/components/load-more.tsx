@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useProjectListContext } from '../context/project-list-context'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
 
 export default function LoadMore() {
   const {
@@ -21,7 +21,7 @@ export default function LoadMore() {
             className="project-list-load-more-button"
             onClick={() => loadMoreProjects()}
           >
-            {t('show_x_more_projects', { count: loadMoreCount })}
+            {t('show_x_more_projects', { x: loadMoreCount })}
           </OLButton>
         </>
       ) : null}

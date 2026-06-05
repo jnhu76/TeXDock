@@ -13,7 +13,7 @@ import {
   makeProjectKey,
 } from '../../../../storage/lib/blob_store/index.js'
 import { NotFoundError } from '@overleaf/object-persistor/src/Errors.js'
-import projectKey from '@overleaf/object-persistor/src/ProjectKey.js'
+import projectKey from '../../../../storage/lib/project_key.js'
 import { getBackupStatus } from '../../../../storage/lib/backup_store/index.js'
 import { text, buffer } from 'node:stream/consumers'
 import { createGunzip } from 'node:zlib'
@@ -35,7 +35,6 @@ import {
   chunksBucket,
 } from '../../../../storage/lib/backupPersistor.mjs'
 import { Readable } from 'node:stream'
-import { ListObjectsV2Command } from '@aws-sdk/client-s3'
 
 const projectsCollection = client.db().collection('projects')
 
@@ -584,13 +583,11 @@ describe('backup script', function () {
       // Get all chunks and verify they were backed up
       const listing = await backupPersistor
         ._getClientForBucket(chunksBucket)
-        .send(
-          new ListObjectsV2Command({
-            Bucket: chunksBucket,
-            Prefix: projectKey.format(historyId) + '/',
-          })
-        )
-
+        .listObjectsV2({
+          Bucket: chunksBucket,
+          Prefix: projectKey.format(historyId) + '/',
+        })
+        .promise()
       const chunkKeys = listing.Contents.map(item => item.Key)
       expect(chunkKeys.length).to.equal(6) // Should have multiple chunks
 
@@ -647,68 +644,6 @@ describe('backup script', function () {
       expect(newBackupStatus.backupStatus.lastBackedUpVersion).to.equal(50) // backup fails on final chunk
       expect(newBackupStatus.currentEndVersion).to.equal(54) // backup is incomplete due to missing blob
     })
-
-    it('can recover zip file from backup in raw mode', async function () {
-      // First, run backup so data is available
-      await runBackupScript(['--projectId', projectId])
-
-      const zipPath = `/tmp/test-recover-raw-${historyId}.zip`
-      try {
-        await runRecoverZipFromBackupScript([
-          '--historyId',
-          historyId,
-          '--output',
-          zipPath,
-          '--mode=raw',
-        ])
-
-        // Verify the zip file is valid
-        const { stdout } = await promisify(execFile)('unzip', ['-l', zipPath], {
-          encoding: 'utf-8',
-        })
-
-        // Raw mode includes chunk and blob keys
-        // Verify chunks are present
-        expect(stdout).to.include('chunk.json')
-
-        // Verify blob hashes are present (hashes are stored as {hash[0:2]}/{hash[2:]})
-        expect(stdout).to.include(testFiles.GRAPH_PNG_HASH.slice(2))
-        expect(stdout).to.include(testFiles.NON_BMP_TXT_HASH.slice(2))
-      } finally {
-        await fs.promises.unlink(zipPath).catch(() => {})
-      }
-    })
-
-    it('can recover zip file from backup in latest mode', async function () {
-      // First, run backup so data is available
-      await runBackupScript(['--projectId', projectId])
-
-      const zipPath = `/tmp/test-recover-latest-${historyId}.zip`
-      try {
-        await runRecoverZipFromBackupScript([
-          '--historyId',
-          historyId,
-          '--output',
-          zipPath,
-          '--mode=latest',
-        ])
-
-        // Verify the zip file is valid
-        const { stdout } = await promisify(execFile)('unzip', ['-l', zipPath], {
-          encoding: 'utf-8',
-        })
-
-        // Latest mode includes the project files
-        expect(stdout).to.include('main.tex')
-        expect(stdout).to.include('chapter1.tex')
-        expect(stdout).to.include('chapter2.tex')
-        expect(stdout).to.include('bibliography.bib')
-        expect(stdout).to.include('graph.png')
-        expect(stdout).to.include('unicodeFile.tex')
-      } finally {
-        await fs.promises.unlink(zipPath).catch(() => {})
-      }
-    })
   })
 })
 
@@ -742,40 +677,6 @@ async function runBackupScript(args) {
   }
   if (result.status !== 0) {
     throw new Error('backup failed')
-  }
-  return result
-}
-
-/**
- * Run the recover_zip_from_backup script with given arguments
- * @param {string[]} args
- */
-async function runRecoverZipFromBackupScript(args) {
-  const TIMEOUT = 30 * 1000
-  let result
-  try {
-    result = await promisify(execFile)(
-      'node',
-      ['storage/scripts/recover_zip_from_backup.mjs', ...args],
-      {
-        encoding: 'utf-8',
-        timeout: TIMEOUT,
-        env: {
-          ...process.env,
-          LOG_LEVEL: 'debug',
-        },
-      }
-    )
-    result.status = 0
-  } catch (err) {
-    const { stdout, stderr, code } = err
-    if (typeof code !== 'number') {
-      console.log(err)
-    }
-    result = { stdout, stderr, status: code }
-  }
-  if (result.status !== 0) {
-    throw new Error(`recover_zip_from_backup failed: ${result.stderr}`)
   }
   return result
 }

@@ -1,9 +1,6 @@
 // Needed since eslint gets confused by mocha-each
 /* eslint-disable mocha/prefer-arrow-callback */
-import {
-  EditorProviders,
-  makeEditorPropertiesProvider,
-} from '../../../helpers/editor-providers'
+import { EditorProviders } from '../../../helpers/editor-providers'
 import CodemirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { mockScope } from '../helpers/mock-scope'
 import forEach from 'mocha-each'
@@ -17,18 +14,11 @@ const mountEditor = (content: string | string[]) => {
     content = '\n' + content
   }
   const scope = mockScope(content)
+  scope.editor.showVisual = true
   cy.viewport(1000, 800)
   cy.mount(
     <TestContainer style={{ width: 1000, height: 800 }}>
-      <EditorProviders
-        scope={scope}
-        providers={{
-          EditorPropertiesProvider: makeEditorPropertiesProvider({
-            showVisual: true,
-            showSymbolPalette: false,
-          }),
-        }}
-      >
+      <EditorProviders scope={scope}>
         <CodemirrorEditor />
       </EditorProviders>
     </TestContainer>

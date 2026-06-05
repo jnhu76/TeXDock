@@ -1,5 +1,5 @@
 import classNames from 'classnames'
-import React, { memo } from 'react'
+import React from 'react'
 import unfilledIconTypes from '../../../fonts/material-symbols/unfilled-symbols.mjs'
 
 export type AvailableUnfilledIcon = (typeof unfilledIconTypes)[number]
@@ -20,7 +20,7 @@ type UnfilledIconProps = BaseIconProps & {
   unfilled: true
 }
 
-export type IconProps = FilledIconProps | UnfilledIconProps
+type IconProps = FilledIconProps | UnfilledIconProps
 
 function MaterialIcon({
   type,
@@ -38,12 +38,7 @@ function MaterialIcon({
 
   return (
     <>
-      <span
-        className={iconClassName}
-        aria-hidden="true"
-        translate="no"
-        {...rest}
-      >
+      <span className={iconClassName} aria-hidden="true" {...rest}>
         {type}
       </span>
       {accessibilityLabel && (
@@ -53,4 +48,4 @@ function MaterialIcon({
   )
 }
 
-export default memo(MaterialIcon)
+export default MaterialIcon

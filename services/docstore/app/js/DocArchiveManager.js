@@ -1,19 +1,35 @@
-import MongoManager from './MongoManager.js'
-import Errors from './Errors.js'
-import logger from '@overleaf/logger'
-import Settings from '@overleaf/settings'
-import crypto from 'node:crypto'
-import { ReadableString } from '@overleaf/stream-utils'
-import RangeManager from './RangeManager.js'
-import PersistorManager from './PersistorManager.js'
-import pMap from 'p-map'
-import { streamToBuffer } from './StreamToBuffer.js'
-import mongodb from 'mongodb-legacy'
-
-const { BSON } = mongodb
+const { callbackify } = require('node:util')
+const MongoManager = require('./MongoManager').promises
+const Errors = require('./Errors')
+const logger = require('@overleaf/logger')
+const Settings = require('@overleaf/settings')
+const crypto = require('node:crypto')
+const { ReadableString } = require('@overleaf/stream-utils')
+const RangeManager = require('./RangeManager')
+const PersistorManager = require('./PersistorManager')
+const pMap = require('p-map')
+const { streamToBuffer } = require('./StreamToBuffer').promises
+const { BSON } = require('mongodb-legacy')
 
 const PARALLEL_JOBS = Settings.parallelArchiveJobs
 const UN_ARCHIVE_BATCH_SIZE = Settings.unArchiveBatchSize
+
+module.exports = {
+  archiveAllDocs: callbackify(archiveAllDocs),
+  archiveDoc: callbackify(archiveDoc),
+  unArchiveAllDocs: callbackify(unArchiveAllDocs),
+  unarchiveDoc: callbackify(unarchiveDoc),
+  destroyProject: callbackify(destroyProject),
+  getDoc: callbackify(getDoc),
+  promises: {
+    archiveAllDocs,
+    archiveDoc,
+    unArchiveAllDocs,
+    unarchiveDoc,
+    destroyProject,
+    getDoc,
+  },
+}
 
 async function archiveAllDocs(projectId) {
   if (!_isArchivingEnabled()) {
@@ -46,8 +62,6 @@ async function archiveDoc(projectId, docId) {
     throw new Error('doc has no lines')
   }
 
-  RangeManager.fixCommentIds(doc)
-
   // warn about any oversized docs already in mongo
   const linesSize = BSON.calculateObjectSize(doc.lines || {})
   const rangesSize = BSON.calculateObjectSize(doc.ranges || {})
@@ -76,15 +90,11 @@ async function archiveDoc(projectId, docId) {
     throw error
   }
 
+  const md5 = crypto.createHash('md5').update(json).digest('hex')
   const stream = new ReadableString(json)
-  if (Settings.docstore.backend === 's3') {
-    await PersistorManager.sendStream(Settings.docstore.bucket, key, stream)
-  } else {
-    await PersistorManager.sendStream(Settings.docstore.bucket, key, stream, {
-      sourceMd5: crypto.createHash('md5').update(json).digest('hex'),
-    })
-  }
-
+  await PersistorManager.sendStream(Settings.docstore.bucket, key, stream, {
+    sourceMd5: md5,
+  })
   await MongoManager.markDocAsArchived(projectId, docId, doc.rev)
 }
 
@@ -118,31 +128,25 @@ async function unArchiveAllDocs(projectId) {
 // get the doc from the PersistorManager without storing it in mongo
 async function getDoc(projectId, docId) {
   const key = `${projectId}/${docId}`
+  const sourceMd5 = await PersistorManager.getObjectMd5Hash(
+    Settings.docstore.bucket,
+    key
+  )
   const stream = await PersistorManager.getObjectStream(
     Settings.docstore.bucket,
     key
   )
-
-  let buffer
-  if (Settings.docstore.backend === 's3') {
-    stream.resume()
-    buffer = await streamToBuffer(projectId, docId, stream)
-  } else {
-    const sourceMd5 = await PersistorManager.getObjectMd5Hash(
-      Settings.docstore.bucket,
-      key
-    )
-    stream.resume()
-    buffer = await streamToBuffer(projectId, docId, stream)
-    const md5 = crypto.createHash('md5').update(buffer).digest('hex')
-    if (sourceMd5 !== md5) {
-      throw new Errors.Md5MismatchError('md5 mismatch when downloading doc', {
-        key,
-        sourceMd5,
-        md5,
-      })
-    }
+  stream.resume()
+  const buffer = await streamToBuffer(projectId, docId, stream)
+  const md5 = crypto.createHash('md5').update(buffer).digest('hex')
+  if (sourceMd5 !== md5) {
+    throw new Errors.Md5MismatchError('md5 mismatch when downloading doc', {
+      key,
+      sourceMd5,
+      md5,
+    })
   }
+
   return _deserializeArchivedDoc(buffer)
 }
 
@@ -220,13 +224,4 @@ function _isArchivingEnabled() {
   }
 
   return true
-}
-
-export default {
-  archiveAllDocs,
-  archiveDoc,
-  unArchiveAllDocs,
-  unarchiveDoc,
-  destroyProject,
-  getDoc,
 }

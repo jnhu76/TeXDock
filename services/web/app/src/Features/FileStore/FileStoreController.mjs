@@ -4,15 +4,13 @@ import { pipeline } from 'node:stream/promises'
 import logger from '@overleaf/logger'
 import { expressify } from '@overleaf/promise-utils'
 import Metrics from '@overleaf/metrics'
-import ProjectLocator from '../Project/ProjectLocator.mjs'
-import HistoryManager from '../History/HistoryManager.mjs'
+import FileStoreHandler from './FileStoreHandler.js'
+import ProjectLocator from '../Project/ProjectLocator.js'
+import HistoryManager from '../History/HistoryManager.js'
 import Errors from '../Errors/Errors.js'
-import { preparePlainTextResponse } from '../../infrastructure/Response.mjs'
+import Features from '../../infrastructure/Features.js'
+import { preparePlainTextResponse } from '../../infrastructure/Response.js'
 
-/**
- * @param {any} req
- * @param {any} res
- */
 async function getFile(req, res) {
   const projectId = req.params.Project_id
   const fileId = req.params.File_id
@@ -57,15 +55,25 @@ async function getFile(req, res) {
     status: Boolean(file?.hash),
   })
 
-  let stream, contentLength
+  let source, stream, contentLength
   try {
-    // Get the file from history
-    ;({ stream, contentLength } =
-      await HistoryManager.promises.requestBlobWithProjectId(
+    if (Features.hasFeature('project-history-blobs') && file?.hash) {
+      // Get the file from history
+      ;({ source, stream, contentLength } =
+        await HistoryManager.promises.requestBlobWithFallback(
+          projectId,
+          file.hash,
+          fileId
+        ))
+    } else {
+      // The file-hash is missing. Fall back to filestore.
+      stream = await FileStoreHandler.promises.getFileStream(
         projectId,
-        file.hash,
-        'GET'
-      ))
+        fileId,
+        queryString
+      )
+      source = 'filestore'
+    }
   } catch (err) {
     if (err instanceof Errors.NotFoundError) {
       return res.status(404).end()
@@ -89,14 +97,14 @@ async function getFile(req, res) {
   // allow the browser to cache these immutable files
   // note: both "private" and "max-age" appear to be required for caching
   res.setHeader('Cache-Control', 'private, max-age=3600')
+  res.appendHeader('X-Served-By', source)
   try {
     await pipeline(stream, res)
   } catch (err) {
     if (
       err instanceof Error &&
       'code' in err &&
-      (err.code === 'ERR_STREAM_PREMATURE_CLOSE' ||
-        err.code === 'ERR_STREAM_UNABLE_TO_PIPE')
+      err.code === 'ERR_STREAM_PREMATURE_CLOSE'
     ) {
       // Ignore clients closing the connection prematurely
       return
@@ -105,10 +113,6 @@ async function getFile(req, res) {
   }
 }
 
-/**
- * @param {any} req
- * @param {any} res
- */
 async function getFileHead(req, res) {
   const projectId = req.params.Project_id
   const fileId = req.params.File_id
@@ -146,14 +150,20 @@ async function getFileHead(req, res) {
     status: Boolean(file?.hash),
   })
 
-  let fileSize
+  let fileSize, source
   try {
-    ;({ contentLength: fileSize } =
-      await HistoryManager.promises.requestBlobWithProjectId(
-        projectId,
-        file.hash,
-        'HEAD'
-      ))
+    if (Features.hasFeature('project-history-blobs') && file?.hash) {
+      ;({ source, contentLength: fileSize } =
+        await HistoryManager.promises.requestBlobWithFallback(
+          projectId,
+          file.hash,
+          fileId,
+          'HEAD'
+        ))
+    } else {
+      fileSize = await FileStoreHandler.promises.getFileSize(projectId, fileId)
+      source = 'filestore'
+    }
   } catch (err) {
     if (err instanceof Errors.NotFoundError) {
       return res.status(404).end()
@@ -164,12 +174,10 @@ async function getFileHead(req, res) {
   }
 
   res.setHeader('Content-Length', fileSize)
+  res.appendHeader('X-Served-By', source)
   res.status(200).end()
 }
 
-/**
- * @param {any} file
- */
 function isHtml(file) {
   return (
     fileEndsWith(file, '.html') ||
@@ -178,10 +186,6 @@ function isHtml(file) {
   )
 }
 
-/**
- * @param {any} file
- * @param {any} ext
- */
 function fileEndsWith(file, ext) {
   return (
     file.name != null &&
@@ -190,9 +194,6 @@ function fileEndsWith(file, ext) {
   )
 }
 
-/**
- * @param {any} userAgent
- */
 function isMobileSafari(userAgent) {
   return (
     userAgent &&

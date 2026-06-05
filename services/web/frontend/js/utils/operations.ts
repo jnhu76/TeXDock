@@ -22,6 +22,10 @@ export const isInsertChange = (
   change: Change<EditOperation>
 ): change is Change<InsertOperation> => isInsertOperation(change.op)
 
+export const isCommentChange = (
+  change: Change<CommentOperation>
+): change is Change<CommentOperation> => isCommentOperation(change.op)
+
 export const isDeleteChange = (
   change: Change<EditOperation>
 ): change is Change<DeleteOperation> => isDeleteOperation(change.op)

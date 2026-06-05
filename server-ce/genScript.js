@@ -5,7 +5,7 @@ console.log('set -ex')
 
 switch (process.argv.pop()) {
   case 'install':
-    console.log('yarn workspaces focus --all --production')
+    console.log('npm install --omit=dev')
     break
   case 'compile':
     for (const service of services) {
@@ -13,18 +13,18 @@ switch (process.argv.pop()) {
       switch (service.name) {
         case 'web':
           // precompile pug in background
-          console.log('yarn run precompile-pug &')
+          console.log('npm run precompile-pug &')
           console.log('pug_precompile=$!')
 
           // Avoid downloading of cypress
           console.log('export CYPRESS_INSTALL_BINARY=0')
 
           // install webpack and frontend dependencies
-          console.log('yarn install')
+          console.log('npm install --include=dev')
           // run webpack
-          console.log('yarn run webpack:production')
+          console.log('npm run webpack:production')
           // uninstall webpack and frontend dependencies
-          console.log('yarn workspaces focus --all --production')
+          console.log('npm install --omit=dev')
 
           // Wait for pug precompile to finish
           console.log('wait "$pug_precompile"')

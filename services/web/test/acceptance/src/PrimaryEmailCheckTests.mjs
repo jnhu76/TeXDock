@@ -1,7 +1,7 @@
 import UserHelper from './helpers/UserHelper.mjs'
 import Settings from '@overleaf/settings'
 import { expect } from 'chai'
-import Features from '../../../app/src/infrastructure/Features.mjs'
+import Features from '../../../app/src/infrastructure/Features.js'
 import MockV1ApiClass from './mocks/MockV1Api.mjs'
 import SubscriptionHelper from './helpers/Subscription.mjs'
 
@@ -69,7 +69,10 @@ describe('PrimaryEmailCheck', function () {
           $set: { lastPrimaryEmailCheck: new Date(time) },
         })
 
-        await userHelper.confirmEmail(userHelper.user.email)
+        await userHelper.confirmEmail(
+          userHelper.user._id,
+          userHelper.user.email
+        )
       })
 
       it("shouldn't be redirected from project list to the primary email check page", async function () {
@@ -150,7 +153,10 @@ describe('PrimaryEmailCheck', function () {
           $set: { lastPrimaryEmailCheck: new Date(time) },
         })
 
-        await userHelper.confirmEmail(userHelper.user.email)
+        await userHelper.confirmEmail(
+          userHelper.user._id,
+          userHelper.user.email
+        )
       })
 
       it("shouldn't be redirected from project list to the primary email check page", async function () {
@@ -213,8 +219,14 @@ describe('PrimaryEmailCheck', function () {
       })
 
       beforeEach(async function () {
-        await userHelper.confirmEmail(userHelper.user.email)
-        await userHelper.addEmailAndConfirm('secondary@overleaf.com')
+        await userHelper.confirmEmail(
+          userHelper.user._id,
+          userHelper.user.email
+        )
+        await userHelper.addEmailAndConfirm(
+          userHelper.user._id,
+          'secondary@overleaf.com'
+        )
 
         checkResponse = await userHelper.fetch(
           '/user/emails/primary-email-check',
@@ -265,10 +277,6 @@ describe('PrimaryEmailCheck', function () {
 
     describe('when the user is a managed user', function () {
       beforeEach(async function () {
-        if (!Features.hasFeature('saas')) {
-          this.skip()
-        }
-
         const adminUser = await UserHelper.createUser()
         this.subscription = new Subscription({
           adminId: adminUser._id,

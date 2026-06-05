@@ -16,11 +16,9 @@ function ProjectListTitle({
 }) {
   const { t } = useTranslation()
   let message = t('projects')
-  let extraProps = {}
 
   if (selectedTag) {
     message = `${selectedTag.name}`
-    extraProps = { translate: 'no' }
   } else if (selectedTagId === UNCATEGORIZED_KEY) {
     message = t('uncategorized_projects')
   } else {
@@ -44,14 +42,7 @@ function ProjectListTitle({
   }
 
   return (
-    <h1
-      id="main-content"
-      tabIndex={-1}
-      className={classnames('project-list-title', className)}
-      {...extraProps}
-    >
-      {message}
-    </h1>
+    <div className={classnames('project-list-title', className)}>{message}</div>
   )
 }
 

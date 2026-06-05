@@ -1,21 +1,17 @@
 import { useTranslation } from 'react-i18next'
 import { useDetachCompileContext as useCompileContext } from '../../../shared/context/detach-compile-context'
 import { useProjectContext } from '@/shared/context/project-context'
-import { isSmallDevice } from '@/infrastructure/event-tracking'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
-import OLButton from '@/shared/components/ol/ol-button'
+import { sendMB, isSmallDevice } from '@/infrastructure/event-tracking'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import MaterialIcon from '@/shared/components/material-icon'
-import { useEditorAnalytics } from '@/shared/hooks/use-editor-analytics'
 
 function PdfHybridDownloadButton() {
-  const { pdfDownloadUrl, showLogs } = useCompileContext()
-  const { sendEvent } = useEditorAnalytics()
-  const { projectId } = useProjectContext()
-  const { t } = useTranslation()
+  const { pdfDownloadUrl } = useCompileContext()
 
-  if (showLogs) {
-    return null
-  }
+  const { _id: projectId } = useProjectContext()
+
+  const { t } = useTranslation()
   const description = pdfDownloadUrl
     ? t('download_pdf')
     : t('please_compile_pdf_before_download')
@@ -27,7 +23,7 @@ function PdfHybridDownloadButton() {
       return
     }
 
-    sendEvent('download-pdf-button-click', {
+    sendMB('download-pdf-button-click', {
       projectId,
       location: 'pdf-preview',
       isSmallDevice,

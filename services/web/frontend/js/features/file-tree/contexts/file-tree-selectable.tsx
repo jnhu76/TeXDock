@@ -128,8 +128,7 @@ export const FileTreeSelectableProvider: FC<
     onSelect: (value: FindResult[]) => void
   }>
 > = ({ onSelect, children }) => {
-  const { projectId, project } = useProjectContext()
-  const rootDocId = project?.rootDocId
+  const { _id: projectId, rootDocId } = useProjectContext()
 
   const [initialSelectedEntityId] = usePersistedState(
     `doc.open_id.${projectId}`,

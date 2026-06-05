@@ -34,16 +34,6 @@ class BinaryFileData extends FileData {
   }
 
   /**
-   * @returns {Record<string, number>}
-   */
-  toStats() {
-    return {
-      hashes: 1,
-      byteLength: this.byteLength,
-    }
-  }
-
-  /**
    * @inheritdoc
    * @returns {RawBinaryFileData}
    */

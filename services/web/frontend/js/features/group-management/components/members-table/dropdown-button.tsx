@@ -10,7 +10,7 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
-} from '@/shared/components/dropdown/dropdown-menu'
+} from '@/features/ui/components/bootstrap-5/dropdown-menu'
 import { User } from '../../../../../../types/group-management/user'
 import useAsync from '@/shared/hooks/use-async'
 import { type FetchError, postJSON } from '@/infrastructure/fetch-json'
@@ -18,9 +18,8 @@ import { GroupUserAlert } from '../../utils/types'
 import { useGroupMembersContext } from '../../context/group-members-context'
 import getMeta from '@/utils/meta'
 import MaterialIcon from '@/shared/components/material-icon'
-import DropdownListItem from '@/shared/components/dropdown/dropdown-list-item'
-import { sendMB } from '@/infrastructure/event-tracking'
-import OLSpinner from '@/shared/components/ol/ol-spinner'
+import DropdownListItem from '@/features/ui/components/bootstrap-5/dropdown-list-item'
+import { Spinner } from 'react-bootstrap'
 
 type resendInviteResponse = {
   success: boolean
@@ -29,24 +28,20 @@ type resendInviteResponse = {
 type ManagedUserDropdownButtonProps = {
   user: User
   openOffboardingModalForUser: (user: User) => void
-  openRemoveModalForUser: (user: User) => void
   openUnlinkUserModal: (user: User) => void
   groupId: string
   setGroupUserAlert: Dispatch<SetStateAction<GroupUserAlert>>
-  combinedUserManagement?: boolean
 }
 
 export default function DropdownButton({
   user,
   openOffboardingModalForUser,
-  openRemoveModalForUser,
   openUnlinkUserModal,
   groupId,
   setGroupUserAlert,
-  combinedUserManagement = false,
 }: ManagedUserDropdownButtonProps) {
   const { t } = useTranslation()
-  const { removeMember, addMembers } = useGroupMembersContext()
+  const { removeMember } = useGroupMembersContext()
   const {
     runAsync: runResendManagedUserInviteAsync,
     isLoading: isResendingManagedUserInvite,
@@ -62,8 +57,7 @@ export default function DropdownButton({
 
   const managedUsersActive = getMeta('ol-managedUsersActive')
   const groupSSOActive = getMeta('ol-groupSSOActive')
-  const userId = getMeta('ol-user_id')
-  const isUserGroupManager = getMeta('ol-isUserGroupManager')
+
   const userPending = user.invite
   const isGroupSSOLinked =
     !userPending && user.enrollment?.sso?.some(sso => sso.groupId === groupId)
@@ -175,33 +169,15 @@ export default function DropdownButton({
   }
 
   const onDeleteUserClick = () => {
-    sendMB('delete-managed-user-selected')
     openOffboardingModalForUser(user)
   }
 
-  const onReleaseUserClick = () => {
-    sendMB('remove-managed-user-selected')
-    openRemoveModalForUser(user)
-  }
-
   const onRemoveFromGroup = () => {
-    if (combinedUserManagement) {
-      openRemoveModalForUser(user)
-    } else {
-      removeMember(user)
-    }
+    removeMember(user)
   }
 
   const onUnlinkUserClick = () => {
     openUnlinkUserModal(user)
-  }
-
-  const onAllocateLicenseClick = () => {
-    addMembers(user.email)
-  }
-
-  const onRevokeLicenseClick = () => {
-    removeMember(user, combinedUserManagement)
   }
 
   const buttons = []
@@ -218,12 +194,7 @@ export default function DropdownButton({
       </MenuItemButton>
     )
   }
-  if (
-    managedUsersActive &&
-    !isUserManaged &&
-    !userPending &&
-    user.isEntityMember
-  ) {
+  if (managedUsersActive && !isUserManaged && !userPending) {
     buttons.push(
       <MenuItemButton
         onClick={onResendManagedUserInviteClick}
@@ -235,27 +206,6 @@ export default function DropdownButton({
       </MenuItemButton>
     )
   }
-  if (combinedUserManagement && user.isEntityManager) {
-    if (!user.isEntityMember && !user.invite) {
-      buttons.push(
-        <MenuItemButton
-          onClick={onAllocateLicenseClick}
-          key="allocate-license-action"
-        >
-          {t('allocate_license')}
-        </MenuItemButton>
-      )
-    } else {
-      buttons.push(
-        <MenuItemButton
-          onClick={onRevokeLicenseClick}
-          key="revoke-license-action"
-        >
-          {t('revoke_license')}
-        </MenuItemButton>
-      )
-    }
-  }
   if (groupSSOActive && isGroupSSOLinked) {
     buttons.push(
       <MenuItemButton
@@ -263,7 +213,7 @@ export default function DropdownButton({
         key="unlink-user-action"
         data-testid="unlink-user-action"
       >
-        {t('unlink_from_sso')}
+        {t('unlink_user')}
       </MenuItemButton>
     )
   }
@@ -279,27 +229,15 @@ export default function DropdownButton({
       </MenuItemButton>
     )
   }
-  if (
-    isUserManaged &&
-    !user.isEntityAdmin &&
-    (!isUserGroupManager || userId !== user._id)
-  ) {
+  if (isUserManaged && !user.isEntityAdmin) {
     buttons.push(
       <MenuItemButton
-        key="release-user-action"
-        data-testid="release-user-action"
-        onClick={onReleaseUserClick}
-      >
-        {t('remove_from_group')}
-      </MenuItemButton>
-    )
-    buttons.push(
-      <MenuItemButton
+        className="delete-user-action"
         key="delete-user-action"
         data-testid="delete-user-action"
         onClick={onDeleteUserClick}
       >
-        {t('delete_permanently')}
+        {t('delete_user')}
       </MenuItemButton>
     )
   } else if (!isUserManaged) {
@@ -308,6 +246,7 @@ export default function DropdownButton({
         key="remove-user-action"
         data-testid="remove-user-action"
         onClick={onRemoveFromGroup}
+        className="delete-user-action"
         variant="danger"
       >
         {t('remove_from_group')}
@@ -317,7 +256,7 @@ export default function DropdownButton({
 
   if (buttons.length === 0) {
     buttons.push(
-      <DropdownListItem key="no-actions-available">
+      <DropdownListItem>
         <DropdownItem
           as="button"
           tabIndex={-1}
@@ -338,9 +277,7 @@ export default function DropdownButton({
       >
         <MaterialIcon type="more_vert" accessibilityLabel={t('actions')} />
       </DropdownToggle>
-      <DropdownMenu flip renderOnMount popperConfig={{ strategy: 'fixed' }}>
-        {buttons}
-      </DropdownMenu>
+      <DropdownMenu flip={false}>{buttons}</DropdownMenu>
     </Dropdown>
   )
 }
@@ -354,6 +291,7 @@ type MenuItemButtonProps = {
 function MenuItemButton({
   children,
   onClick,
+  className,
   isLoading,
   variant,
   'data-testid': dataTestId,
@@ -364,7 +302,16 @@ function MenuItemButton({
         as="button"
         tabIndex={-1}
         onClick={onClick}
-        leadingIcon={isLoading ? <OLSpinner size="sm" /> : null}
+        leadingIcon={
+          isLoading ? (
+            <Spinner
+              animation="border"
+              aria-hidden="true"
+              size="sm"
+              role="status"
+            />
+          ) : null
+        }
         data-testid={dataTestId}
         variant={variant}
       >

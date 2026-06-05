@@ -1,15 +1,15 @@
 import { expressify } from '@overleaf/promise-utils'
 import TpdsUpdateHandler from './TpdsUpdateHandler.mjs'
-import UpdateMerger from './UpdateMerger.mjs'
+import UpdateMerger from './UpdateMerger.js'
 import Errors from '../Errors/Errors.js'
 import logger from '@overleaf/logger'
 import Path from 'node:path'
 import metrics from '@overleaf/metrics'
-import NotificationsBuilder from '../Notifications/NotificationsBuilder.mjs'
-import SessionManager from '../Authentication/SessionManager.mjs'
-import ProjectCreationHandler from '../Project/ProjectCreationHandler.mjs'
-import ProjectDetailsHandler from '../Project/ProjectDetailsHandler.mjs'
-import HttpErrorHandler from '../Errors/HttpErrorHandler.mjs'
+import NotificationsBuilder from '../Notifications/NotificationsBuilder.js'
+import SessionManager from '../Authentication/SessionManager.js'
+import ProjectCreationHandler from '../Project/ProjectCreationHandler.js'
+import ProjectDetailsHandler from '../Project/ProjectDetailsHandler.js'
+import HttpErrorHandler from '../Errors/HttpErrorHandler.js'
 import TpdsQueueManager from './TpdsQueueManager.mjs'
 
 async function createProject(req, res) {
@@ -62,9 +62,7 @@ async function mergeUpdate(req, res) {
         { err, userId, filePath },
         'tpds trying to append to project over file limit'
       )
-      await NotificationsBuilder.promises
-        .tpdsFileLimit(userId)
-        .create(projectName, projectId)
+      NotificationsBuilder.tpdsFileLimit(userId).create(projectName, projectId)
       return res.sendStatus(400)
     } else {
       throw err

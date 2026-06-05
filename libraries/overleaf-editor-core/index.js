@@ -46,9 +46,6 @@ const CommentList = require('./lib/file_data/comment_list')
 const LazyStringFileData = require('./lib/file_data/lazy_string_file_data')
 const StringFileData = require('./lib/file_data/string_file_data')
 const EditOperationBuilder = require('./lib/operation/edit_operation_builder')
-const {
-  getDocUpdaterCompatibleRanges,
-} = require('./lib/doc_updater_compatible_ranges')
 
 exports.AddCommentOperation = AddCommentOperation
 exports.Author = Author
@@ -96,4 +93,3 @@ exports.TrackedChange = TrackedChange
 exports.Range = Range
 exports.CommentList = CommentList
 exports.TrackingProps = TrackingProps
-exports.getDocUpdaterCompatibleRanges = getDocUpdaterCompatibleRanges

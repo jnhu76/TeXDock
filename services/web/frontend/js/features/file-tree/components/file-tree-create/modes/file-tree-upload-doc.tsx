@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Uppy from '@uppy/core'
 import XHRUpload from '@uppy/xhr-upload'
 import { Dashboard } from '@uppy/react'
@@ -28,14 +28,13 @@ export default function FileTreeUploadDoc() {
   const { parentFolderId, cancel, droppedFiles, setDroppedFiles } =
     useFileTreeActionable()
   const { fileTreeData } = useFileTreeData()
-  const { projectId } = useProjectContext()
+  const { _id: projectId } = useProjectContext()
 
   const [error, setError] = useState<string>()
 
   const [conflicts, setConflicts] = useState<Conflict[]>([])
   const [folderConflicts, setFolderConflicts] = useState<Conflict[]>([])
   const [overwrite, setOverwrite] = useState(false)
-  const dashboardRef = useRef<HTMLDivElement>(null)
 
   const maxNumberOfFiles = 180
   const maxFileSize = getMeta('ol-ExposedSettings').maxUploadSize
@@ -177,6 +176,7 @@ export default function FileTreeUploadDoc() {
         // close the modal when all the uploads completed successfully
         .on('complete', result => {
           if (!result.failed.length) {
+            // $scope.$emit('done', { name: name })
             cancel()
           }
         })
@@ -264,22 +264,6 @@ export default function FileTreeUploadDoc() {
     !overwrite && !showFolderUploadConflicts && conflicts.length > 0
   const showDashboard = !showFileUploadConfilcts && !showFolderUploadConflicts
 
-  useEffect(() => {
-    if (!showDashboard) {
-      return
-    }
-
-    const frameId = window.requestAnimationFrame(() => {
-      dashboardRef.current
-        ?.querySelector<HTMLButtonElement>('.uppy-Dashboard-browse')
-        ?.focus()
-    })
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-    }
-  }, [showDashboard])
-
   return (
     <>
       {error && (
@@ -301,32 +285,30 @@ export default function FileTreeUploadDoc() {
         />
       )}
       {showDashboard && (
-        <div ref={dashboardRef}>
-          <Dashboard
-            uppy={uppy}
-            showProgressDetails
-            // note={`Up to ${maxNumberOfFiles} files, up to ${maxFileSize / (1024 * 1024)}MB`}
-            height={400}
-            width="100%"
-            showLinkToFileUploadResult={false}
-            proudlyDisplayPoweredByUppy={false}
-            // allow files or folders to be selected
-            fileManagerSelectionType="both"
-            locale={{
-              strings: {
-                // Text to show on the droppable area.
-                // `%{browse}` is replaced with a link that opens the system file selection dialog.
-                // TODO: 'drag_here' or 'drop_files_here_to_upload'?
-                // dropHereOr: `${t('drag_here')} ${t('or')} %{browse}`,
-                dropPasteBoth: `Drop or paste your files, folder, or images here. %{browseFiles} or %{browseFolders} from your computer.`,
-                // Used as the label for the link that opens the system file selection dialog.
-                // browseFiles: t('select_from_your_computer')
-                browseFiles: 'Select files',
-                browseFolders: 'select a folder',
-              },
-            }}
-          />
-        </div>
+        <Dashboard
+          uppy={uppy}
+          showProgressDetails
+          // note={`Up to ${maxNumberOfFiles} files, up to ${maxFileSize / (1024 * 1024)}MB`}
+          height={400}
+          width="100%"
+          showLinkToFileUploadResult={false}
+          proudlyDisplayPoweredByUppy={false}
+          // allow files or folders to be selected
+          fileManagerSelectionType="both"
+          locale={{
+            strings: {
+              // Text to show on the droppable area.
+              // `%{browse}` is replaced with a link that opens the system file selection dialog.
+              // TODO: 'drag_here' or 'drop_files_here_to_upload'?
+              // dropHereOr: `${t('drag_here')} ${t('or')} %{browse}`,
+              dropPasteBoth: `Drop or paste your files, folder, or images here. %{browseFiles} or %{browseFolders} from your computer.`,
+              // Used as the label for the link that opens the system file selection dialog.
+              // browseFiles: t('select_from_your_computer')
+              browseFiles: 'Select files',
+              browseFolders: 'select a folder',
+            },
+          }}
+        />
       )}
     </>
   )

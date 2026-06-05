@@ -9,12 +9,11 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import sinon from 'sinon'
-import express from 'express'
-
 let MockDocUpdaterServer
+const sinon = require('sinon')
+const express = require('express')
 
-export default MockDocUpdaterServer = {
+module.exports = MockDocUpdaterServer = {
   docs: {},
 
   createMockDoc(projectId, docId, data) {

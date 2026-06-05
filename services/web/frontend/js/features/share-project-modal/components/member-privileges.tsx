@@ -1,10 +1,10 @@
-import { ProjectMember } from '@/shared/context/types/project-metadata'
+import { ProjectContextMember } from '@/shared/context/types/project-context'
 import { useTranslation } from 'react-i18next'
 
 export default function MemberPrivileges({
   privileges,
 }: {
-  privileges: ProjectMember['privileges']
+  privileges: ProjectContextMember['privileges']
 }) {
   const { t } = useTranslation()
 

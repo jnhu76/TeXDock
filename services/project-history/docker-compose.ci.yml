@@ -2,57 +2,40 @@
 # Instead run bin/update_build_scripts from
 # https://github.com/overleaf/internal/
 
+version: "2.3"
+
 services:
   test_unit:
     image: ci/$PROJECT_NAME:$BRANCH_NAME-$BUILD_NUMBER
     user: node
-    volumes:
-      - ./reports:/overleaf/services/project-history/reports
-      - ../../bin/shared/wait_for_it:/overleaf/bin/shared/wait_for_it
-    entrypoint: /overleaf/bin/shared/wait_for_it mongo:27017 --timeout=60 --
-    command: yarn run test:unit:_run
+    command: npm run test:unit:_run
     environment:
-      CI:
-      MONGO_CONNECTION_STRING: mongodb://mongo/test-overleaf
       NODE_ENV: test
       NODE_OPTIONS: "--unhandled-rejections=strict"
-      REDIS_HOST: redis_test
-      QUEUES_REDIS_HOST: redis_test
-      HISTORY_REDIS_HOST: redis_test
-      ANALYTICS_QUEUES_REDIS_HOST: redis_test
-      ANALYTICS_QUEUES_BQ_SINK_REDIS_HOST: redis_test
-    depends_on:
-      mongo:
-        condition: service_started
-      redis_test:
-        condition: service_healthy
+
 
   test_acceptance:
+    build: .
     image: ci/$PROJECT_NAME:$BRANCH_NAME-$BUILD_NUMBER
     environment:
-      CI:
-      RETRIES:
-      REDIS_HOST: redis_test
-      QUEUES_REDIS_HOST: redis_test
-      HISTORY_REDIS_HOST: redis_test
-      ANALYTICS_QUEUES_REDIS_HOST: redis_test
-      ANALYTICS_QUEUES_BQ_SINK_REDIS_HOST: redis_test
+      ELASTIC_SEARCH_DSN: es:9200
+      REDIS_HOST: redis
+      QUEUES_REDIS_HOST: redis
+      HISTORY_REDIS_HOST: redis
+      ANALYTICS_QUEUES_REDIS_HOST: redis
       MONGO_HOST: mongo
       POSTGRES_HOST: postgres
       MOCHA_GREP: ${MOCHA_GREP}
       NODE_ENV: test
       NODE_OPTIONS: "--unhandled-rejections=strict"
-    volumes:
-      - ./reports:/overleaf/services/project-history/reports
-      - ../../bin/shared/wait_for_it:/overleaf/bin/shared/wait_for_it
     depends_on:
       mongo:
         condition: service_started
-      redis_test:
+      redis:
         condition: service_healthy
     user: node
-    entrypoint: /overleaf/bin/shared/wait_for_it mongo:27017 --timeout=60 --
-    command: yarn run test:acceptance
+    command: npm run test:acceptance
+
 
   tar:
     build: .
@@ -61,21 +44,18 @@ services:
       - ./:/tmp/build/
     command: tar -czf /tmp/build/build.tar.gz --exclude=build.tar.gz --exclude-vcs .
     user: root
-
-  redis_test:
-    image: redis:7.4.8
+  redis:
+    image: redis
     healthcheck:
       test: ping="$$(redis-cli ping)" && [ "$$ping" = 'PONG' ]
       interval: 1s
       retries: 20
 
   mongo:
-    image: mongo:8.0.11
-    command: --replSet overleaf --notablescan
+    image: mongo:7.0.20
+    command: --replSet overleaf
     volumes:
       - ../../bin/shared/mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js
-      - ../../bin/shared/mongodb-docker-entrypoint-wait.sh:/mongodb-docker-entrypoint-wait.sh
-    entrypoint: /mongodb-docker-entrypoint-wait.sh
     environment:
       MONGO_INITDB_DATABASE: sharelatex
     extra_hosts:

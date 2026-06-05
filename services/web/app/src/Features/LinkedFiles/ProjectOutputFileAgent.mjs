@@ -1,15 +1,16 @@
-import AuthorizationManager from '../Authorization/AuthorizationManager.mjs'
-import CompileManager from '../Compile/CompileManager.mjs'
-import ClsiManager from '../Compile/ClsiManager.mjs'
-import ProjectFileAgent from './ProjectFileAgent.mjs'
+import AuthorizationManager from '../Authorization/AuthorizationManager.js'
+import CompileManager from '../Compile/CompileManager.js'
+import ClsiManager from '../Compile/ClsiManager.js'
+import ProjectFileAgent from './ProjectFileAgent.js'
 import _ from 'lodash'
-import LinkedFilesErrors from './LinkedFilesErrors.mjs'
+import {
+  CompileFailedError,
+  BadDataError,
+  AccessDeniedError,
+} from './LinkedFilesErrors.js'
 import { OutputFileFetchFailedError } from '../Errors/Errors.js'
-import LinkedFilesHandler from './LinkedFilesHandler.mjs'
+import LinkedFilesHandler from './LinkedFilesHandler.js'
 import { promisify } from '@overleaf/promise-utils'
-
-const { CompileFailedError, BadDataError, AccessDeniedError } =
-  LinkedFilesErrors
 
 function _prepare(projectId, linkedFileData, userId, callback) {
   _checkAuth(projectId, linkedFileData, userId, (err, allowed) => {
@@ -158,19 +159,24 @@ function _getFileStream(linkedFileData, userId, callback) {
       return callback(err)
     }
     const sourceProjectId = project._id
-    ClsiManager.getOutputFileStream(
-      sourceProjectId,
-      userId,
-      clsiServerId,
-      buildId,
-      sourceOutputFilePath,
-      (err, readStream) => {
-        if (err) {
-          return callback(err)
+    CompileManager.getProjectCompileLimits(sourceProjectId, (err, limits) => {
+      if (err) return callback(err)
+
+      ClsiManager.getOutputFileStream(
+        sourceProjectId,
+        userId,
+        limits,
+        clsiServerId,
+        buildId,
+        sourceOutputFilePath,
+        (err, readStream) => {
+          if (err) {
+            return callback(err)
+          }
+          callback(null, readStream)
         }
-        callback(null, readStream)
-      }
-    )
+      )
+    })
   })
 }
 
@@ -186,7 +192,7 @@ function _compileAndGetFileStream(linkedFileData, userId, callback) {
       sourceProjectId,
       userId,
       {},
-      (err, status, outputFiles, clsiServerId) => {
+      (err, status, outputFiles, clsiServerId, limits) => {
         if (err) {
           return callback(err)
         }
@@ -204,6 +210,7 @@ function _compileAndGetFileStream(linkedFileData, userId, callback) {
         ClsiManager.getOutputFileStream(
           sourceProjectId,
           userId,
+          limits,
           clsiServerId,
           buildId,
           sourceOutputFilePath,

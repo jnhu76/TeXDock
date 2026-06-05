@@ -5,20 +5,18 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from '@/shared/hooks/use-location'
 import { FetchError, postJSON } from '@/infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLNotification from '@/shared/components/ol/ol-notification'
-import OLFormControl from '@/shared/components/ol/ol-form-control'
-import OLFormLabel from '@/shared/components/ol/ol-form-label'
-import OLFormSelect from '@/shared/components/ol/ol-form-select'
-import { sendMB } from '@/infrastructure/event-tracking'
+} from '@/features/ui/components/ol/ol-modal'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLNotification from '@/features/ui/components/ol/ol-notification'
+import OLFormControl from '@/features/ui/components/ol/ol-form-control'
+import OLFormLabel from '@/features/ui/components/ol/ol-form-label'
+import OLFormSelect from '@/features/ui/components/ol/ol-form-select'
 
 type OffboardManagedUserModalProps = {
   user: User
@@ -50,9 +48,8 @@ export default function OffboardManagedUserModal({
   const shouldEnableDeleteUserButton =
     suppliedEmail === user.email && !!selectedRecipientId
 
-  const handleDeleteUserSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleDeleteUserSubmit = (event: any) => {
     event.preventDefault()
-    sendMB('delete-managed-user-confirmed')
     runAsync(
       postJSON(`/manage/groups/${groupId}/offboardManagedUser/${user._id}`, {
         body: {

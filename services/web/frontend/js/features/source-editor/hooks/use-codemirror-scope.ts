@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
+import useScopeValue from '../../../shared/hooks/use-scope-value'
 import useScopeEventEmitter from '../../../shared/hooks/use-scope-event-emitter'
 import useEventListener from '../../../shared/hooks/use-event-listener'
 import useScopeEventListener from '../../../shared/hooks/use-scope-event-listener'
@@ -37,6 +38,7 @@ import { setVisual } from '../extensions/visual/visual'
 import { useFileTreePathContext } from '@/features/file-tree/contexts/file-tree-path'
 import { useUserSettingsContext } from '@/shared/context/user-settings-context'
 import { setDocName } from '@/features/source-editor/extensions/doc-name'
+import { isValidTeXFile } from '@/main/is-valid-tex-file'
 import { captureException } from '@/infrastructure/error-reporter'
 import grammarlyExtensionPresent from '@/shared/utils/grammarly'
 import { debugConsole } from '@/utils/debugging'
@@ -44,38 +46,30 @@ import { useMetadataContext } from '@/features/ide-react/context/metadata-contex
 import { useUserContext } from '@/shared/context/user-context'
 import { useReferencesContext } from '@/features/ide-react/context/references-context'
 import { setMathPreview } from '@/features/source-editor/extensions/math-preview'
-import { setNonBlinkingCursor } from '@/features/source-editor/extensions/non-blinking-cursor'
-import { useRangesContext } from '@/features/review-panel/context/ranges-context'
+import { useRangesContext } from '@/features/review-panel-new/context/ranges-context'
 import { updateRanges } from '@/features/source-editor/extensions/ranges'
-import { useThreadsContext } from '@/features/review-panel/context/threads-context'
+import { useThreadsContext } from '@/features/review-panel-new/context/threads-context'
 import { useHunspell } from '@/features/source-editor/hooks/use-hunspell'
 import { Permissions } from '@/features/ide-react/types/permissions'
-import { GotoOffsetOptions } from '@/features/ide-react/context/editor-manager-context'
+import {
+  GotoOffsetOptions,
+  useEditorManagerContext,
+} from '@/features/ide-react/context/editor-manager-context'
 import { GotoLineOptions } from '@/features/ide-react/types/goto-line-options'
 import { useOnlineUsersContext } from '@/features/ide-react/context/online-users-context'
-import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
-import { useProjectContext } from '@/shared/context/project-context'
-import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
-import { useEditorPropertiesContext } from '@/features/ide-react/context/editor-properties-context'
-import { SearchQuery } from '@codemirror/search'
-import { beforeChangeDocEffect } from '@/features/source-editor/extensions/before-change-doc'
-import { useActiveOverallTheme } from '@/shared/hooks/use-active-overall-theme'
-import { useEditorSelectionContext } from '@/shared/context/editor-selection-context'
-import { useActiveEditorTheme } from '@/shared/hooks/use-active-editor-theme'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
-import { isCmVisualEditorAvailable } from '../utils/visual-editor'
 
 function useCodeMirrorScope(view: EditorView) {
   const { fileTreeData } = useFileTreeData()
 
-  const permissions: Permissions = usePermissionsContext()
+  const [permissions] = useScopeValue<Permissions>('permissions')
 
   // set up scope listeners
 
   const { logEntryAnnotations, editedSinceCompileStarted, compiling } =
     useCompileContext()
 
-  const { openDocName, currentDocument } = useEditorOpenDocContext()
+  const { currentDocument, openDocName, trackChanges } =
+    useEditorManagerContext()
   const metadata = useMetadataContext()
 
   const { id: userId } = useUserContext()
@@ -84,34 +78,35 @@ function useCodeMirrorScope(view: EditorView) {
     fontFamily,
     fontSize,
     lineHeight,
+    overallTheme,
     autoComplete,
+    editorTheme,
     autoPairDelimiters,
     mode,
     syntaxValidation,
     mathPreview,
-    nonBlinkingCursor,
     referencesSearchMode,
+    enableNewEditor,
   } = userSettings
-  const activeOverallTheme = useActiveOverallTheme()
-  const editorTheme = useActiveEditorTheme()
 
   const { onlineUserCursorHighlights } = useOnlineUsersContext()
 
-  const { project, features: projectFeatures } = useProjectContext()
-  const editorContextMenuEnabled = useFeatureFlag('editor-context-menu')
-  let spellCheckLanguage = project?.spellCheckLanguage || ''
+  let [spellCheckLanguage] = useScopeValue<string>('project.spellCheckLanguage')
   // spell check is off when read-only
   if (!permissions.write && !permissions.trackedWrite) {
     spellCheckLanguage = ''
   }
 
+  const [projectFeatures] =
+    useScopeValue<Record<string, boolean | string | number | undefined>>(
+      'project.features'
+    )
+
   const hunspellManager = useHunspell(spellCheckLanguage)
 
-  const { showVisual: visual, trackChanges } = useEditorPropertiesContext()
+  const [visual] = useScopeValue<boolean>('editor.showVisual')
 
-  const { referenceKeys, searchLocalReferences } = useReferencesContext()
-
-  const { setEditorSelection } = useEditorSelectionContext()
+  const { referenceKeys } = useReferencesContext()
 
   const ranges = useRangesContext()
   const threads = useThreadsContext()
@@ -127,7 +122,7 @@ function useCodeMirrorScope(view: EditorView) {
     fontFamily,
     fontSize,
     lineHeight,
-    activeOverallTheme,
+    overallTheme,
     editorTheme,
   })
 
@@ -136,7 +131,7 @@ function useCodeMirrorScope(view: EditorView) {
       fontFamily,
       fontSize,
       lineHeight,
-      activeOverallTheme,
+      overallTheme,
       editorTheme,
     }
 
@@ -145,14 +140,14 @@ function useCodeMirrorScope(view: EditorView) {
         fontFamily,
         fontSize,
         lineHeight,
-        activeOverallTheme,
+        overallTheme,
       })
     )
 
     setEditorTheme(editorTheme).then(spec => {
       view.dispatch(spec)
     })
-  }, [view, fontFamily, fontSize, lineHeight, activeOverallTheme, editorTheme])
+  }, [view, fontFamily, fontSize, lineHeight, overallTheme, editorTheme])
 
   const settingsRef = useRef({
     autoComplete,
@@ -160,8 +155,8 @@ function useCodeMirrorScope(view: EditorView) {
     mode,
     syntaxValidation,
     mathPreview,
-    nonBlinkingCursor,
     referencesSearchMode,
+    enableNewEditor,
   })
 
   const currentDocRef = useRef({
@@ -190,9 +185,9 @@ function useCodeMirrorScope(view: EditorView) {
 
     if (currentDocument) {
       if (trackChanges) {
-        currentDocument.setTrackChangesUserId(userId ?? 'anonymous')
+        currentDocument.track_changes_as = userId || 'anonymous'
       } else {
-        currentDocument.setTrackChangesUserId(null)
+        currentDocument.track_changes_as = null
       }
     }
   }, [userId, currentDocument, trackChanges])
@@ -213,7 +208,6 @@ function useCodeMirrorScope(view: EditorView) {
   }, [view, spellCheckLanguage, hunspellManager])
 
   const projectFeaturesRef = useRef(projectFeatures)
-  const editorContextMenuEnabledRef = useRef(editorContextMenuEnabled)
 
   // listen to doc:after-opened, and focus the editor if it's not a new doc
   useEffect(() => {
@@ -235,7 +229,6 @@ function useCodeMirrorScope(view: EditorView) {
   const metadataRef = useRef({
     ...metadata,
     referenceKeys,
-    searchLocalReferences,
     fileTreeData,
   })
 
@@ -255,14 +248,6 @@ function useCodeMirrorScope(view: EditorView) {
     })
   }, [view, referenceKeys])
 
-  // listen to project reference search updates
-  useEffect(() => {
-    metadataRef.current.searchLocalReferences = searchLocalReferences
-    window.setTimeout(() => {
-      view.dispatch(setMetadata(metadataRef.current))
-    })
-  }, [view, searchLocalReferences])
-
   // listen to project root folder updates
   useEffect(() => {
     if (fileTreeData) {
@@ -277,23 +262,12 @@ function useCodeMirrorScope(view: EditorView) {
 
   const { previewByPath } = useFileTreePathContext()
 
-  const showVisual =
-    visual && !!openDocName && isCmVisualEditorAvailable(openDocName)
+  const showVisual = visual && !!openDocName && isValidTeXFile(openDocName)
 
   const visualRef = useRef({
     previewByPath,
     visual: showVisual,
   })
-
-  // Persist the search query in this hook when the document changes by keeping
-  // a reference to the search query in sync with the editor state
-  const searchQueryRef = useRef<SearchQuery | null>(null)
-  useEventListener(
-    'search-panel-before-doc-change',
-    useCallback((event: CustomEvent) => {
-      searchQueryRef.current = event.detail
-    }, [])
-  )
 
   const { showBoundary } = useErrorBoundary()
 
@@ -306,7 +280,7 @@ function useCodeMirrorScope(view: EditorView) {
         // which editor keybindings are active ('default' | 'vim' | 'emacs')
         ol_editor_keybindings: settingsRef.current.mode,
         // whether Writefull is present ('extension' | 'integration' | 'none')
-        ol_extensions_writefull: window.writefull ? 'integration' : 'none',
+        ol_extensions_writefull: window.writefull?.type ?? 'none',
         // whether Grammarly is present
         ol_extensions_grammarly: grammarlyExtensionPresent(),
       },
@@ -318,13 +292,6 @@ function useCodeMirrorScope(view: EditorView) {
   useEffect(() => {
     if (currentDocument) {
       debugConsole.log('creating new editor state')
-
-      // Warn any interested extension that the document is about to change,
-      // allowing it to perform any necessary actions before creating the new
-      // state. destroy() is too late because the new state is already created
-      view.dispatch({
-        effects: beforeChangeDocEffect.of(null),
-      })
 
       const state = EditorState.create({
         doc: currentDocument.getSnapshot(),
@@ -341,11 +308,8 @@ function useCodeMirrorScope(view: EditorView) {
           spelling: spellingRef.current,
           visual: visualRef.current,
           projectFeatures: projectFeaturesRef.current,
-          editorContextMenuEnabled: editorContextMenuEnabledRef.current,
-          initialSearchQuery: searchQueryRef.current,
           showBoundary,
           handleException,
-          setEditorSelection,
         }),
       })
       view.setState(state)
@@ -375,7 +339,7 @@ function useCodeMirrorScope(view: EditorView) {
     }
     // IMPORTANT: This effect must not depend on anything variable apart from currentDocument,
     // as the editor state is recreated when the effect runs.
-  }, [view, currentDocument, showBoundary, handleException, setEditorSelection])
+  }, [view, currentDocument, showBoundary, handleException])
 
   useEffect(() => {
     if (openDocName) {
@@ -470,13 +434,6 @@ function useCodeMirrorScope(view: EditorView) {
       view.dispatch(setMathPreview(mathPreview))
     })
   }, [view, mathPreview])
-
-  useEffect(() => {
-    settingsRef.current.nonBlinkingCursor = nonBlinkingCursor
-    window.setTimeout(() => {
-      view.dispatch(setNonBlinkingCursor(nonBlinkingCursor))
-    })
-  }, [view, nonBlinkingCursor])
 
   useEffect(() => {
     settingsRef.current.referencesSearchMode = referencesSearchMode

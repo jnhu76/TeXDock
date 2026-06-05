@@ -3,23 +3,22 @@ import { Trans, useTranslation } from 'react-i18next'
 import { transferProjectOwnership } from '../utils/api'
 import { useProjectContext } from '@/shared/context/project-context'
 import { useLocation } from '@/shared/hooks/use-location'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLNotification from '@/shared/components/ol/ol-notification'
-import OLButton from '@/shared/components/ol/ol-button'
-import { ProjectMember } from '@/shared/context/types/project-metadata'
-import OLSpinner from '@/shared/components/ol/ol-spinner'
+} from '@/features/ui/components/ol/ol-modal'
+import OLNotification from '@/features/ui/components/ol/ol-notification'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import { Spinner } from 'react-bootstrap'
+import { ProjectContextMember } from '@/shared/context/types/project-context'
 
 export default function TransferOwnershipModal({
   member,
   cancel,
 }: {
-  member: ProjectMember
+  member: ProjectContextMember
   cancel: () => void
 }) {
   const { t } = useTranslation()
@@ -28,7 +27,7 @@ export default function TransferOwnershipModal({
   const [error, setError] = useState(false)
   const location = useLocation()
 
-  const { projectId, name: projectName } = useProjectContext()
+  const { _id: projectId, name: projectName } = useProjectContext()
 
   function confirm() {
     setError(false)
@@ -46,7 +45,7 @@ export default function TransferOwnershipModal({
 
   return (
     <OLModal show onHide={cancel}>
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{t('change_project_owner')}</OLModalTitle>
       </OLModalHeader>
       <OLModalBody>
@@ -69,7 +68,16 @@ export default function TransferOwnershipModal({
         )}
       </OLModalBody>
       <OLModalFooter>
-        <div className="me-auto">{inflight && <OLSpinner size="sm" />}</div>
+        <div className="me-auto">
+          {inflight && (
+            <Spinner
+              animation="border"
+              aria-hidden="true"
+              size="sm"
+              role="status"
+            />
+          )}
+        </div>
         <OLButton variant="secondary" onClick={cancel} disabled={inflight}>
           {t('cancel')}
         </OLButton>

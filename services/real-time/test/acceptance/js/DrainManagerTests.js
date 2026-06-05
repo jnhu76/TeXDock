@@ -5,17 +5,22 @@
  * DS102: Remove unnecessary code created because of implicit returns
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import RealTimeClient from './helpers/RealTimeClient.js'
+const RealTimeClient = require('./helpers/RealTimeClient')
+const FixturesManager = require('./helpers/FixturesManager')
 
-import FixturesManager from './helpers/FixturesManager.js'
-import { expect } from 'chai'
-import async from 'async'
-import { fetchNothing } from '@overleaf/fetch-utils'
+const { expect } = require('chai')
 
-const drain = async function (rate) {
-  await fetchNothing(`http://127.0.0.1:3026/drain?rate=${rate}`, {
-    method: 'POST',
-  })
+const async = require('async')
+const request = require('request')
+
+const drain = function (rate, callback) {
+  request.post(
+    {
+      url: `http://127.0.0.1:3026/drain?rate=${rate}`,
+    },
+    (error, response, data) => callback(error, data)
+  )
+  return null
 }
 
 describe('DrainManagerTests', function () {
@@ -30,7 +35,7 @@ describe('DrainManagerTests', function () {
       (e, { project_id: projectId, user_id: userId }) => {
         this.project_id = projectId
         this.user_id = userId
-        done()
+        return done()
       }
     )
     return null
@@ -39,23 +44,23 @@ describe('DrainManagerTests', function () {
   before(function (done) {
     // cleanup to speedup reconnecting
     this.timeout(10000)
-    RealTimeClient.disconnectAllClients(done)
+    return RealTimeClient.disconnectAllClients(done)
   })
 
   // trigger and check cleanup
   it('should have disconnected all previous clients', function (done) {
-    RealTimeClient.getConnectedClients((error, data) => {
+    return RealTimeClient.getConnectedClients((error, data) => {
       if (error) {
         return done(error)
       }
       expect(data.length).to.equal(0)
-      done()
+      return done()
     })
   })
 
-  describe('with two clients in the project', function () {
+  return describe('with two clients in the project', function () {
     beforeEach(function (done) {
-      async.series(
+      return async.series(
         [
           cb => {
             this.clientA = RealTimeClient.connect(this.project_id, cb)
@@ -69,37 +74,34 @@ describe('DrainManagerTests', function () {
       )
     })
 
-    describe('starting to drain', function () {
+    return describe('starting to drain', function () {
       beforeEach(function (done) {
-        async.parallel(
+        return async.parallel(
           [
             cb => {
-              this.clientA.on('reconnectGracefully', cb)
+              return this.clientA.on('reconnectGracefully', cb)
             },
             cb => {
-              this.clientB.on('reconnectGracefully', cb)
+              return this.clientB.on('reconnectGracefully', cb)
             },
 
-            cb =>
-              drain(2)
-                .then(() => cb())
-                .catch(cb),
+            cb => drain(2, cb),
           ],
           done
         )
       })
 
-      afterEach(async function () {
-        await drain(0)
+      afterEach(function (done) {
+        return drain(0, done)
       }) // reset drain
 
       it('should not timeout', function () {
-        expect(true).to.equal(true)
+        return expect(true).to.equal(true)
       })
 
-      it('should not have disconnected', function () {
+      return it('should not have disconnected', function () {
         expect(this.clientA.socket.connected).to.equal(true)
-        expect(this.clientB.socket.connected).to.equal(true)
+        return expect(this.clientB.socket.connected).to.equal(true)
       })
     })
   })

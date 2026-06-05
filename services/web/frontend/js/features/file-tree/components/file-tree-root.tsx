@@ -6,6 +6,7 @@ import FileTreeContext from './file-tree-context'
 import FileTreeDraggablePreviewLayer from './file-tree-draggable-preview-layer'
 import FileTreeFolderList from './file-tree-folder-list'
 import FileTreeToolbar from './file-tree-toolbar'
+import FileTreeToolbarNew from '@/features/ide-redesign/components/file-tree/file-tree-toolbar'
 import FileTreeModalDelete from './modals/file-tree-modal-delete'
 import FileTreeModalCreateFolder from './modals/file-tree-modal-create-folder'
 import FileTreeModalError from './modals/file-tree-modal-error'
@@ -18,7 +19,7 @@ import FileTreeInner from './file-tree-inner'
 import { useDragLayer } from 'react-dnd'
 import classnames from 'classnames'
 import { pathInFolder } from '@/features/file-tree/util/path'
-import { FileTreeFindResult } from '@/features/ide-react/types/file-tree'
+import { useIsNewEditorEnabled } from '@/features/ide-redesign/utils/new-editor-utils'
 
 const FileTreeRoot = React.memo<{
   onSelect: () => void
@@ -39,9 +40,10 @@ const FileTreeRoot = React.memo<{
 }) {
   const [fileTreeContainer, setFileTreeContainer] =
     useState<HTMLDivElement | null>(null)
-  const { projectId } = useProjectContext()
+  const { _id: projectId } = useProjectContext()
   const { fileTreeData } = useFileTreeData()
   const isReady = Boolean(projectId && fileTreeData)
+  const newEditor = useIsNewEditorEnabled()
 
   useEffect(() => {
     if (fileTreeContainer) {
@@ -98,7 +100,7 @@ const FileTreeRoot = React.memo<{
           fileTreeContainer={fileTreeContainer}
         >
           {isConnected ? null : <div className="disconnected-overlay" />}
-          <FileTreeToolbar />
+          {newEditor ? <FileTreeToolbarNew /> : <FileTreeToolbar />}
           <FileTreeContextMenu />
           <FileTreeInner>
             <FileTreeRootFolder onDelete={onDelete} />
@@ -113,11 +115,7 @@ const FileTreeRoot = React.memo<{
   )
 })
 
-function FileTreeRootFolder({
-  onDelete,
-}: {
-  onDelete: (entity: FileTreeFindResult, isFileRestore?: boolean) => void
-}) {
+function FileTreeRootFolder({ onDelete }: { onDelete: () => void }) {
   useFileTreeSocketListener(onDelete)
   const { fileTreeData } = useFileTreeData()
 

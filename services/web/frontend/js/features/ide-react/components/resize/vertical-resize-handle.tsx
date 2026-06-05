@@ -1,8 +1,6 @@
-import {
-  PanelResizeHandle,
-  PanelResizeHandleProps,
-} from 'react-resizable-panels'
+import { PanelResizeHandle } from 'react-resizable-panels'
 import { useTranslation } from 'react-i18next'
+import { PanelResizeHandleProps } from 'react-resizable-panels/dist/declarations/src/PanelResizeHandle'
 import classNames from 'classnames'
 
 export function VerticalResizeHandle(props: PanelResizeHandleProps) {

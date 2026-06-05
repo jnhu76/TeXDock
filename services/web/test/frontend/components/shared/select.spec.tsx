@@ -1,7 +1,7 @@
 import { useCallback, FormEvent } from 'react'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLForm from '@/shared/components/ol/ol-form'
-import OLFormControl from '@/shared/components/ol/ol-form-control'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLForm from '@/features/ui/components/ol/ol-form'
+import OLFormControl from '@/features/ui/components/ol/ol-form-control'
 import {
   Select,
   SelectProps,
@@ -40,7 +40,6 @@ function render(props: RenderProps) {
           items={testData}
           itemToString={x => String(x?.value)}
           label={props.label}
-          id={props.id}
           name="select_control"
           defaultText={props.defaultText}
           defaultItem={props.defaultItem}
@@ -53,7 +52,6 @@ function render(props: RenderProps) {
           optionalLabel={props.optionalLabel}
           loading={props.loading}
           selectedIcon={props.selectedIcon}
-          portal={props.portal}
         />
         <button type="submit">submit</button>
       </form>
@@ -63,41 +61,9 @@ function render(props: RenderProps) {
 
 describe('<Select />', function () {
   describe('initial rendering', function () {
-    it('associates an external label when id is provided', function () {
-      cy.mount(
-        <div style={{ width: '300px' }}>
-          <label htmlFor="external-select">External label</label>
-          <Select
-            id="external-select"
-            items={testData}
-            itemToString={x => String(x?.value)}
-            itemToKey={x => String(x.key)}
-            defaultText="Choose an item"
-          />
-        </div>
-      )
-      cy.findByRole('combobox', { name: 'External label' }).should('exist')
-    })
-
-    it('does not associate an external label when id is not provided', function () {
-      cy.mount(
-        <div style={{ width: '300px' }}>
-          <label htmlFor="external-select">External label</label>
-          <Select
-            items={testData}
-            itemToString={x => String(x?.value)}
-            itemToKey={x => String(x.key)}
-            defaultText="Choose an item"
-          />
-        </div>
-      )
-      cy.findByRole('combobox').should('have.value', 'Choose an item')
-      cy.findByRole('combobox', { name: 'External label' }).should('not.exist')
-    })
-
     it('renders default text', function () {
       render({ defaultText: 'Choose an item' })
-      cy.findByTestId('ol-spinner').should('not.exist')
+      cy.findByTestId('spinner').should('not.exist')
       cy.findByRole('combobox').should('have.value', 'Choose an item')
     })
 
@@ -136,7 +102,7 @@ describe('<Select />', function () {
         label: 'test label',
         loading: true,
       })
-      cy.findByTestId('ol-spinner')
+      cy.findByTestId('spinner')
     })
 
     it('does not render a spinner while loading if there is no label', function () {
@@ -144,7 +110,7 @@ describe('<Select />', function () {
         defaultText: 'Choose an item',
         loading: true,
       })
-      cy.findByTestId('ol-spinner').should('not.exist')
+      cy.findByTestId('spinner').should('not.exist')
     })
   })
 
@@ -168,26 +134,6 @@ describe('<Select />', function () {
       cy.findByRole('option', { name: 'Demo item 1 Subtitle 1' })
       cy.findByRole('option', { name: 'Demo item 2 Subtitle 2' })
       cy.findByRole('option', { name: 'Demo item 3 Subtitle 3' })
-    })
-
-    it('renders dropdown inside a popover when portal is enabled', function () {
-      render({ defaultText: 'Choose an item', portal: true })
-      cy.findByRole('combobox').click()
-
-      cy.get('.select-portal-popover').should('exist')
-      cy.get('.select-portal-popover .select-portal-menu')
-        .should('exist')
-        .and('be.visible')
-      cy.findByRole('option', { name: 'Demo item 1' }).should('exist')
-    })
-
-    it('does not render a popover when portal is disabled', function () {
-      render({ defaultText: 'Choose an item', portal: false })
-      cy.findByRole('combobox').click()
-
-      cy.get('.select-portal-popover').should('not.exist')
-      cy.get('.select-portal-menu').should('not.exist')
-      cy.findByRole('option', { name: 'Demo item 1' }).should('exist')
     })
   })
 

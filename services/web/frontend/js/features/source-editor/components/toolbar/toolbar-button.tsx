@@ -4,7 +4,7 @@ import { useCodeMirrorViewContext } from '../codemirror-context'
 import classnames from 'classnames'
 import { emitToolbarEvent } from '../../extensions/toolbar/utils/analytics'
 import MaterialIcon from '@/shared/components/material-icon'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
 
 export const ToolbarButton = memo<{
   id: string
@@ -73,10 +73,8 @@ export const ToolbarButton = memo<{
 
   const description = (
     <>
-      <div>
-        {label}
-        {shortcut && <span> ({shortcut})</span>}
-      </div>
+      <div>{label}</div>
+      {shortcut && <div>{shortcut}</div>}
     </>
   )
 

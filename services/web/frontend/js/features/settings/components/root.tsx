@@ -15,14 +15,13 @@ import LeaveSection from './leave-section'
 import * as eventTracking from '../../../infrastructure/event-tracking'
 import { UserProvider } from '../../../shared/context/user-context'
 import { SSOProvider } from '../context/sso-context'
+import { SplitTestProvider } from '@/shared/context/split-test-context'
 import useWaitForI18n from '../../../shared/hooks/use-wait-for-i18n'
 import useScrollToIdOnLoad from '../../../shared/hooks/use-scroll-to-id-on-load'
 import { SSOAlert } from './emails/sso-alert'
-import OLRow from '@/shared/components/ol/ol-row'
-import OLCol from '@/shared/components/ol/ol-col'
-import OLPageContentCard from '@/shared/components/ol/ol-page-content-card'
-import { isSplitTestEnabled } from '@/utils/splitTestUtils'
-import NotificationsSection from './notifications-section'
+import OLRow from '@/features/ui/components/ol/ol-row'
+import OLCol from '@/features/ui/components/ol/ol-col'
+import OLPageContentCard from '@/features/ui/components/ol/ol-page-content-card'
 
 function SettingsPageRoot() {
   const { isReady } = useWaitForI18n()
@@ -46,7 +45,7 @@ function SettingsPageRoot() {
 function SettingsPageContent() {
   const { t } = useTranslation()
   const { isOverleaf, labsEnabled } = getMeta('ol-ExposedSettings')
-  const inNotificationsSplitTest = isSplitTestEnabled('email-notifications')
+
   return (
     <UserProvider>
       <OLPageContentCard>
@@ -67,9 +66,11 @@ function SettingsPageContent() {
           </OLRow>
           <hr />
           <SecuritySection />
-          <SSOProvider>
-            <LinkingSection />
-          </SSOProvider>
+          <SplitTestProvider>
+            <SSOProvider>
+              <LinkingSection />
+            </SSOProvider>
+          </SplitTestProvider>
           {isOverleaf ? (
             <>
               <BetaProgramSection />
@@ -85,11 +86,7 @@ function SettingsPageContent() {
           {isOverleaf ? (
             <>
               <hr />
-              {inNotificationsSplitTest ? (
-                <NotificationsSection />
-              ) : (
-                <NewsletterSection />
-              )}
+              <NewsletterSection />
               <hr />
               <LeaveSection />
             </>

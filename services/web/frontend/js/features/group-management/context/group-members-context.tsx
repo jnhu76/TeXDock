@@ -1,7 +1,5 @@
 import {
-  Dispatch,
   ReactNode,
-  SetStateAction,
   createContext,
   useCallback,
   useContext,
@@ -20,23 +18,19 @@ import { debugConsole } from '@/utils/debugging'
 export type GroupMembersContextValue = {
   users: User[]
   selectedUsers: User[]
-  setSelectedUsers: Dispatch<SetStateAction<User[]>>
   selectUser: (user: User) => void
   selectAllUsers: () => void
   unselectAllUsers: () => void
   selectAllNonManagedUsers: () => void
   unselectUser: (user: User) => void
   addMembers: (emailString: string) => void
-  removeMembers: (e: any, keepUsers?: boolean) => void
-  removeMember: (user: User, keepUser?: boolean) => Promise<void>
+  removeMembers: (e: any) => void
+  removeMember: (user: User) => Promise<void>
   removeMemberLoading: boolean
   removeMemberError?: APIError
   updateMemberView: (userId: string, updatedUser: User) => void
   inviteMemberLoading: boolean
   inviteError?: APIError
-  addManager: (email: string) => Promise<void>
-  removeManager: (user: User, keepUser?: boolean) => Promise<void>
-  memberAdded: boolean
   paths: { [key: string]: string }
 }
 
@@ -53,7 +47,6 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
     users,
     setUsers,
     selectedUsers,
-    setSelectedUsers,
     selectAllUsers,
     unselectAllUsers,
     selectAllNonManagedUsers,
@@ -65,9 +58,6 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
   const [inviteError, setInviteError] = useState<APIError>()
   const [removeMemberInflightCount, setRemoveMemberInflightCount] = useState(0)
   const [removeMemberError, setRemoveMemberError] = useState<APIError>()
-  const [addManagerError, setAddManagerError] = useState<APIError>()
-  const [removeManagerError, setRemoveManagerError] = useState<APIError>()
-  const [memberAdded, setMemberAdded] = useState(false)
 
   const groupId = getMeta('ol-groupId')
 
@@ -77,33 +67,14 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
       removeMember: `/manage/groups/${groupId}/user`,
       removeInvite: `/manage/groups/${groupId}/invites`,
       exportMembers: `/manage/groups/${groupId}/members/export`,
-      addManager: `/manage/groups/${groupId}/managers`,
-      removeManager: `/manage/groups/${groupId}/managers`,
     }),
     [groupId]
-  )
-
-  const updateMemberView = useCallback(
-    (userId: string, updatedUser: User) => {
-      setUsers(users =>
-        users.map(u => {
-          if (u._id === userId) {
-            return updatedUser
-          } else {
-            return u
-          }
-        })
-      )
-    },
-    [setUsers]
   )
 
   const addMembers = useCallback(
     (emailString: string) => {
       setInviteError(undefined)
-      setMemberAdded(false)
       const emails = parseEmails(emailString)
-      let isError = false
       mapSeries(emails, async email => {
         setInviteUserInflightCount(count => count + 1)
         try {
@@ -118,34 +89,22 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
             )
             if (!alreadyListed) {
               setUsers(users => [...users, data.user])
-            } else {
-              updateMemberView(alreadyListed._id, {
-                ...alreadyListed,
-                invite: true,
-              })
             }
           }
         } catch (error: unknown) {
           debugConsole.error(error)
           setInviteError((error as FetchError)?.data?.error || {})
-          isError = true
         }
-        setInviteUserInflightCount(count => {
-          const newCount = count - 1
-          if (newCount === 0 && !isError) {
-            setMemberAdded(true)
-          }
-          return newCount
-        })
+        setInviteUserInflightCount(count => count - 1)
       })
     },
-    [paths.addMember, users, setUsers, updateMemberView]
+    [paths.addMember, users, setUsers]
   )
 
   const removeMember = useCallback(
-    async (user: User, keepUser = false) => {
+    async (user: User) => {
       let url
-      if (paths.removeInvite && user.invite && user._id === null) {
+      if (paths.removeInvite && user.invite && user._id == null) {
         url = `${paths.removeInvite}/${encodeURIComponent(user.email)}`
       } else if (paths.removeMember && user._id) {
         url = `${paths.removeMember}/${user._id}`
@@ -155,16 +114,7 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
       setRemoveMemberInflightCount(count => count + 1)
       try {
         await deleteJSON(url, {})
-        if (!keepUser) {
-          setUsers(users => users.filter(u => u !== user))
-        } else {
-          updateMemberView(user._id, {
-            ...user,
-            invite: false,
-            isEntityMember: false,
-            enrollment: {},
-          })
-        }
+        setUsers(users => users.filter(u => u !== user))
         unselectUser(user)
       } catch (error: unknown) {
         debugConsole.error(error)
@@ -172,17 +122,11 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
       }
       setRemoveMemberInflightCount(count => count - 1)
     },
-    [
-      unselectUser,
-      setUsers,
-      paths.removeInvite,
-      paths.removeMember,
-      updateMemberView,
-    ]
+    [unselectUser, setUsers, paths.removeInvite, paths.removeMember]
   )
 
   const removeMembers = useCallback(
-    (e: any, keepUsers = false) => {
+    (e: any) => {
       e.preventDefault()
       setRemoveMemberError(undefined)
       ;(async () => {
@@ -190,78 +134,32 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
           if (user?.enrollment?.managedBy) {
             continue
           }
-          await removeMember(user, keepUsers)
+          await removeMember(user)
         }
       })()
     },
     [selectedUsers, removeMember]
   )
 
-  const addManager = useCallback(
-    async (email: string) => {
-      setAddManagerError(undefined)
-
-      try {
-        const data = await postJSON<{ user: User }>(paths.addManager, {
-          body: {
-            email,
-          },
-        })
-        if (data.user) {
-          const alreadyListed = users.find(
-            user => user.email === data.user.email
-          )
-          if (!alreadyListed) {
-            setUsers(users => [...users, data.user])
+  const updateMemberView = useCallback(
+    (userId: string, updatedUser: User) => {
+      setUsers(
+        users.map(u => {
+          if (u._id === userId) {
+            return updatedUser
           } else {
-            updateMemberView(alreadyListed._id, {
-              ...alreadyListed,
-              isEntityManager: true,
-            })
+            return u
           }
-        }
-      } catch (error: unknown) {
-        debugConsole.error(error)
-        setAddManagerError((error as FetchError)?.data?.error || {})
-      }
+        })
+      )
     },
-    [paths.addManager, users, setUsers, updateMemberView]
-  )
-
-  const removeManager = useCallback(
-    async (user: User, keepUser = false) => {
-      setRemoveMemberError(undefined)
-
-      let url
-      if (paths.removeManager && user._id) {
-        url = `${paths.removeManager}/${user._id}`
-      } else {
-        return
-      }
-      try {
-        await deleteJSON(url, {})
-        if (!keepUser) {
-          setUsers(users => users.filter(u => u !== user))
-        } else {
-          updateMemberView(user._id, {
-            ...user,
-            isEntityManager: false,
-          })
-        }
-        unselectUser(user)
-      } catch (error: unknown) {
-        debugConsole.error(error)
-        setRemoveManagerError((error as FetchError)?.data?.error || {})
-      }
-    },
-    [unselectUser, paths.removeManager, setUsers, updateMemberView]
+    [setUsers, users]
   )
 
   const value = useMemo<GroupMembersContextValue>(
     () => ({
       users,
       selectedUsers,
-      setSelectedUsers,
       selectAllUsers,
       unselectAllUsers,
       selectAllNonManagedUsers,
@@ -275,16 +173,10 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
       removeMemberError,
       inviteMemberLoading: inviteUserInflightCount > 0,
       inviteError,
-      addManager,
-      addManagerError,
-      removeManager,
-      removeManagerError,
-      memberAdded,
       paths,
     }),
     [
       users,
-      setSelectedUsers,
       selectedUsers,
       selectAllUsers,
       unselectAllUsers,
@@ -299,11 +191,6 @@ export function GroupMembersProvider({ children }: GroupMembersProviderProps) {
       removeMemberError,
       inviteUserInflightCount,
       inviteError,
-      addManager,
-      addManagerError,
-      removeManager,
-      removeManagerError,
-      memberAdded,
       paths,
     ]
   )

@@ -5,56 +5,14 @@ import {
   useCallback,
   ReactNode,
   useState,
-  useId,
 } from 'react'
 import classNames from 'classnames'
 import { useSelect } from 'downshift'
 import { useTranslation } from 'react-i18next'
-import { Form } from 'react-bootstrap'
-import FormControl from '@/shared/components/form/form-control'
+import { Form, Spinner } from 'react-bootstrap'
+import FormControl from '@/features/ui/components/bootstrap-5/form/form-control'
 import MaterialIcon from '@/shared/components/material-icon'
-import { CaretUp, CaretDown, Check } from '@phosphor-icons/react'
-import { DropdownItem } from '@/shared/components/dropdown/dropdown-menu'
-import OLOverlay from '@/shared/components/ol/ol-overlay'
-import OLSpinner from './ol/ol-spinner'
-import DSFormLabel from '@/shared/components/ds/ds-form-label'
-import DSFormGroup from '@/shared/components/ds/ds-form-group'
-import DSFormControl from '@/shared/components/ds/ds-form-control'
-import { DropdownItemProps } from '@/shared/components/types/dropdown-menu-props'
-
-function SelectMenuPopover({
-  show,
-  target,
-  onHide,
-  children,
-}: {
-  show: boolean
-  target: HTMLElement | null
-  onHide: () => void
-  children: ReactNode
-}) {
-  const id = useId()
-  return (
-    <OLOverlay
-      show={show}
-      target={target}
-      placement="bottom-start"
-      rootClose
-      onHide={onHide}
-    >
-      {({ ref, style }) => (
-        <div
-          id={`select-popover-${id}`}
-          ref={ref}
-          style={{ ...style, width: target?.offsetWidth }}
-          className="select-portal-popover"
-        >
-          {children}
-        </div>
-      )}
-    </OLOverlay>
-  )
-}
+import { DropdownItem } from '@/features/ui/components/bootstrap-5/dropdown-menu'
 
 export type SelectProps<T> = {
   // The items rendered as dropdown options.
@@ -76,10 +34,6 @@ export type SelectProps<T> = {
   itemToSubtitle?: (item: T | null | undefined) => string
   // Stringifies an item. The resulting string is rendered as a React `key` for each item.
   itemToKey: (item: T) => string
-  // Maps an item to a leading icon.
-  itemToLeadingIcon?: (
-    item: T | null | undefined
-  ) => DropdownItemProps['leadingIcon']
   // Callback invoked after the selected item is updated.
   onSelectedItemChanged?: (item: T | null | undefined) => void
   // Optionally directly control the selected item.
@@ -96,14 +50,6 @@ export type SelectProps<T> = {
   selectedIcon?: boolean
   // testId for the input element
   dataTestId?: string
-  // CIAM-specific layout
-  isCiam?: boolean
-  size?: React.ComponentProps<typeof FormControl>['size']
-  // Renders the menu in a portal so it escapes overflow-clipping ancestors.
-  portal?: boolean
-  // Optional id for the toggle button element. When provided, enables association
-  // with an external <label htmlFor="...">
-  id?: string
 }
 
 export const Select = <T,>({
@@ -115,7 +61,6 @@ export const Select = <T,>({
   defaultItem,
   itemToSubtitle,
   itemToKey,
-  itemToLeadingIcon,
   onSelectedItemChanged,
   selected,
   disabled = false,
@@ -124,12 +69,7 @@ export const Select = <T,>({
   loading = false,
   selectedIcon = false,
   dataTestId,
-  isCiam,
-  size,
-  portal = false,
-  id,
 }: SelectProps<T>) => {
-  const toggleButtonId = id ? { id } : {}
   const [selectedItem, setSelectedItem] = useState<T | undefined | null>(
     defaultItem
   )
@@ -204,95 +144,6 @@ export const Select = <T,>({
     value = defaultText
   }
 
-  const tickIcon = function () {
-    return isCiam ? <Check /> : 'check'
-  }
-
-  const menu = (
-    <ul
-      {...getMenuProps({ disabled }, { suppressRefError: portal })}
-      className={classNames('dropdown-menu', {
-        'w-100': !isCiam,
-        'ciam-dropdown-menu': isCiam,
-        show: isOpen,
-        'select-portal-menu': portal,
-      })}
-    >
-      {isOpen &&
-        items?.map((item, index) => {
-          // We're using an actual disabled button so we don't need the
-          // aria-disabled prop
-          const { 'aria-disabled': disabled, ...itemProps } = getItemProps({
-            item,
-            index,
-          })
-          return (
-            <li role="none" key={itemToKey(item)}>
-              <DropdownItem
-                as="button"
-                type="button"
-                className={classNames({
-                  'select-highlighted': highlightedIndex === index,
-                })}
-                active={selectedItem === item}
-                trailingIcon={
-                  selectedIcon && selectedItem === item ? tickIcon() : undefined
-                }
-                leadingIcon={
-                  itemToLeadingIcon ? itemToLeadingIcon(item) : undefined
-                }
-                description={itemToSubtitle ? itemToSubtitle(item) : undefined}
-                {...itemProps}
-                disabled={disabled}
-              >
-                {itemToString(item)}
-              </DropdownItem>
-            </li>
-          )
-        })}
-    </ul>
-  )
-
-  const dropdown = portal ? (
-    <SelectMenuPopover
-      show={isOpen}
-      target={rootRef.current}
-      onHide={closeMenu}
-    >
-      {menu}
-    </SelectMenuPopover>
-  ) : (
-    menu
-  )
-
-  if (isCiam) {
-    return (
-      <div className="select-wrapper" ref={rootRef}>
-        <DSFormGroup>
-          {label ? (
-            <DSFormLabel {...getLabelProps()}>
-              {label} {optionalLabel && <span>({t('optional')})</span>}{' '}
-              {loading && <OLSpinner size="sm" />}
-            </DSFormLabel>
-          ) : null}
-          <DSFormControl
-            data-testid={dataTestId}
-            {...getToggleButtonProps({
-              disabled,
-              onKeyDown,
-              className: 'select-trigger',
-              ...toggleButtonId,
-            })}
-            value={value}
-            readOnly
-            append={isOpen ? <CaretUp /> : <CaretDown />}
-          />
-          {dropdown}
-        </DSFormGroup>
-      </div>
-    )
-  }
-
   return (
     <div className="select-wrapper" ref={rootRef}>
       {label ? (
@@ -301,7 +152,17 @@ export const Select = <T,>({
           {optionalLabel && (
             <span className="fw-normal">({t('optional')})</span>
           )}{' '}
-          {loading && <OLSpinner size="sm" />}
+          {loading && (
+            <span data-testid="spinner">
+              <Spinner
+                animation="border"
+                aria-hidden="true"
+                as="span"
+                role="status"
+                size="sm"
+              />
+            </span>
+          )}
         </Form.Label>
       ) : null}
       <FormControl
@@ -310,7 +171,6 @@ export const Select = <T,>({
           disabled,
           onKeyDown,
           className: 'select-trigger',
-          ...toggleButtonId,
         })}
         value={value}
         readOnly
@@ -320,9 +180,43 @@ export const Select = <T,>({
             className="align-text-bottom"
           />
         }
-        size={size}
       />
-      {dropdown}
+      <ul
+        {...getMenuProps({ disabled })}
+        className={classNames('dropdown-menu w-100', { show: isOpen })}
+      >
+        {isOpen &&
+          items?.map((item, index) => {
+            // We're using an actual disabled button so we don't need the
+            // aria-disabled prop
+            const { 'aria-disabled': disabled, ...itemProps } = getItemProps({
+              item,
+              index,
+            })
+            return (
+              <li role="none" key={itemToKey(item)}>
+                <DropdownItem
+                  as="button"
+                  type="button"
+                  className={classNames({
+                    'select-highlighted': highlightedIndex === index,
+                  })}
+                  active={selectedItem === item}
+                  trailingIcon={
+                    selectedIcon && selectedItem === item ? 'check' : undefined
+                  }
+                  description={
+                    itemToSubtitle ? itemToSubtitle(item) : undefined
+                  }
+                  {...itemProps}
+                  disabled={disabled}
+                >
+                  {itemToString(item)}
+                </DropdownItem>
+              </li>
+            )
+          })}
+      </ul>
     </div>
   )
 }

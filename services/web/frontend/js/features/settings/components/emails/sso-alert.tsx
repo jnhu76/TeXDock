@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import getMeta from '../../../../utils/meta'
-import OLNotification from '@/shared/components/ol/ol-notification'
+import OLNotification from '@/features/ui/components/ol/ol-notification'
 
 export function SSOAlert() {
   const { t } = useTranslation()
@@ -21,26 +21,17 @@ export function SSOAlert() {
   const handleErrorClosed = () => setErrorClosed(true)
 
   if (samlError) {
-    const content =
-      samlError.name === 'SAMLCommonsReconfirmationUnableToFindUserError' ? (
-        <Trans
-          i18nKey="saml_commons_reconfirmation_unable_to_find_user"
-          // eslint-disable-next-line jsx-a11y/anchor-has-content, react/jsx-key
-          components={[<a href="/contact" target="_blank" />]}
-        />
-      ) : (
-        <>
-          {samlError.translatedMessage
-            ? samlError.translatedMessage
-            : samlError.message}
-          {samlError.tryAgain && <p>{t('try_again')}</p>}
-        </>
-      )
-
     return !errorClosed ? (
       <OLNotification
         type="error"
-        content={content}
+        content={
+          <>
+            {samlError.translatedMessage
+              ? samlError.translatedMessage
+              : samlError.message}
+            {samlError.tryAgain && <p>{t('try_again')}</p>}
+          </>
+        }
         isDismissible
         onDismiss={handleErrorClosed}
       />
@@ -72,7 +63,7 @@ export function SSOAlert() {
                   <Trans
                     i18nKey="this_grants_access_to_features_2"
                     components={[<strong />]} // eslint-disable-line react/jsx-key
-                    values={{ featureType: t('commons') }}
+                    values={{ featureType: t('professional') }}
                     shouldUnescape
                     tOptions={{ interpolation: { escapeValue: true } }}
                   />

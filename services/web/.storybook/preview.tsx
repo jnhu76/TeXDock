@@ -1,8 +1,4 @@
-import { definePreview } from '@storybook/react-webpack5'
-import addonA11y from '@storybook/addon-a11y'
-import addonDesigns from '@storybook/addon-designs'
-import addonDocs from '@storybook/addon-docs'
-import addonLinks from '@storybook/addon-links'
+import type { Preview } from '@storybook/react'
 
 // Storybook does not (currently) support async loading of "stories". Therefore
 // the strategy in frontend/js/i18n.ts does not work (because we cannot wait on
@@ -17,10 +13,6 @@ import en from '../../../services/web/locales/en.json'
 function resetMeta() {
   window.metaAttributesCache = new Map()
   window.metaAttributesCache.set('ol-i18n', { currentLangCode: 'en' })
-  window.metaAttributesCache.set('ol-capabilities', ['chat'])
-  window.metaAttributesCache.set('ol-compileSettings', {
-    compileTimeout: 20,
-  })
   window.metaAttributesCache.set('ol-ExposedSettings', {
     adminEmail: 'placeholder@example.com',
     appName: 'Overleaf',
@@ -78,9 +70,6 @@ function resetMeta() {
       'gv',
       'mf',
       'lhs',
-      'lean',
-      'lean4',
-      'hs',
       'mk',
       'xmpdata',
       'cfg',
@@ -123,28 +112,15 @@ i18n.use(initReactI18next).init({
   },
 })
 
-export default definePreview({
-  addons: [addonA11y(), addonDesigns(), addonDocs(), addonLinks()],
+const preview: Preview = {
   parameters: {
     // Automatically mark prop-types like onClick, onToggle, etc as Storybook
     // "actions", so that they are logged in the Actions pane at the bottom of the
     // viewer
     actions: { argTypesRegex: '^on.*' },
     docs: {
-      story: {
-        // render stories in iframes, to isolate modals
-        inline: false,
-      },
-    },
-    options: {
-      storySort: {
-        method: 'alphabetical',
-        order: [
-          'Storybook Guideline',
-          ['Foundations', 'Storybook builds', 'Feature Flags'],
-          'Shared',
-        ],
-      },
+      // render stories in iframes, to isolate modals
+      inlineStories: false,
     },
   },
   globalTypes: {
@@ -166,7 +142,7 @@ export default definePreview({
       return {
         mainStyle: await import(
           // @ts-ignore
-          `!!to-string-loader!css-loader!resolve-url-loader!sass-loader!../../../services/web/frontend/stylesheets/main-style.scss`
+          `!!to-string-loader!css-loader!resolve-url-loader!sass-loader!../../../services/web/frontend/stylesheets/bootstrap-5/main-style.scss`
         ),
       }
     },
@@ -189,7 +165,9 @@ export default definePreview({
       )
     },
   ],
-})
+}
+
+export default preview
 
 // Populate meta for top-level access in modules on import
 resetMeta()

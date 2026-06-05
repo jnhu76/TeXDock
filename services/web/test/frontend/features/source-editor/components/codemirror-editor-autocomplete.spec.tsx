@@ -64,6 +64,7 @@ describe('autocomplete', { scrollBehavior: false }, function () {
     ]
 
     const scope = mockScope()
+    scope.project.rootFolder = rootFolder
 
     cy.mount(
       <TestContainer>
@@ -75,7 +76,7 @@ describe('autocomplete', { scrollBehavior: false }, function () {
 
     cy.get('.cm-editor').as('editor')
 
-    cy.get('.tok-keyword') // wait for parsing and syntax highlighting
+    cy.contains('\\section{Results}')
 
     // no autocomplete
     cy.findAllByRole('listbox').should('have.length', 0)
@@ -222,7 +223,7 @@ describe('autocomplete', { scrollBehavior: false }, function () {
 
     cy.get('.cm-editor').as('editor')
 
-    cy.get('.tok-keyword') // wait for parsing and syntax highlighting
+    cy.contains('\\section{Results}')
 
     // put the cursor on a blank line to type in
     cy.get('.cm-line').eq(16).as('line')
@@ -381,11 +382,6 @@ describe('autocomplete', { scrollBehavior: false }, function () {
           value={{
             referenceKeys: new Set(['ref-1', 'ref-2', 'ref-3']),
             indexAllReferences: cy.stub(),
-            searchLocalReferences() {
-              return Promise.resolve({
-                hits: [],
-              })
-            },
           }}
         >
           {children}
@@ -450,6 +446,7 @@ describe('autocomplete', { scrollBehavior: false }, function () {
     ]
 
     const scope = mockScope()
+    scope.project.rootFolder = rootFolder
 
     cy.mount(
       <TestContainer>
@@ -461,7 +458,7 @@ describe('autocomplete', { scrollBehavior: false }, function () {
 
     cy.get('.cm-editor').as('editor')
 
-    cy.get('.tok-keyword') // wait for parsing and syntax highlighting
+    cy.contains('\\section{Results}')
 
     // no autocomplete
     cy.findAllByRole('listbox').should('have.length', 0)
@@ -913,6 +910,7 @@ describe('autocomplete', { scrollBehavior: false }, function () {
     ]
 
     const scope = mockScope()
+    scope.project.rootFolder = rootFolder
 
     cy.mount(
       <TestContainer>

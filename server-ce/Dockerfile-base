@@ -1,19 +1,35 @@
+# syntax=docker/dockerfile:1-labs
 # --------------------------------------------------
 # Overleaf Base Image (sharelatex/sharelatex-base)
 # --------------------------------------------------
-
 FROM phusion/baseimage:noble-1.0.3
-
-RUN sed -i 's|http://archive.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list \
- && sed -i 's|http://security.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
 
 # Makes sure LuaTex cache is writable
 # -----------------------------------
 ENV TEXMFVAR=/var/lib/overleaf/tmp/texmf-var
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Update to ensure dependencies are updated
 # ------------------------------------------
 ENV REBUILT_AFTER="2026-05-21"
+
+# Use Ubuntu mirror for noble deb822 sources.
+ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu/
+RUN set -eux; \
+    cat > /etc/apt/sources.list.d/ubuntu.sources <<EOF
+Types: deb
+URIs: ${UBUNTU_MIRROR}
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: ${UBUNTU_MIRROR}
+Suites: noble-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
 
 # Install dependencies
 # --------------------

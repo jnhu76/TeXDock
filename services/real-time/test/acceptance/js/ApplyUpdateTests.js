@@ -10,13 +10,14 @@
  * DS201: Simplify complex destructure assignments
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import async from 'async'
+const async = require('async')
+const { expect } = require('chai')
 
-import { expect } from 'chai'
-import RealTimeClient from './helpers/RealTimeClient.js'
-import FixturesManager from './helpers/FixturesManager.js'
-import settings from '@overleaf/settings'
-import redis from '@overleaf/redis-wrapper'
+const RealTimeClient = require('./helpers/RealTimeClient')
+const FixturesManager = require('./helpers/FixturesManager')
+
+const settings = require('@overleaf/settings')
+const redis = require('@overleaf/redis-wrapper')
 const rclient = redis.createClient(settings.redis.documentupdater)
 
 const redisSettings = settings.redis

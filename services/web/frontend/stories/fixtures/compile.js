@@ -10,37 +10,37 @@ export const dispatchDocChanged = () => {
 export const outputFiles = [
   {
     path: 'output.pdf',
-    build: '1234-5678',
+    build: '123',
     url: '/build/output.pdf',
     type: 'pdf',
   },
   {
     path: 'output.bbl',
-    build: '1234-5678',
+    build: '123',
     url: '/build/output.bbl',
     type: 'bbl',
   },
   {
     path: 'output.bib',
-    build: '1234-5678',
+    build: '123',
     url: '/build/output.bib',
     type: 'bib',
   },
   {
     path: 'example.txt',
-    build: '1234-5678',
+    build: '123',
     url: '/build/example.txt',
     type: 'txt',
   },
   {
     path: 'output.log',
-    build: '1234-5678',
+    build: '123',
     url: '/build/output.log',
     type: 'log',
   },
   {
     path: 'output.blg',
-    build: '1234-5678',
+    build: '123',
     url: '/build/output.blg',
     type: 'blg',
   },
@@ -100,7 +100,7 @@ export const mockClearCache = fetchMock =>
   })
 
 export const mockBuildFile = fetchMock =>
-  fetchMock.get('express:/build/:file', ({ url }) => {
+  fetchMock.get('express:/build/:file', (url, options, request) => {
     const { pathname } = new URL(url, 'https://example.com')
 
     switch (pathname) {
@@ -190,7 +190,7 @@ export const mockEventTracking = fetchMock =>
   fetchMock.get('express:/event/:event', 204)
 
 export const mockValidPdf = fetchMock =>
-  fetchMock.get('express:/build/output.pdf', () => {
+  fetchMock.get('express:/build/output.pdf', (url, options, request) => {
     return new Promise(resolve => {
       const xhr = new XMLHttpRequest()
       xhr.addEventListener('load', () => {

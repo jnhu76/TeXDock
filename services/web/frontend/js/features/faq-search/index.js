@@ -2,7 +2,7 @@ import _ from 'lodash'
 import { formatWikiHit, searchWiki } from '../algolia-search/search-wiki'
 
 function setupSearch(formEl) {
-  const inputEl = formEl.querySelector('[data-ol-search-input]')
+  const inputEl = formEl.querySelector('input[type="search"]')
   const resultsEl = formEl.querySelector('[data-ol-search-results]')
   const wrapperEl = formEl.querySelector('[data-ol-search-results-wrapper]')
   const noResultsEl = formEl.querySelector('[data-ol-search-no-results]')
@@ -55,25 +55,19 @@ function setupSearch(formEl) {
       for (const hit of hits) {
         const { url, pageName, content } = formatWikiHit(hit)
         const linkEl = document.createElement('a')
-        linkEl.className = 'search-result card'
+        linkEl.className = 'search-result card card-thin'
         linkEl.href = url
 
-        const cardBodyEl = document.createElement('div')
-        cardBodyEl.className = 'card-body'
-
         const headerEl = document.createElement('span')
-        headerEl.className = 'search-result-header'
         headerEl.innerHTML = pageName
-        cardBodyEl.append(headerEl)
+        linkEl.append(headerEl)
 
         if (content) {
           const contentEl = document.createElement('div')
           contentEl.className = 'search-result-content'
           contentEl.innerHTML = content
-          cardBodyEl.append(contentEl)
+          linkEl.append(contentEl)
         }
-
-        linkEl.append(cardBodyEl)
 
         resultsEl.append(linkEl)
       }
@@ -108,7 +102,6 @@ function setupSearch(formEl) {
 
   // display initial results
   handleChange()
-  updateClearBtnVisibility()
 }
 
 document.querySelectorAll('[data-ol-faq-search]').forEach(setupSearch)

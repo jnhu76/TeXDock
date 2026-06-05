@@ -1,5 +1,5 @@
 const logger = require('@overleaf/logger')
-const { expressify } = require('@overleaf/promise-utils')
+const expressify = require('./expressify')
 const { mongodb } = require('../../storage')
 
 async function status(req, res) {

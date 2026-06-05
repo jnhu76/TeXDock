@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 
-interface CellInputProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+interface CellInputProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   value: string
 }
 

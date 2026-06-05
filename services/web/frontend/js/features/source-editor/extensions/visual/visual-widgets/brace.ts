@@ -1,14 +1,16 @@
 import { WidgetType } from '@codemirror/view'
 
 export class BraceWidget extends WidgetType {
-  constructor(private content = '') {
+  constructor(private content?: string) {
     super()
   }
 
   toDOM() {
     const element = document.createElement('span')
     element.classList.add('ol-cm-brace')
-    element.textContent = this.content
+    if (this.content !== undefined) {
+      element.textContent = this.content
+    }
     return element
   }
 
@@ -18,11 +20,6 @@ export class BraceWidget extends WidgetType {
 
   eq(widget: BraceWidget) {
     return widget.content === this.content
-  }
-
-  updateDOM(element: HTMLSpanElement): boolean {
-    element.textContent = this.content
-    return true
   }
 
   coordsAt(element: HTMLElement) {

@@ -10,7 +10,6 @@ export default function useFetchMock(
   fetchMock.mockGlobal()
 
   useLayoutEffect(() => {
-    fetchMock.mockGlobal()
     callback(fetchMock)
     return () => {
       fetchMock.removeRoutes()

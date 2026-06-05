@@ -17,7 +17,7 @@ type Breakpoint = {
  * @param {number} width - Window width in pixels
  * @returns {BreakpointName} Bootstrap breakpoint name
  */
-export function getBootstrapBreakpoint(
+export function getBootstrap5Breakpoint(
   width: number
 ): BreakpointName | undefined {
   const breakpoints: Breakpoint[] = [

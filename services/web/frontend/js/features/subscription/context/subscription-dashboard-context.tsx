@@ -22,8 +22,7 @@ import { Institution } from '../../../../../types/institution'
 import getMeta from '../../../utils/meta'
 import {
   loadDisplayPriceWithTaxPromise,
-  loadGroupDisplayPriceWithTaxForRecurlyPromise,
-  loadGroupDisplayPriceWithTaxForStripePromise,
+  loadGroupDisplayPriceWithTaxPromise,
 } from '../util/recurly-pricing'
 import { isRecurlyLoaded } from '../util/is-recurly-loaded'
 import { SubscriptionDashModalIds } from '../../../../../types/subscription/dashboard/modal-ids'
@@ -129,17 +128,17 @@ export function SubscriptionDashboardProvider({
 
   const hasDisplayedSubscription = Boolean(
     institutionMemberships?.length > 0 ||
-    personalSubscription ||
-    memberGroupSubscriptions?.length > 0 ||
-    managedGroupSubscriptions?.length > 0 ||
-    managedInstitutions?.length > 0 ||
-    managedPublishers?.length > 0
+      personalSubscription ||
+      memberGroupSubscriptions?.length > 0 ||
+      managedGroupSubscriptions?.length > 0 ||
+      managedInstitutions?.length > 0 ||
+      managedPublishers?.length > 0
   )
 
   const hasValidActiveSubscription = Boolean(
     ['active', 'canceled'].includes(personalSubscription?.payment?.state) ||
-    institutionMemberships?.length > 0 ||
-    memberGroupSubscriptions?.length > 0
+      institutionMemberships?.length > 0 ||
+      memberGroupSubscriptions?.length > 0
   )
 
   const getFormattedRenewalDate = useCallback(() => {
@@ -200,46 +199,36 @@ export function SubscriptionDashboardProvider({
 
   useEffect(() => {
     if (
-      !groupPlanToChangeToCode ||
-      !groupPlanToChangeToSize ||
-      !groupPlanToChangeToUsage ||
-      !personalSubscription?.payment
+      isRecurlyLoaded() &&
+      groupPlanToChangeToCode &&
+      groupPlanToChangeToSize &&
+      groupPlanToChangeToUsage &&
+      personalSubscription?.payment
     ) {
-      return
-    }
+      setQueryingGroupPlanToChangeToPrice(true)
 
-    let loadGroupDisplayPrice
-    if (personalSubscription.service?.includes('stripe')) {
-      loadGroupDisplayPrice = loadGroupDisplayPriceWithTaxForStripePromise
-    } else if (isRecurlyLoaded()) {
-      loadGroupDisplayPrice = loadGroupDisplayPriceWithTaxForRecurlyPromise
-    } else {
-      return
-    }
-
-    setQueryingGroupPlanToChangeToPrice(true)
-
-    const { currency, taxRate } = personalSubscription.payment
-    const fetchGroupDisplayPrice = async () => {
-      setGroupPlanToChangeToPriceError(false)
-      let priceData
-      try {
-        priceData = await loadGroupDisplayPrice(
-          groupPlanToChangeToCode,
-          currency,
-          taxRate,
-          groupPlanToChangeToSize,
-          groupPlanToChangeToUsage,
-          i18n.language
-        )
-      } catch (e) {
-        debugConsole.error(e)
-        setGroupPlanToChangeToPriceError(true)
+      const { currency, taxRate } = personalSubscription.payment
+      const fetchGroupDisplayPrice = async () => {
+        setGroupPlanToChangeToPriceError(false)
+        let priceData
+        try {
+          priceData = await loadGroupDisplayPriceWithTaxPromise(
+            groupPlanToChangeToCode,
+            currency,
+            taxRate,
+            groupPlanToChangeToSize,
+            groupPlanToChangeToUsage,
+            i18n.language
+          )
+        } catch (e) {
+          debugConsole.error(e)
+          setGroupPlanToChangeToPriceError(true)
+        }
+        setQueryingGroupPlanToChangeToPrice(false)
+        setGroupPlanToChangeToPrice(priceData)
       }
-      setQueryingGroupPlanToChangeToPrice(false)
-      setGroupPlanToChangeToPrice(priceData)
+      fetchGroupDisplayPrice()
     }
-    fetchGroupDisplayPrice()
   }, [
     groupPlanToChangeToUsage,
     groupPlanToChangeToSize,

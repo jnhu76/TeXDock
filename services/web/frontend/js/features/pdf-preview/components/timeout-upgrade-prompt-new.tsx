@@ -1,107 +1,56 @@
 import { Trans, useTranslation } from 'react-i18next'
 import { useDetachCompileContext } from '../../../shared/context/detach-compile-context'
 import StartFreeTrialButton from '../../../shared/components/start-free-trial-button'
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback } from 'react'
 import PdfLogEntry from './pdf-log-entry'
+import { useStopOnFirstError } from '../../../shared/hooks/use-stop-on-first-error'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import * as eventTracking from '../../../infrastructure/event-tracking'
 import getMeta from '@/utils/meta'
-import { populateEditorRedesignSegmentation } from '@/shared/hooks/use-editor-analytics'
-import CompileTimeoutPaywallModal from '@/features/pdf-preview/components/compile-timeout-paywall-modal'
-import { isSplitTestEnabled } from '@/utils/splitTestUtils'
-import { useSplitTest } from '@/shared/context/split-test-context'
 
 function TimeoutUpgradePromptNew() {
-  const { isProjectOwner } = useDetachCompileContext()
-  const isCompileTimeoutTargetPlansEnabled = isSplitTestEnabled(
-    'compile-timeout-target-plans'
-  )
+  const {
+    startCompile,
+    lastCompileOptions,
+    setAnimateCompileDropdownArrow,
+    isProjectOwner,
+  } = useDetachCompileContext()
 
-  const [showCompileTimeoutPaywall, setShowCompileTimeoutPaywall] =
-    useState(false)
+  const { enableStopOnFirstError } = useStopOnFirstError({
+    eventSource: 'timeout-new',
+  })
 
-  const { compileTimeout } = getMeta('ol-compileSettings')
-
-  const sharedSegmentation = useMemo(
-    () =>
-      populateEditorRedesignSegmentation({
-        'is-owner': isProjectOwner,
-        compileTime: compileTimeout,
-        location: 'logs',
-      }),
-    [isProjectOwner, compileTimeout]
-  )
+  const handleEnableStopOnFirstErrorClick = useCallback(() => {
+    enableStopOnFirstError()
+    startCompile({ stopOnFirstError: true })
+    setAnimateCompileDropdownArrow(true)
+  }, [enableStopOnFirstError, startCompile, setAnimateCompileDropdownArrow])
 
   return (
     <>
-      <CompileTimeout
-        isProjectOwner={isProjectOwner}
-        segmentation={sharedSegmentation}
-        onShowPaywallModal={() => setShowCompileTimeoutPaywall(true)}
-        isCompileTimeoutTargetPlansEnabled={isCompileTimeoutTargetPlansEnabled}
-      />
-      <CompileTimeoutPaywallModal
-        show={showCompileTimeoutPaywall}
-        onHide={() => setShowCompileTimeoutPaywall(false)}
-      />
+      <CompileTimeout isProjectOwner={isProjectOwner} />
+      {getMeta('ol-ExposedSettings').enableSubscriptions && (
+        <PreventTimeoutHelpMessage
+          handleEnableStopOnFirstErrorClick={handleEnableStopOnFirstErrorClick}
+          lastCompileOptions={lastCompileOptions}
+          isProjectOwner={isProjectOwner}
+        />
+      )}
     </>
   )
 }
 
 type CompileTimeoutProps = {
   isProjectOwner: boolean
-  segmentation: eventTracking.Segmentation
-  onShowPaywallModal: () => void
-  isCompileTimeoutTargetPlansEnabled: boolean
 }
 
 const CompileTimeout = memo(function CompileTimeout({
   isProjectOwner,
-  segmentation,
-  onShowPaywallModal,
-  isCompileTimeoutTargetPlansEnabled,
 }: CompileTimeoutProps) {
   const { t } = useTranslation()
-  const { variant } = useSplitTest('compile-timeout-cta')
-
-  let ctaLabel = ''
-
-  switch (variant) {
-    case 'explore-plans':
-      ctaLabel = t('explore_plans')
-      break
-    case 'get-more-compile-time':
-      ctaLabel = t('get_more_compile_time')
-      break
-    case 'upgrade-now':
-      ctaLabel = t('upgrade_now')
-      break
-    case 'subscribe-now':
-      ctaLabel = t('subscribe_now')
-      break
-    default:
-      ctaLabel = t('start_free_trial')
-      break
-  }
-  const extraSearchParams = useMemo(() => {
-    return {
-      itm_content: 'new-editor',
-    }
-  }, [])
-
-  const handleFreeTrialClick = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (isCompileTimeoutTargetPlansEnabled) {
-        event.preventDefault()
-        event.stopPropagation()
-        onShowPaywallModal()
-      }
-    },
-    [isCompileTimeoutTargetPlansEnabled, onShowPaywallModal]
-  )
 
   return (
     <PdfLogEntry
-      autoExpand
       headerTitle={t('your_compile_timed_out')}
       formattedContent={
         getMeta('ol-ExposedSettings').enableSubscriptions && (
@@ -113,8 +62,10 @@ const CompileTimeout = memo(function CompileTimeout({
             </p>
             {isProjectOwner ? (
               <p>
-                <strong>{t('upgrade_for_more_compile_time')}</strong>{' '}
-                {t('plus_additional_collaborators_and_more')}
+                <strong>{t('upgrade_for_12x_more_compile_time')}</strong>{' '}
+                {t(
+                  'plus_additional_collaborators_document_history_track_changes_and_more'
+                )}
               </p>
             ) : (
               <Trans
@@ -131,11 +82,8 @@ const CompileTimeout = memo(function CompileTimeout({
                 <StartFreeTrialButton
                   source="compile-timeout"
                   buttonProps={{ variant: 'primary', className: 'w-100' }}
-                  segmentation={segmentation}
-                  extraSearchParams={extraSearchParams}
-                  handleClick={handleFreeTrialClick}
                 >
-                  {ctaLabel}
+                  {t('start_a_free_trial')}
                 </StartFreeTrialButton>
               </p>
             )}
@@ -145,6 +93,129 @@ const CompileTimeout = memo(function CompileTimeout({
       // @ts-ignore
       entryAriaLabel={t('your_compile_timed_out')}
       level="error"
+    />
+  )
+})
+
+type PreventTimeoutHelpMessageProps = {
+  lastCompileOptions: any
+  handleEnableStopOnFirstErrorClick: () => void
+  isProjectOwner: boolean
+}
+
+const PreventTimeoutHelpMessage = memo(function PreventTimeoutHelpMessage({
+  lastCompileOptions,
+  handleEnableStopOnFirstErrorClick,
+  isProjectOwner,
+}: PreventTimeoutHelpMessageProps) {
+  const { t } = useTranslation()
+
+  function sendInfoClickEvent() {
+    eventTracking.sendMB('paywall-info-click', {
+      'paywall-type': 'compile-timeout',
+      content: 'blog',
+    })
+  }
+
+  const compileTimeoutChangesBlogLink = (
+    /* eslint-disable-next-line jsx-a11y/anchor-has-content, react/jsx-key */
+    <a
+      aria-label={t('read_more_about_free_compile_timeouts_servers')}
+      href="/blog/changes-to-free-compile-timeouts-and-servers"
+      rel="noopener noreferrer"
+      target="_blank"
+      onClick={sendInfoClickEvent}
+    />
+  )
+
+  return (
+    <PdfLogEntry
+      headerTitle={t('reasons_for_compile_timeouts')}
+      formattedContent={
+        <>
+          <p>{t('common_causes_of_compile_timeouts_include')}:</p>
+          <ul>
+            <li>
+              <Trans
+                i18nKey="large_or_high-resolution_images_taking_too_long"
+                components={[
+                  // eslint-disable-next-line jsx-a11y/anchor-has-content, react/jsx-key
+                  <a
+                    href="/learn/how-to/Optimising_very_large_image_files"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  />,
+                ]}
+              />
+            </li>
+            <li>
+              <Trans
+                i18nKey="a_fatal_compile_error_that_completely_blocks_compilation"
+                components={[
+                  // eslint-disable-next-line jsx-a11y/anchor-has-content, react/jsx-key
+                  <a
+                    href="/learn/how-to/Fixing_and_preventing_compile_timeouts#Step_3:_Assess_your_project_for_time-consuming_tasks_and_fatal_errors"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  />,
+                ]}
+              />
+              {!lastCompileOptions.stopOnFirstError && (
+                <>
+                  {' '}
+                  <Trans
+                    i18nKey="enable_stop_on_first_error_under_recompile_dropdown_menu"
+                    components={[
+                      // eslint-disable-next-line react/jsx-key
+                      <OLButton
+                        variant="link"
+                        className="btn-inline-link fw-bold"
+                        size="sm"
+                        onClick={handleEnableStopOnFirstErrorClick}
+                      />,
+                      // eslint-disable-next-line react/jsx-key
+                      <strong />,
+                    ]}
+                  />{' '}
+                </>
+              )}
+            </li>
+          </ul>
+          <p>
+            <Trans
+              i18nKey="learn_more_about_other_causes_of_compile_timeouts"
+              components={[
+                // eslint-disable-next-line jsx-a11y/anchor-has-content, react/jsx-key
+                <a
+                  href="/learn/how-to/Fixing_and_preventing_compile_timeouts"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                />,
+              ]}
+            />
+          </p>
+          <p>
+            <em>
+              <>
+                {isProjectOwner ? (
+                  <Trans
+                    i18nKey="weve_recently_reduced_the_compile_timeout_limit_which_may_have_affected_your_project"
+                    components={[compileTimeoutChangesBlogLink]}
+                  />
+                ) : (
+                  <Trans
+                    i18nKey="weve_recently_reduced_the_compile_timeout_limit_which_may_have_affected_this_project"
+                    components={[compileTimeoutChangesBlogLink]}
+                  />
+                )}
+              </>
+            </em>
+          </p>
+        </>
+      }
+      // @ts-ignore
+      entryAriaLabel={t('reasons_for_compile_timeouts')}
+      level="raw"
     />
   )
 })

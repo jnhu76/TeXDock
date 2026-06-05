@@ -15,8 +15,8 @@ const rclient = require('@overleaf/redis-wrapper').createClient(
 )
 
 describe('CheckRedisMongoSyncState', function () {
-  beforeEach(async function () {
-    await DocUpdaterApp.ensureRunning()
+  beforeEach(function (done) {
+    DocUpdaterApp.ensureRunning(done)
   })
   beforeEach(async function () {
     await rclient.flushall()
@@ -60,14 +60,14 @@ describe('CheckRedisMongoSyncState', function () {
 
   describe('with a project', function () {
     let projectId, docId
-    beforeEach(async function () {
+    beforeEach(function (done) {
       projectId = DocUpdaterClient.randomId()
       docId = DocUpdaterClient.randomId()
       MockWebApi.insertDoc(projectId, docId, {
         lines: ['mongo', 'lines'],
         version: 1,
       })
-      await DocUpdaterClient.preloadDoc(projectId, docId)
+      DocUpdaterClient.getDoc(projectId, docId, done)
     })
 
     it('should work when in sync', async function () {
@@ -149,14 +149,14 @@ describe('CheckRedisMongoSyncState', function () {
 
     describe('with a project', function () {
       let projectId2, docId2
-      beforeEach(async function () {
+      beforeEach(function (done) {
         projectId2 = DocUpdaterClient.randomId()
         docId2 = DocUpdaterClient.randomId()
         MockWebApi.insertDoc(projectId2, docId2, {
           lines: ['mongo', 'lines'],
           version: 1,
         })
-        await DocUpdaterClient.preloadDoc(projectId2, docId2)
+        DocUpdaterClient.getDoc(projectId2, docId2, done)
       })
 
       it('should work when in sync', async function () {
@@ -245,14 +245,14 @@ describe('CheckRedisMongoSyncState', function () {
 
   describe('with more projects than the LIMIT', function () {
     for (let i = 0; i < 20; i++) {
-      beforeEach(async function () {
+      beforeEach(function (done) {
         const projectId = DocUpdaterClient.randomId()
         const docId = DocUpdaterClient.randomId()
         MockWebApi.insertDoc(projectId, docId, {
           lines: ['mongo', 'lines'],
           version: 1,
         })
-        await DocUpdaterClient.preloadDoc(projectId, docId)
+        DocUpdaterClient.getDoc(projectId, docId, done)
       })
     }
 
@@ -278,7 +278,7 @@ describe('CheckRedisMongoSyncState', function () {
 
   describe('with partially deleted doc', function () {
     let projectId, docId
-    beforeEach(async function () {
+    beforeEach(function (done) {
       projectId = DocUpdaterClient.randomId()
       docId = DocUpdaterClient.randomId()
       MockWebApi.insertDoc(projectId, docId, {
@@ -289,8 +289,10 @@ describe('CheckRedisMongoSyncState', function () {
         lines: ['mongo', 'lines'],
         version: 1,
       })
-      await DocUpdaterClient.preloadDoc(projectId, docId)
-      MockWebApi.clearDocs()
+      DocUpdaterClient.getDoc(projectId, docId, err => {
+        MockWebApi.clearDocs()
+        done(err)
+      })
     })
     describe('with only the file-tree entry deleted', function () {
       it('should flag the partial deletion', async function () {
@@ -339,12 +341,17 @@ describe('CheckRedisMongoSyncState', function () {
       })
     })
     describe('with docstore metadata updated', function () {
-      beforeEach(async function () {
-        await MockDocstoreApi.patchDocument(projectId, docId, {
-          deleted: true,
-          deletedAt: new Date(),
-          name: 'c.tex',
-        })
+      beforeEach(function (done) {
+        MockDocstoreApi.patchDocument(
+          projectId,
+          docId,
+          {
+            deleted: true,
+            deletedAt: new Date(),
+            name: 'c.tex',
+          },
+          done
+        )
       })
 
       it('should work when in sync', async function () {

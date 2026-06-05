@@ -2,21 +2,20 @@ import React, { ReactNode } from 'react'
 import {
   Dropdown,
   DropdownMenu,
-  DropdownToggle,
-} from '@/shared/components/dropdown/dropdown-menu'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+} from '@/features/ui/components/bootstrap-5/dropdown-menu'
+import DropdownToggleWithTooltip from '@/features/ui/components/bootstrap-5/dropdown-toggle-with-tooltip'
 
 type ActionDropdownProps = {
   id: string
   children: React.ReactNode
   isOpened: boolean
   iconTag: ReactNode
-  tooltipDescription: string
+  toolTipDescription: string
   setIsOpened: (isOpened: boolean) => void
 }
 
 function ActionsDropdown(props: ActionDropdownProps) {
-  const { id, children, isOpened, iconTag, setIsOpened, tooltipDescription } =
+  const { id, children, isOpened, iconTag, setIsOpened, toolTipDescription } =
     props
   return (
     <Dropdown
@@ -25,23 +24,16 @@ function ActionsDropdown(props: ActionDropdownProps) {
       show={isOpened}
       onToggle={open => setIsOpened(open)}
     >
-      <OLTooltip
+      <DropdownToggleWithTooltip
         id={`history-version-dropdown-${id}`}
-        description={tooltipDescription}
-        overlayProps={{ placement: 'bottom' }}
-        hidden={isOpened}
+        className="history-version-dropdown-menu-btn"
+        aria-label={toolTipDescription}
+        toolTipDescription={toolTipDescription}
+        overlayTriggerProps={{ placement: 'bottom' }}
+        tooltipProps={{ hidden: isOpened }}
       >
-        {/* OverlayTrigger won't fire unless the child is a non-react html element (e.g div, span) */}
-        <span>
-          <DropdownToggle
-            id={`history-version-dropdown-toggle-${id}`}
-            className="history-version-dropdown-menu-btn"
-            as="button"
-          >
-            {iconTag}
-          </DropdownToggle>
-        </span>
-      </OLTooltip>
+        {iconTag}
+      </DropdownToggleWithTooltip>
       <DropdownMenu className="history-version-dropdown-menu">
         {children}
       </DropdownMenu>

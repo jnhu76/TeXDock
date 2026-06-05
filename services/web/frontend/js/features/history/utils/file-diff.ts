@@ -1,24 +1,24 @@
-import {
-  FileChanged,
+import type {
   FileDiff,
   FileRemoved,
   FileRenamed,
+  FileWithEditable,
 } from '../services/types/file'
 
-export function isFileChanged(fileDiff: FileDiff): fileDiff is FileChanged {
-  return 'operation' in fileDiff
-}
-
 export function isFileRenamed(fileDiff: FileDiff): fileDiff is FileRenamed {
-  return isFileChanged(fileDiff) && fileDiff.operation === 'renamed'
+  return (fileDiff as FileRenamed).operation === 'renamed'
 }
 
 export function isFileRemoved(fileDiff: FileDiff): fileDiff is FileRemoved {
-  return isFileChanged(fileDiff) && fileDiff.operation === 'removed'
+  return (fileDiff as FileRemoved).operation === 'removed'
+}
+
+function isFileWithEditable(fileDiff: FileDiff): fileDiff is FileWithEditable {
+  return 'editable' in (fileDiff as FileWithEditable)
 }
 
 export function isFileEditable(fileDiff: FileDiff) {
-  return 'editable' in fileDiff
+  return isFileWithEditable(fileDiff)
     ? fileDiff.editable
     : fileDiff.operation === 'edited'
 }

@@ -1,6 +1,6 @@
 import readline from 'node:readline'
-import ProjectEntityHandler from '../app/src/Features/Project/ProjectEntityHandler.mjs'
-import ProjectGetter from '../app/src/Features/Project/ProjectGetter.mjs'
+import ProjectEntityHandler from '../app/src/Features/Project/ProjectEntityHandler.js'
+import ProjectGetter from '../app/src/Features/Project/ProjectGetter.js'
 import Errors from '../app/src/Features/Errors/Errors.js'
 
 async function countFiles() {

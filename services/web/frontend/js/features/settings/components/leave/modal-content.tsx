@@ -2,13 +2,15 @@ import { useState, Dispatch, SetStateAction } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import getMeta from '../../../../utils/meta'
 import LeaveModalForm, { LeaveModalFormProps } from './modal-form'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
+} from '@/features/ui/components/ol/ol-modal'
+
+const WRITEFULL_SUPPORT_EMAIL = 'support@writefull.com'
 
 type LeaveModalContentProps = {
   handleHide: () => void
@@ -44,16 +46,13 @@ function LeaveModalContentBlock({
       />
       <p>
         <Trans
-          i18nKey="if_you_need_to_delete_your_writefull_account"
+          i18nKey="to_delete_your_writefull_account"
+          values={{ email: WRITEFULL_SUPPORT_EMAIL }}
+          shouldUnescape
+          tOptions={{ interpolation: { escapeValue: true } }}
           components={{
-            a: (
-              // eslint-disable-next-line jsx-a11y/anchor-has-content
-              <a
-                href="https://my.writefull.com/account"
-                target="_blank"
-                rel="noopener noreferrer"
-              />
-            ),
+            // eslint-disable-next-line jsx-a11y/anchor-has-content
+            a: <a href={`mailto:${WRITEFULL_SUPPORT_EMAIL}`} />,
           }}
         />
       </p>
@@ -71,7 +70,7 @@ function LeaveModalContent({
 
   return (
     <>
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{t('delete_account')}</OLModalTitle>
       </OLModalHeader>
 

@@ -47,7 +47,7 @@ describe('<AccountInfoSection />', function () {
     })
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Update account info',
+        name: /update/i,
       })
     )
     expect(updateMock.callHistory.called()).to.be.true
@@ -68,7 +68,7 @@ describe('<AccountInfoSection />', function () {
       target: { value: 'john' },
     })
     const button = screen.getByRole('button', {
-      name: 'Update account info',
+      name: /update/i,
     }) as HTMLButtonElement
 
     expect(button.disabled).to.be.true
@@ -129,8 +129,7 @@ describe('<AccountInfoSection />', function () {
     fetchMock.post('/user/settings', {
       status: 409,
       body: {
-        message:
-          'This email address is already associated with a different Overleaf account.',
+        message: 'This email is already registered',
       },
     })
     renderSectionWithUserProvider()
@@ -140,9 +139,7 @@ describe('<AccountInfoSection />', function () {
         name: /update/i,
       })
     )
-    await screen.findByText(
-      'This email address is already associated with a different Overleaf account.'
-    )
+    await screen.findByText('This email is already registered')
   })
 
   it('hides email input', async function () {

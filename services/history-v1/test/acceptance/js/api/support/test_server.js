@@ -11,7 +11,7 @@ const config = require('config')
 const http = require('node:http')
 const jwt = require('jsonwebtoken')
 
-const createHttpClient = require('./http_client')
+const Swagger = require('swagger-client')
 
 const app = require('../../../../../app')
 
@@ -28,8 +28,10 @@ function testUrl(pathname, opts = {}) {
 exports.url = testUrl
 
 function createClient(options) {
-  // Create HTTP client that mimics swagger-client API
-  return BPromise.resolve(createHttpClient(testUrl(''), options))
+  // The Swagger client returns native Promises; we use Bluebird promises. Just
+  // wrapping the client creation is enough in many (but not all) cases to
+  // get Bluebird into the chain.
+  return BPromise.resolve(new Swagger(testUrl('/api-docs'), options))
 }
 
 function createTokenForProject(projectId, opts = {}) {

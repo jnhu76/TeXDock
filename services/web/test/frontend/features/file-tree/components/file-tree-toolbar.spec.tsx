@@ -28,7 +28,7 @@ describe('<FileTreeToolbar/>', function () {
       </EditorProviders>
     )
 
-    cy.findAllByRole('button').should('have.length', 1)
+    cy.findAllByRole('button').should('not.exist')
   })
 
   it('with one selected file', function () {
@@ -53,6 +53,7 @@ describe('<FileTreeToolbar/>', function () {
     cy.findAllByRole('button', { name: 'New file' })
     cy.findAllByRole('button', { name: 'New folder' })
     cy.findAllByRole('button', { name: 'Upload' })
-    cy.findAllByRole('button', { name: 'Close' })
+    cy.findAllByRole('button', { name: 'Rename' })
+    cy.findAllByRole('button', { name: 'Delete' })
   })
 })

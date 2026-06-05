@@ -1,16 +1,11 @@
-import { OLModal } from '@/shared/components/ol/ol-modal'
+import OLModal from '@/features/ui/components/ol/ol-modal'
 import ModalContentNewProjectForm from './modal-content-new-project-form'
-import { Tag } from '../../../../../../app/src/Features/Tags/types'
 
 type ExampleProjectModalProps = {
   onHide: () => void
-  initialTags?: Tag[]
 }
 
-function ExampleProjectModal({
-  onHide,
-  initialTags,
-}: ExampleProjectModalProps) {
+function ExampleProjectModal({ onHide }: ExampleProjectModalProps) {
   return (
     <OLModal
       show
@@ -19,11 +14,7 @@ function ExampleProjectModal({
       id="example-project-modal"
       backdrop="static"
     >
-      <ModalContentNewProjectForm
-        onCancel={onHide}
-        template="example"
-        initialTags={initialTags}
-      />
+      <ModalContentNewProjectForm onCancel={onHide} template="example" />
     </OLModal>
   )
 }

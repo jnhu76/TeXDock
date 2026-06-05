@@ -1,6 +1,6 @@
 import _ from 'lodash'
 import type { FileDiff, FileRenamed } from '../services/types/file'
-import { isFileChanged, isFileEditable, isFileRemoved } from './file-diff'
+import { isFileEditable, isFileRemoved } from './file-diff'
 
 export type FileTreeEntity = {
   name?: string
@@ -65,29 +65,22 @@ export function fileTreeDiffToFileTreeData(
   const folders: HistoryFileTree[] = []
   const docs: HistoryDoc[] = []
 
-  for (const fileDiff of fileTreeDiff) {
-    if (fileDiff.type === 'file') {
-      if (isFileChanged(fileDiff)) {
-        docs.push({
-          pathname: fileDiff.pathname ?? '',
-          name: fileDiff.name ?? '',
-          editable: isFileEditable(fileDiff),
-          operation: fileDiff.operation,
-          deletedAtV: isFileRemoved(fileDiff) ? fileDiff.deletedAtV : undefined,
-        })
-      } else {
-        docs.push({
-          pathname: fileDiff.pathname ?? '',
-          name: fileDiff.name ?? '',
-          editable: isFileEditable(fileDiff),
-        })
+  for (const file of fileTreeDiff) {
+    if (file.type === 'file') {
+      const deletedAtV = isFileRemoved(file) ? file.deletedAtV : undefined
+
+      const newDoc: HistoryDoc = {
+        pathname: file.pathname ?? '',
+        name: file.name ?? '',
+        deletedAtV,
+        editable: isFileEditable(file),
+        operation: 'operation' in file ? file.operation : undefined,
       }
-    } else if (fileDiff.type === 'folder') {
-      if (fileDiff.children) {
-        const folder = fileTreeDiffToFileTreeData(
-          fileDiff.children,
-          fileDiff.name
-        )
+
+      docs.push(newDoc)
+    } else if (file.type === 'folder') {
+      if (file.children) {
+        const folder = fileTreeDiffToFileTreeData(file.children, file.name)
         folders.push(folder)
       }
     }

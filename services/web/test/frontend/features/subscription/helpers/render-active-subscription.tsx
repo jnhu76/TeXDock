@@ -8,8 +8,7 @@ import { CurrencyCode } from '../../../../../types/subscription/currency'
 export function renderActiveSubscription(
   subscription: PaidSubscription,
   tags: MetaTag[] = [],
-  currencyCode?: CurrencyCode,
-  canUseFlexibleLicensing?: boolean
+  currencyCode?: CurrencyCode
 ) {
   renderWithSubscriptionDashContext(
     <ActiveSubscription subscription={subscription} />,
@@ -26,13 +25,6 @@ export function renderActiveSubscription(
         {
           name: 'ol-recommendedCurrency',
           value: currencyCode || 'USD',
-        },
-        {
-          name: 'ol-canUseFlexibleLicensing',
-          value:
-            canUseFlexibleLicensing ||
-            subscription.plan?.canUseFlexibleLicensing ||
-            false,
         },
       ],
     }

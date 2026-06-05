@@ -540,12 +540,6 @@ export default [
     score: 0.152074250347974,
   },
   {
-    caption: '\\subparagraph{}',
-    snippet: '\\subparagraph{$1}',
-    meta: 'cmd',
-    score: 0.13,
-  },
-  {
     caption: '\\varepsilon',
     snippet: '\\varepsilon',
     meta: 'cmd',

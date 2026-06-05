@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
-import OLSpinner, { OLSpinnerSize } from '@/shared/components/ol/ol-spinner'
+import OLSpinner, {
+  OLSpinnerSize,
+} from '@/features/ui/components/ol/ol-spinner'
 import classNames from 'classnames'
 
 function LoadingSpinner({
@@ -42,7 +44,6 @@ function LoadingSpinner({
 
   return (
     <div
-      role="status"
       className={classNames(
         'loading',
         className,
@@ -50,6 +51,7 @@ function LoadingSpinner({
       )}
     >
       <OLSpinner size={size} />
+      &nbsp;
       {loadingText || `${t('loading')}…`}
     </div>
   )

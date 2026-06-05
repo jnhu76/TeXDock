@@ -35,8 +35,7 @@ import importOverleafModules from '../../../../macros/import-overleaf-module.mac
 import { emptyLineFiller } from './empty-line-filler'
 import { goToLinePanel } from './go-to-line'
 import { drawSelection } from './draw-selection'
-import { nonBlinkingCursor } from './non-blinking-cursor'
-import { sourceOnly, visual } from './visual/visual'
+import { visual } from './visual/visual'
 import { inlineBackground } from './inline-background'
 import { indentationMarkers } from './indentation-markers'
 import { codemirrorDevTools } from '../languages/latex/codemirror-dev-tools'
@@ -51,14 +50,8 @@ import { docName } from './doc-name'
 import { fileTreeItemDrop } from './file-tree-item-drop'
 import { mathPreview } from './math-preview'
 import { ranges } from './ranges'
-import { historyOT } from './history-ot'
 import { trackDetachedComments } from './track-detached-comments'
 import { reviewTooltip } from './review-tooltip'
-import { tooltipsReposition } from './tooltips-reposition'
-import { selectionListener } from '@/features/source-editor/extensions/selection-listener'
-import { contextMenu } from './context-menu'
-import { tabsListener } from './tabs-listener'
-import { isSplitTestEnabled } from '@/utils/splitTestUtils'
 
 const moduleExtensions: Array<(options: Record<string, any>) => Extension> =
   importOverleafModules('sourceEditorExtensions').map(
@@ -78,17 +71,12 @@ export const createExtensions = (options: Record<string, any>): Extension[] => [
     closedText: '▸',
   }),
   drawSelection(),
-  nonBlinkingCursor(),
   // A built-in facet that is set to true to allow multiple selections.
   // This makes the editor more like a code editor than Google Docs or Microsoft Word,
   // which only have single selections.
   EditorState.allowMultipleSelections.of(true),
   // A built-in extension that enables soft line wrapping.
   EditorView.lineWrapping,
-  sourceOnly(
-    options.visual.visual,
-    EditorView.contentAttributes.of({ 'aria-label': 'Source Editor editing' })
-  ),
   // A built-in extension that re-indents input if the language defines an indentOnInput field in its language data.
   indentOnInput(),
   lineWrappingIndentation(options.visual.visual),
@@ -146,7 +134,7 @@ export const createExtensions = (options: Record<string, any>): Extension[] => [
   cursorHighlights(),
   autoPair(options.settings),
   editable(),
-  search(options.initialSearchQuery),
+  search(),
   phrases(options.phrases),
   spelling(options.spelling),
   shortcuts,
@@ -154,14 +142,11 @@ export const createExtensions = (options: Record<string, any>): Extension[] => [
   // NOTE: `emptyLineFiller` needs to be before `trackChanges`,
   // so the decorations are added in the correct order.
   emptyLineFiller(),
-  options.currentDoc.currentDocument.getType() === 'history-ot'
-    ? historyOT(options.currentDoc.currentDocument)
-    : ranges(),
+  ranges(),
   trackDetachedComments(options.currentDoc),
   visual(options.visual),
   mathPreview(options.settings.mathPreview),
-  reviewTooltip(options.editorContextMenuEnabled),
-  contextMenu(options.editorContextMenuEnabled),
+  reviewTooltip(),
   toolbarPanel(),
   breadcrumbPanel(),
   verticalOverflow(),
@@ -178,7 +163,4 @@ export const createExtensions = (options: Record<string, any>): Extension[] => [
   effectListeners(),
   geometryChangeEvent(),
   fileTreeItemDrop(),
-  tooltipsReposition(),
-  selectionListener(options.setEditorSelection),
-  isSplitTestEnabled('editor-tabs') ? tabsListener() : [],
 ]

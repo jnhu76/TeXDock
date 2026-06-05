@@ -11,7 +11,6 @@ export const CollapsibleFileHeader: FC<{
     type="button"
     className="collapsible-file-header"
     onClick={toggleCollapsed}
-    translate="no"
   >
     <MaterialIcon
       type={collapsed ? 'keyboard_arrow_right' : 'keyboard_arrow_down'}

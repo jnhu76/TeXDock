@@ -1,11 +1,9 @@
 real-time
 --dependencies=redis
+--docker-repos=us-east1-docker.pkg.dev/overleaf-ops/ol-docker
 --env-add=
 --env-pass-through=
 --esmock-loader=False
---node-version=24.14.1
---package-name=@overleaf/real-time
---pipeline-owner=32
+--node-version=22.15.1
 --public-repo=False
---test-unit-vitest=True
---tsconfig-extra-includes=vitest.config.unit.cjs
+--script-version=4.7.0

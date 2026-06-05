@@ -3,20 +3,16 @@ import { useTranslation, Trans } from 'react-i18next'
 import { SubscriptionDashModalIds } from '../../../../../../../../../../types/subscription/dashboard/modal-ids'
 import { postJSON } from '../../../../../../../../infrastructure/fetch-json'
 import { useSubscriptionDashboardContext } from '../../../../../../context/subscription-dashboard-context'
-import {
-  cancelPendingSubscriptionChangeUrl,
-  reloadWithoutHasSubscription,
-} from '../../../../../../data/subscription-url'
+import { cancelPendingSubscriptionChangeUrl } from '../../../../../../data/subscription-url'
 import { useLocation } from '../../../../../../../../shared/hooks/use-location'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLNotification from '@/shared/components/ol/ol-notification'
+} from '@/features/ui/components/ol/ol-modal'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLNotification from '@/features/ui/components/ol/ol-notification'
 
 export function KeepCurrentPlanModal() {
   const modalId: SubscriptionDashModalIds = 'keep-current-plan'
@@ -33,7 +29,7 @@ export function KeepCurrentPlanModal() {
 
     try {
       await postJSON(cancelPendingSubscriptionChangeUrl)
-      reloadWithoutHasSubscription(location)
+      location.reload()
     } catch (e) {
       setError(true)
       setInflight(false)

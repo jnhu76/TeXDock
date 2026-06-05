@@ -2,29 +2,26 @@ import { useCallback, useState } from 'react'
 import { useResizeObserver } from '../../../shared/hooks/use-resize-observer'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import Icon from '../../../shared/components/icon'
 
 export default function PdfLogEntryRawContent({
   rawContent,
   collapsedSize = 0,
-  alwaysExpanded = false,
 }: {
   rawContent: string
   collapsedSize?: number
-  alwaysExpanded?: boolean
 }) {
-  const [expanded, setExpanded] = useState(alwaysExpanded)
-  const [needsExpander, setNeedsExpander] = useState(!alwaysExpanded)
+  const [expanded, setExpanded] = useState(false)
+  const [needsExpander, setNeedsExpander] = useState(true)
 
   const { elementRef } = useResizeObserver(
     useCallback(
       (element: Element) => {
         if (element.scrollHeight === 0) return // skip update when logs-pane is closed
-        setNeedsExpander(
-          !alwaysExpanded && element.scrollHeight > collapsedSize
-        )
+        setNeedsExpander(element.scrollHeight > collapsedSize)
       },
-      [collapsedSize, alwaysExpanded]
+      [collapsedSize]
     )
   )
 
@@ -38,7 +35,7 @@ export default function PdfLogEntryRawContent({
           height: expanded || !needsExpander ? 'auto' : collapsedSize,
         }}
       >
-        <pre className="log-entry-content-raw" ref={elementRef} translate="no">
+        <pre className="log-entry-content-raw" ref={elementRef}>
           {rawContent.trim()}
         </pre>
       </div>
@@ -52,10 +49,17 @@ export default function PdfLogEntryRawContent({
           <OLButton
             variant="secondary"
             size="sm"
-            leadingIcon={expanded ? 'expand_less' : 'expand_more'}
             onClick={() => setExpanded(value => !value)}
           >
-            {expanded ? t('collapse') : t('expand')}
+            {expanded ? (
+              <>
+                <Icon type="angle-up" /> {t('collapse')}
+              </>
+            ) : (
+              <>
+                <Icon type="angle-down" /> {t('expand')}
+              </>
+            )}
           </OLButton>
         </div>
       )}

@@ -1,6 +1,5 @@
 import { SortingOrder } from '../../sorting-order'
 import { MergeAndOverride } from '../../utils'
-import { Source } from '../../../app/src/Features/Authorization/types'
 
 export type Page = {
   size: number
@@ -34,13 +33,6 @@ export type UserRef = {
   lastName: string
 }
 
-export type ProjectAccessLevel =
-  | 'owner'
-  | 'readWrite'
-  | 'readOnly'
-  | 'readAndWrite'
-  | 'review'
-
 export type ProjectApi = {
   id: string
   name: string
@@ -49,8 +41,8 @@ export type ProjectApi = {
   lastUpdatedBy: UserRef | null
   archived: boolean
   trashed: boolean
-  accessLevel: ProjectAccessLevel
-  source: Source
+  accessLevel: 'owner' | 'readWrite' | 'readOnly' | 'readAndWrite'
+  source: 'owner' | 'invite' | 'token'
 }
 
 export type Project = MergeAndOverride<

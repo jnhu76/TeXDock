@@ -27,10 +27,6 @@ describe('<GroupInvitationNotification />', function () {
   }
 
   beforeEach(function () {
-    cy.intercept('GET', `/user/notification/${notification._id}`, {
-      statusCode: 200,
-      body: notification,
-    }).as('getNotification')
     cy.intercept(
       'PUT',
       `/subscription/invites/${notification.messageOpts.token}`,
@@ -52,7 +48,6 @@ describe('<GroupInvitationNotification />', function () {
 
       cy.findByRole('button', { name: 'Join now' }).click()
 
-      cy.wait('@getNotification')
       cy.wait('@acceptInvite')
 
       cy.findByText(
@@ -67,7 +62,10 @@ describe('<GroupInvitationNotification />', function () {
 
   describe('user with existing personal subscription', function () {
     beforeEach(function () {
-      window.metaAttributesCache.set('ol-hasIndividualPaidSubscription', true)
+      window.metaAttributesCache.set(
+        'ol-hasIndividualRecurlySubscription',
+        true
+      )
     })
 
     it('is able to join group successfully without cancelling personal subscription', function () {
@@ -87,7 +85,6 @@ describe('<GroupInvitationNotification />', function () {
 
       cy.findByRole('button', { name: 'Join now' }).click()
 
-      cy.wait('@getNotification')
       cy.wait('@acceptInvite')
 
       cy.findByText(
@@ -122,7 +119,6 @@ describe('<GroupInvitationNotification />', function () {
 
       cy.findByRole('button', { name: 'Join now' }).click()
 
-      cy.wait('@getNotification')
       cy.wait('@acceptInvite')
 
       cy.findByText(

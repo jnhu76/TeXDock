@@ -1,22 +1,20 @@
 // Metrics must be initialized before importing anything else
-import '@overleaf/metrics/initialize.js'
+require('@overleaf/metrics/initialize')
 
-import Events from 'node:events'
-import Metrics from '@overleaf/metrics'
-import Settings from '@overleaf/settings'
-import logger from '@overleaf/logger'
-import express from 'express'
-import bodyParser from 'body-parser'
-import {
-  celebrate as validate,
+const Events = require('node:events')
+const Metrics = require('@overleaf/metrics')
+const Settings = require('@overleaf/settings')
+const logger = require('@overleaf/logger')
+const express = require('express')
+const bodyParser = require('body-parser')
+const {
+  celebrate: validate,
   Joi,
-  errors as handleValidationErrors,
-} from 'celebrate'
-import mongodb from './app/js/mongodb.js'
-import Errors from './app/js/Errors.js'
-import HttpController from './app/js/HttpController.js'
-
-const { mongoClient } = mongodb
+  errors: handleValidationErrors,
+} = require('celebrate')
+const { mongoClient } = require('./app/js/mongodb')
+const Errors = require('./app/js/Errors')
+const HttpController = require('./app/js/HttpController')
 
 Events.setMaxListeners(20)
 
@@ -51,20 +49,7 @@ app.param('doc_id', function (req, res, next, docId) {
 
 app.get('/project/:project_id/doc-deleted', HttpController.getAllDeletedDocs)
 app.get('/project/:project_id/doc', HttpController.getAllDocs)
-app.get(
-  '/project/:project_id/doc-with-ranges',
-  HttpController.getAllDocsWithRanges
-)
-app.get('/project/:project_id/doc-versions', HttpController.getAllDocVersions)
 app.get('/project/:project_id/ranges', HttpController.getAllRanges)
-app.get(
-  '/project/:project_id/comment-thread-ids',
-  HttpController.getCommentThreadIds
-)
-app.get(
-  '/project/:project_id/tracked-changes-user-ids',
-  HttpController.getTrackedChangesUserIds
-)
 app.get('/project/:project_id/has-ranges', HttpController.projectHasRanges)
 app.get('/project/:project_id/doc/:doc_id', HttpController.getDoc)
 app.get('/project/:project_id/doc/:doc_id/deleted', HttpController.isDocDeleted)
@@ -121,7 +106,7 @@ app.use(function (error, req, res, next) {
 const { port } = Settings.internal.docstore
 const { host } = Settings.internal.docstore
 
-if (import.meta.main) {
+if (!module.parent) {
   // Called directly
   mongoClient
     .connect()
@@ -144,4 +129,4 @@ if (import.meta.main) {
     })
 }
 
-export default app
+module.exports = app

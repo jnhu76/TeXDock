@@ -1,79 +1,49 @@
+import EventEmitter from '@/utils/EventEmitter'
 import {
-  EditOperation,
+  EditOperationBuilder,
   EditOperationTransformer,
+  InsertOp,
+  RemoveOp,
+  RetainOp,
   StringFileData,
+  TextOperation,
 } from 'overleaf-editor-core'
-import { ShareDoc } from '../../../../../types/share-doc'
+import { RawEditOperation } from 'overleaf-editor-core/lib/types'
 
-type Api = {
-  otType: 'history-ot'
-  trackChangesUserId: string | null
+export class HistoryOTType extends EventEmitter {
+  // stub interface, these are actually on the Doc
+  api: HistoryOTType
+  snapshot: StringFileData
 
-  getText(): string
-  getLength(): number
-}
+  constructor(snapshot: StringFileData) {
+    super()
+    this.api = this
+    this.snapshot = snapshot
+  }
 
-const api: Api & ThisType<Api & ShareDoc & { snapshot: StringFileData }> = {
-  otType: 'history-ot',
-  trackChangesUserId: null,
+  transformX(raw1: RawEditOperation[], raw2: RawEditOperation[]) {
+    const [a, b] = EditOperationTransformer.transform(
+      EditOperationBuilder.fromJSON(raw1[0]),
+      EditOperationBuilder.fromJSON(raw2[0])
+    )
+    return [[a.toJSON()], [b.toJSON()]]
+  }
 
-  getText() {
-    return this.snapshot.getContent({ filterTrackedDeletes: true })
-  },
-
-  getLength() {
-    return this.snapshot.getStringLength()
-  },
-}
-
-export const historyOTType = {
-  api,
-
-  transformX(ops1: EditOperation[], ops2: EditOperation[]) {
-    // Dynamic programming algorithm: gradually transform both sides in a nested
-    // loop.
-    const left = [...ops1]
-    const right = [...ops2]
-    for (let i = 0; i < left.length; i++) {
-      for (let j = 0; j < right.length; j++) {
-        // At this point:
-        // left[0..i] is ops1[0..i] rebased over ops2[0..j-1]
-        // right[0..j] is ops2[0..j] rebased over ops1[0..i-1]
-        const [a, b] = EditOperationTransformer.transform(left[i], right[j])
-        left[i] = a
-        right[j] = b
-      }
-    }
-    return [left, right]
-  },
-
-  apply(snapshot: StringFileData, ops: EditOperation[]) {
+  apply(snapshot: StringFileData, rawEditOperation: RawEditOperation[]) {
+    const operation = EditOperationBuilder.fromJSON(rawEditOperation[0])
     const afterFile = StringFileData.fromRaw(snapshot.toRaw())
-    for (const op of ops) {
-      afterFile.edit(op)
-    }
+    afterFile.edit(operation)
+    this.snapshot = afterFile
     return afterFile
-  },
+  }
 
-  compose(ops1: EditOperation[], ops2: EditOperation[]) {
-    const ops = [...ops1, ...ops2]
-    let currentOp = ops.shift()
-    if (currentOp === undefined) {
-      // No ops to process
-      return []
-    }
-    const result = []
-    for (const op of ops) {
-      if (currentOp.canBeComposedWith(op)) {
-        currentOp = currentOp.compose(op)
-      } else {
-        result.push(currentOp)
-        currentOp = op
-      }
-    }
-    result.push(currentOp)
-    return result
-  },
+  compose(op1: RawEditOperation[], op2: RawEditOperation[]) {
+    return [
+      EditOperationBuilder.fromJSON(op1[0])
+        .compose(EditOperationBuilder.fromJSON(op2[0]))
+        .toJSON(),
+    ]
+  }
 
   // Do not provide normalize, used by submitOp to fixup bad input.
   // normalize(op: TextOperation) {}
@@ -81,4 +51,83 @@ export const historyOTType = {
   // Do not provide invert, only needed for reverting a rejected update.
   // We are displaying an out-of-sync modal when an op is rejected.
   // invert(op: TextOperation) {}
+
+  // API
+  insert(pos: number, text: string, fromUndo: boolean) {
+    const old = this.getText()
+    const op = new TextOperation()
+    op.retain(pos)
+    op.insert(text)
+    op.retain(old.length - pos)
+    this.submitOp([op.toJSON()])
+  }
+
+  del(pos: number, length: number, fromUndo: boolean) {
+    const old = this.getText()
+    const op = new TextOperation()
+    op.retain(pos)
+    op.remove(length)
+    op.retain(old.length - pos - length)
+    this.submitOp([op.toJSON()])
+  }
+
+  getText() {
+    return this.snapshot.getContent({ filterTrackedDeletes: true })
+  }
+
+  getLength() {
+    return this.getText().length
+  }
+
+  _register() {
+    this.on(
+      'remoteop',
+      (rawEditOperation: RawEditOperation[], oldSnapshot: StringFileData) => {
+        const operation = EditOperationBuilder.fromJSON(rawEditOperation[0])
+        if (operation instanceof TextOperation) {
+          const str = oldSnapshot.getContent()
+          if (str.length !== operation.baseLength)
+            throw new TextOperation.ApplyError(
+              "The operation's base length must be equal to the string's length.",
+              operation,
+              str
+            )
+
+          let outputCursor = 0
+          let inputCursor = 0
+          for (const op of operation.ops) {
+            if (op instanceof RetainOp) {
+              inputCursor += op.length
+              outputCursor += op.length
+            } else if (op instanceof InsertOp) {
+              this.emit(
+                'insert',
+                outputCursor,
+                op.insertion,
+                op.insertion.length
+              )
+              outputCursor += op.insertion.length
+            } else if (op instanceof RemoveOp) {
+              this.emit(
+                'delete',
+                outputCursor,
+                str.slice(inputCursor, inputCursor + op.length)
+              )
+              inputCursor += op.length
+            }
+          }
+
+          if (inputCursor !== str.length)
+            throw new TextOperation.ApplyError(
+              "The operation didn't operate on the whole string.",
+              operation,
+              str
+            )
+        }
+      }
+    )
+  }
+
+  // stub-interface, provided by sharejs.Doc
+  submitOp(op: RawEditOperation[]) {}
 }

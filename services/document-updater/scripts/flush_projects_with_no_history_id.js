@@ -34,7 +34,7 @@ const batchSize = parseInt(args.batchSize, 10)
  * @return {string|void}
  */
 function extractDocId(key) {
-  const matches = key.match(/DocVersion:\{(.*?)\}/)
+  const matches = key.match(/ProjectHistoryId:\{(.*?)\}/)
   if (matches) {
     return matches[1]
   }
@@ -91,38 +91,19 @@ async function getHistoryId(docId) {
  * @return {Promise<Array<UpdateableDoc>>}
  */
 async function findDocsWithMissingHistoryIds(node, docIds) {
-  const fromRedis = await node.mget(
-    docIds
-      .map(docId => [
-        docUpdaterKeys.docVersion({ doc_id: docId }),
-        docUpdaterKeys.projectHistoryId({ doc_id: docId }),
-        docUpdaterKeys.lastUpdatedAt({ doc_id: docId }),
-        docUpdaterKeys.unflushedTime({ doc_id: docId }),
-      ])
-      .flat()
+  const historyIds = await node.mget(
+    docIds.map(docId => docUpdaterKeys.projectHistoryId({ doc_id: docId }))
   )
 
   const results = []
 
-  const nKeysPerDoc = 4
-  for (const [index, docId] of docIds.entries()) {
-    const [docVersion, historyId, lastUpdatedAt, unflushedTime] =
-      fromRedis.slice(index * nKeysPerDoc, index * nKeysPerDoc + nKeysPerDoc)
-    if (!docVersion) {
-      // Already removed from redis.
-      continue
-    }
+  for (const index in docIds) {
+    const historyId = historyIds[index]
+    const docId = docIds[index]
     if (!historyId) {
       try {
         const { projectId, historyId } = await getHistoryId(docId)
-        results.push({
-          projectId,
-          historyId,
-          docId,
-          docVersion,
-          lastUpdatedAt,
-          unflushedTime,
-        })
+        results.push({ projectId, historyId, docId })
       } catch (error) {
         logger.warn(
           { error },
@@ -176,7 +157,7 @@ async function scanNodes(nodes, batchSize = 1000) {
 
   for (const node of nodes) {
     const stream = node.scanStream({
-      match: docUpdaterKeys.docVersion({ doc_id: '*' }),
+      match: docUpdaterKeys.projectHistoryId({ doc_id: '*' }),
       count: batchSize,
     })
 

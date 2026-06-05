@@ -10,7 +10,6 @@ export type SAMLError = {
   translatedMessage?: string
   message?: string
   tryAgain?: boolean
-  name?: string
 }
 
 export type InstitutionLink = {

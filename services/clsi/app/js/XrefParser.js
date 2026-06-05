@@ -1,5 +1,5 @@
-import { NoXrefTableError } from './Errors.js'
-import fs from 'node:fs'
+const { NoXrefTableError } = require('./Errors')
+const fs = require('node:fs')
 const { O_RDONLY, O_NOFOLLOW } = fs.constants
 const MAX_XREF_FILE_SIZE = 1024 * 1024
 
@@ -62,6 +62,6 @@ async function parseXrefTable(filePath, pdfFileSize) {
   }
 }
 
-export default {
+module.exports = {
   parseXrefTable,
 }

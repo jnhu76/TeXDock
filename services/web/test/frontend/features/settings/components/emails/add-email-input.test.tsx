@@ -13,7 +13,7 @@ const testInstitutionData = [
 
 describe('<AddEmailInput/>', function () {
   const defaultProps = {
-    onChange: () => {},
+    onChange: (value: string) => {},
     handleAddNewEmail: () => {},
   }
 
@@ -23,9 +23,9 @@ describe('<AddEmailInput/>', function () {
   })
 
   describe('on initial render', function () {
-    it('should render an initial input', function () {
+    it('should render an input with a placeholder', function () {
       render(<Input {...defaultProps} />)
-      screen.getByTestId('affiliations-email')
+      screen.getByPlaceholderText('e.g. johndoe@mit.edu')
     })
 
     it('should not dispatch any `change` event', function () {

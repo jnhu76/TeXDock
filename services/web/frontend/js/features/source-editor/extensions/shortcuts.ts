@@ -23,7 +23,6 @@ import {
   deleteToVisualLineStart,
 } from './visual-line-selection'
 import { emitShortcutEvent } from '@/features/source-editor/extensions/toolbar/utils/analytics'
-import { sendMB } from '@/infrastructure/event-tracking'
 
 const toggleReviewPanel = () => {
   window.dispatchEvent(new Event('ui.toggle-review-panel'))
@@ -31,9 +30,6 @@ const toggleReviewPanel = () => {
 }
 
 const addNewCommentFromKbdShortcut = () => {
-  sendMB('add-comment', {
-    location: 'shortcut',
-  })
   window.dispatchEvent(new Event('add-new-review-comment'))
   return true
 }

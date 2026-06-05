@@ -6,11 +6,8 @@ import { useFileTreeSelectable } from '../contexts/file-tree-selectable'
 import { findInTree, findInTreeOrThrow } from '../util/find-in-tree'
 import { useIdeContext } from '@/shared/context/ide-context'
 import { useSnapshotContext } from '@/features/ide-react/context/snapshot-context'
-import { FileTreeFindResult } from '@/features/ide-react/types/file-tree'
 
-export function useFileTreeSocketListener(
-  onDelete: (entity: FileTreeFindResult, isFileRestore?: boolean) => void
-) {
+export function useFileTreeSocketListener(onDelete: (entity: any) => void) {
   const user = useUserContext()
   const {
     dispatchRename,
@@ -56,10 +53,7 @@ export function useFileTreeSocketListener(
 
   useEffect(() => {
     if (fileTreeFromHistory) return
-    function handleDispatchDelete(
-      entityId: string,
-      origin?: { kind: string } | string
-    ) {
+    function handleDispatchDelete(entityId: string) {
       const entity = findInTree(fileTreeData, entityId)
       unselect(entityId)
       if (selectedEntityParentIds.has(entityId)) {
@@ -76,12 +70,8 @@ export function useFileTreeSocketListener(
         }
       }
       dispatchDelete(entityId)
-      if (onDelete && entity) {
-        const isFileRestore =
-          typeof origin === 'object' &&
-          (origin.kind === 'file-restore' || origin.kind === 'project-restore')
-
-        onDelete(entity, isFileRestore)
+      if (onDelete) {
+        onDelete(entity)
       }
     }
     if (socket) socket.on('removeEntity', handleDispatchDelete)

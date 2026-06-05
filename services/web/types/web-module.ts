@@ -1,5 +1,3 @@
-import type { RequestHandler } from 'express'
-
 type LinkedFileAgent = {
   createLinkedFile: (
     projectId: string,
@@ -43,23 +41,15 @@ export type WebModule = {
       privateApiRouter?: any,
       publicApiRouter?: any
     ) => void
-    applyNonCsrfRouter?: (
-      webRouter: any,
-      privateApiRouter?: any,
-      publicApiRouter?: any
-    ) => void
   }
   nonCsrfRouter?: {
     apply: (webRouter: any, privateApiRouter: any, publicApiRouter: any) => void
   }
   hooks?: {
-    promises?: {
-      [name: string]: (...args: any[]) => Promise<any>
-    }
-    [name: string]: ((...args: any[]) => void) | any
+    [name: string]: (args: any[]) => void
   }
   middleware?: {
-    [name: string]: RequestHandler
+    [name: string]: (req: any, res: any, next: any) => void
   }
   sessionMiddleware?: (webRouter: any, options: any) => void
   start?: () => Promise<void>
@@ -67,5 +57,4 @@ export type WebModule = {
   linkedFileAgents?: {
     [name: string]: () => LinkedFileAgent
   }
-  viewIncludes?: Record<string, string[]>
 }

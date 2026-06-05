@@ -1,6 +1,6 @@
-import logger from '@overleaf/logger'
-import Metrics from '@overleaf/metrics'
-import os from 'node:os'
+const logger = require('@overleaf/logger')
+const Metrics = require('./Metrics')
+const os = require('node:os')
 
 let CACHED_LOAD = {
   expires: -1,
@@ -141,6 +141,6 @@ function emitPdfCachingStats(stats, timings, request) {
   )
 }
 
-export default {
+module.exports = {
   emitPdfStats,
 }

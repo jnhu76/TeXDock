@@ -35,7 +35,7 @@ describe('<LeaveSection />', function () {
     )
 
     const cancelButton = screen.getByRole('button', {
-      name: 'Cancel',
+      name: 'Close',
     })
 
     fireEvent.click(cancelButton)

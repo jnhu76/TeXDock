@@ -11,14 +11,15 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { expect } from 'chai'
+const { expect } = require('chai')
+const sinon = require('sinon')
 
-import sinon from 'sinon'
-import RealTimeClient from './helpers/RealTimeClient.js'
-import MockDocUpdaterServer from './helpers/MockDocUpdaterServer.js'
-import FixturesManager from './helpers/FixturesManager.js'
-import logger from '@overleaf/logger'
-import async from 'async'
+const RealTimeClient = require('./helpers/RealTimeClient')
+const MockDocUpdaterServer = require('./helpers/MockDocUpdaterServer')
+const FixturesManager = require('./helpers/FixturesManager')
+const logger = require('@overleaf/logger')
+
+const async = require('async')
 
 describe('leaveDoc', function () {
   before(function () {

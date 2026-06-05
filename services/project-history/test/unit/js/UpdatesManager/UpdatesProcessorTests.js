@@ -6,14 +6,14 @@ import * as Errors from '../../../../app/js/Errors.js'
 const MODULE_PATH = '../../../../app/js/UpdatesProcessor.js'
 
 describe('UpdatesProcessor', function () {
-  beforeEach(async function () {
+  before(async function () {
     this.extendLock = sinon.stub()
     this.BlobManager = {
       createBlobsForUpdates: sinon.stub(),
     }
     this.HistoryStoreManager = {
       getMostRecentVersion: sinon.stub(),
-      sendChanges: sinon.stub().yields(null, { resyncNeeded: true }),
+      sendChanges: sinon.stub().yields(null, {}),
     }
     this.LockManager = {
       runWithLock: sinon.spy((key, runner, callback) =>
@@ -22,7 +22,7 @@ describe('UpdatesProcessor', function () {
     }
     this.RedisManager = {}
     this.UpdateCompressor = {
-      compressRawUpdatesWithMetricsCb: sinon.stub(),
+      compressRawUpdates: sinon.stub(),
     }
     this.UpdateTranslator = {
       convertToChanges: sinon.stub(),
@@ -299,10 +299,7 @@ describe('UpdatesProcessor', function () {
         null,
         this.expandedUpdates
       )
-      this.UpdateCompressor.compressRawUpdatesWithMetricsCb.yields(
-        null,
-        this.compressedUpdates
-      )
+      this.UpdateCompressor.compressRawUpdates.returns(this.compressedUpdates)
       this.BlobManager.createBlobsForUpdates.callsArgWith(
         4,
         null,
@@ -318,8 +315,8 @@ describe('UpdatesProcessor', function () {
           this.ol_project_id,
           this.rawUpdates,
           this.extendLock,
-          (err, flushResponse) => {
-            this.callback(err, flushResponse)
+          err => {
+            this.callback(err)
             done()
           }
         )
@@ -350,7 +347,7 @@ describe('UpdatesProcessor', function () {
       })
 
       it('should compress updates', function () {
-        this.UpdateCompressor.compressRawUpdatesWithMetricsCb.should.have.been.calledWith(
+        this.UpdateCompressor.compressRawUpdates.should.have.been.calledWith(
           this.expandedUpdates
         )
       })
@@ -385,74 +382,8 @@ describe('UpdatesProcessor', function () {
         )
       })
 
-      it('should call the callback with no error and flush response', function () {
-        this.callback.should.have.been.calledWith(null, { resyncNeeded: true })
-      })
-    })
-
-    describe('no updates', function () {
-      beforeEach(function (done) {
-        this.SyncManager.skipUpdatesDuringSync.yields(
-          null,
-          [],
-          this.newSyncState
-        )
-        this.UpdatesProcessor._processUpdates(
-          this.project_id,
-          this.ol_project_id,
-          this.rawUpdates,
-          this.extendLock,
-          (err, flushResponse) => {
-            this.callback(err, flushResponse)
-            done()
-          }
-        )
-      })
-
-      it('should not get the latest version id', function () {
-        this.HistoryStoreManager.getMostRecentVersion.should.not.have.been.calledWith(
-          this.project_id,
-          this.ol_project_id
-        )
-      })
-
-      it('should skip updates when resyncing', function () {
-        this.SyncManager.skipUpdatesDuringSync.should.have.been.calledWith(
-          this.project_id,
-          this.rawUpdates
-        )
-      })
-
-      it('should not expand sync updates', function () {
-        this.SyncManager.expandSyncUpdates.should.not.have.been.called
-      })
-
-      it('should not compress updates', function () {
-        this.UpdateCompressor.compressRawUpdatesWithMetricsCb.should.not.have
-          .been.called
-      })
-
-      it('should not create any blobs for the updates', function () {
-        this.BlobManager.createBlobsForUpdates.should.not.have.been.called
-      })
-
-      it('should not convert the updates into a change requests', function () {
-        this.UpdateTranslator.convertToChanges.should.not.have.been.called
-      })
-
-      it('should not send the change request to the history store', function () {
-        this.HistoryStoreManager.sendChanges.should.not.have.been.called
-      })
-
-      it('should set the sync state', function () {
-        this.SyncManager.setResyncState.should.have.been.calledWith(
-          this.project_id,
-          this.newSyncState
-        )
-      })
-
-      it('should call the callback with fake flush response', function () {
-        this.callback.should.have.been.calledWith(null, { resyncNeeded: false })
+      it('should call the callback with no error', function () {
+        this.callback.should.have.been.called
       })
     })
 
@@ -481,7 +412,7 @@ describe('UpdatesProcessor', function () {
   })
 
   describe('_skipAlreadyAppliedUpdates', function () {
-    beforeEach(function () {
+    before(function () {
       this.UpdateTranslator.isProjectStructureUpdate.callsFake(
         update => update.version != null
       )
@@ -489,7 +420,7 @@ describe('UpdatesProcessor', function () {
     })
 
     describe('with all doc ops in order', function () {
-      beforeEach(function () {
+      before(function () {
         this.updates = [
           { doc: 'id', v: 1 },
           { doc: 'id', v: 2 },
@@ -509,7 +440,7 @@ describe('UpdatesProcessor', function () {
     })
 
     describe('with all project ops in order', function () {
-      beforeEach(function () {
+      before(function () {
         this.updates = [
           { version: 1 },
           { version: 2 },
@@ -529,7 +460,7 @@ describe('UpdatesProcessor', function () {
     })
 
     describe('with all multiple doc and ops in order', function () {
-      beforeEach(function () {
+      before(function () {
         this.updates = [
           { doc: 'id1', v: 1 },
           { doc: 'id1', v: 2 },
@@ -557,47 +488,64 @@ describe('UpdatesProcessor', function () {
     })
 
     describe('with doc ops out of order', function () {
-      beforeEach(function () {
+      before(function () {
         this.updates = [
           { doc: 'id', v: 1 },
           { doc: 'id', v: 2 },
           { doc: 'id', v: 4 },
           { doc: 'id', v: 3 },
         ]
+        this.skipFn = sinon.spy(
+          this.UpdatesProcessor._mocks,
+          '_skipAlreadyAppliedUpdates'
+        )
+        try {
+          this.updatesToApply =
+            this.UpdatesProcessor._skipAlreadyAppliedUpdates(
+              this.project_id,
+              this.updates,
+              { docs: {} }
+            )
+        } catch (error) {}
+      })
+
+      after(function () {
+        this.skipFn.restore()
       })
 
       it('should throw an exception', function () {
-        expect(() => {
-          this.UpdatesProcessor._skipAlreadyAppliedUpdates(
-            this.project_id,
-            this.updates,
-            { docs: {} }
-          )
-        }).to.throw(Errors.OpsOutOfOrderError)
+        this.skipFn.threw('OpsOutOfOrderError').should.equal(true)
       })
     })
 
     describe('with project ops out of order', function () {
-      beforeEach(function () {
-        this.UpdateTranslator.isProjectStructureUpdate.callsFake(
-          update => update.version != null
-        )
+      before(function () {
         this.updates = [
           { version: 1 },
           { version: 2 },
           { version: 4 },
           { version: 3 },
         ]
+        this.skipFn = sinon.spy(
+          this.UpdatesProcessor._mocks,
+          '_skipAlreadyAppliedUpdates'
+        )
+        try {
+          this.updatesToApply =
+            this.UpdatesProcessor._skipAlreadyAppliedUpdates(
+              this.project_id,
+              this.updates,
+              { docs: {} }
+            )
+        } catch (error) {}
+      })
+
+      after(function () {
+        this.skipFn.restore()
       })
 
       it('should throw an exception', function () {
-        expect(() => {
-          this.UpdatesProcessor._skipAlreadyAppliedUpdates(
-            this.project_id,
-            this.updates,
-            { docs: {} }
-          )
-        }).to.throw(Errors.OpsOutOfOrderError)
+        this.skipFn.threw('OpsOutOfOrderError').should.equal(true)
       })
     })
   })

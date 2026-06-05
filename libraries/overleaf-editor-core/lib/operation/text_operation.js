@@ -314,18 +314,25 @@ class TextOperation extends EditOperation {
             str
           )
         }
+        file.trackedChanges.applyRetain(result.length, op.length, {
+          tracking: op.tracking,
+        })
         result += str.slice(inputCursor, inputCursor + op.length)
         inputCursor += op.length
       } else if (op instanceof InsertOp) {
         if (containsNonBmpChars(op.insertion)) {
           throw new InvalidInsertionError(str, op.toJSON())
         }
+        file.trackedChanges.applyInsert(result.length, op.insertion, {
+          tracking: op.tracking,
+        })
         file.comments.applyInsert(
           new Range(result.length, op.insertion.length),
           { commentIds: op.commentIds }
         )
         result += op.insertion
       } else if (op instanceof RemoveOp) {
+        file.trackedChanges.applyDelete(result.length, op.length)
         file.comments.applyDelete(new Range(result.length, op.length))
         inputCursor += op.length
       } else {
@@ -344,8 +351,6 @@ class TextOperation extends EditOperation {
     if (result.length > TextOperation.MAX_STRING_LENGTH) {
       throw new TextOperation.TooLongError(operation, result.length)
     }
-
-    file.trackedChanges.applyTextOperation(this)
 
     file.content = result
   }
@@ -395,36 +400,44 @@ class TextOperation extends EditOperation {
     for (let i = 0, l = ops.length; i < l; i++) {
       const op = ops[i]
       if (op instanceof RetainOp) {
-        if (op.tracking) {
-          // Where we need to end up after the retains
-          const target = strIndex + op.length
-          // A previous retain could have overriden some tracking info. Now we
-          // need to restore it.
-          const previousChanges = previousState.trackedChanges.intersectRange(
-            new Range(strIndex, op.length)
-          )
+        // Where we need to end up after the retains
+        const target = strIndex + op.length
+        // A previous retain could have overriden some tracking info. Now we
+        // need to restore it.
+        const previousRanges = previousState.trackedChanges.inRange(
+          new Range(strIndex, op.length)
+        )
 
-          for (const change of previousChanges) {
-            if (strIndex < change.range.start) {
-              inverse.retain(change.range.start - strIndex, {
-                tracking: new ClearTrackingProps(),
-              })
-              strIndex = change.range.start
-            }
-            inverse.retain(change.range.length, {
-              tracking: change.tracking,
+        let removeTrackingInfoIfNeeded
+        if (op.tracking) {
+          removeTrackingInfoIfNeeded = new ClearTrackingProps()
+        }
+
+        for (const trackedChange of previousRanges) {
+          if (strIndex < trackedChange.range.start) {
+            inverse.retain(trackedChange.range.start - strIndex, {
+              tracking: removeTrackingInfoIfNeeded,
             })
-            strIndex += change.range.length
+            strIndex = trackedChange.range.start
           }
-          if (strIndex < target) {
-            inverse.retain(target - strIndex, {
-              tracking: new ClearTrackingProps(),
+          if (trackedChange.range.end < strIndex + op.length) {
+            inverse.retain(trackedChange.range.length, {
+              tracking: trackedChange.tracking,
             })
-            strIndex = target
+            strIndex = trackedChange.range.end
           }
-        } else {
-          inverse.retain(op.length)
-          strIndex += op.length
+          if (trackedChange.range.end !== strIndex) {
+            // No need to split the range at the end
+            const [left] = trackedChange.range.splitAt(strIndex)
+            inverse.retain(left.length, { tracking: trackedChange.tracking })
+            strIndex = left.end
+          }
+        }
+        if (strIndex < target) {
+          inverse.retain(target - strIndex, {
+            tracking: removeTrackingInfoIfNeeded,
+          })
+          strIndex = target
         }
       } else if (op instanceof InsertOp) {
         inverse.remove(op.insertion.length)

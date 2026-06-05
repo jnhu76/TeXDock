@@ -2,14 +2,14 @@ import fs from 'node:fs'
 import Path from 'node:path'
 import UserModule from './User.mjs'
 import SubscriptionHelper from './Subscription.mjs'
-import { SSOConfig } from '../../../../app/src/models/SSOConfig.mjs'
+import { SSOConfig } from '../../../../app/src/models/SSOConfig.js'
 import UserHelper from './UserHelper.mjs'
 import SAMLHelper from './SAMLHelper.mjs'
 import Settings from '@overleaf/settings'
-import GroupUtils from '../../../../app/src/Features/Subscription/GroupUtils.mjs'
-import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
+import { getProviderId } from '../../../../app/src/Features/Subscription/GroupUtils.js'
+import UserGetter from '../../../../app/src/Features/User/UserGetter.js'
 import { fileURLToPath } from 'node:url'
-import { Subscription as SubscriptionModel } from '../../../../app/src/models/Subscription.mjs'
+import { Subscription as SubscriptionModel } from '../../../../app/src/models/Subscription.js'
 
 const { promises: User } = UserModule
 const { promises: Subscription } = SubscriptionHelper
@@ -34,30 +34,21 @@ export const baseSsoConfig = {
   userIdAttribute,
 } // the database also sets enabled and validated, but we cannot set that in the POST request for /manage/groups/:ID/settings/sso
 
-export async function createGroupSSO(
-  SSOConfigValidated = true,
-  useSettingsUKAMF
-) {
+export async function createGroupSSO(SSOConfigValidated = true) {
   const nonSSOMemberHelper = await UserHelper.createUser()
   const nonSSOMember = nonSSOMemberHelper.user
 
   const groupAdminUser = new User()
-  const memberUser = new User({ confirmedAt: new Date() })
+  const memberUser = new User()
 
   await groupAdminUser.ensureUserExists()
   await memberUser.ensureUserExists()
 
-  const ssoConfigDoc = {
+  const ssoConfig = new SSOConfig({
     ...baseSsoConfig,
     enabled: true,
     validated: SSOConfigValidated,
-  }
-
-  if (useSettingsUKAMF) {
-    ssoConfigDoc.useSettingsUKAMF = useSettingsUKAMF // conditionally adding because this field was added after group SSO was released and it will be undefined for some groups
-  }
-
-  const ssoConfig = new SSOConfig(ssoConfigDoc)
+  })
 
   await ssoConfig.save()
 
@@ -71,20 +62,18 @@ export async function createGroupSSO(
     },
     ssoConfig: ssoConfig._id,
     membersLimit: 10,
-    teamName: 'Test Team',
   })
   await subscription.ensureExists()
   const subscriptionId = subscription._id.toString()
   const enrollmentUrl = getEnrollmentUrl(subscriptionId)
-  const internalProviderId = GroupUtils.getProviderId(subscriptionId)
+  const internalProviderId = getProviderId(subscriptionId)
 
   if (SSOConfigValidated) {
     await linkGroupMember(
       memberUser.email,
       memberUser.password,
       subscriptionId,
-      'mock@email.com',
-      useSettingsUKAMF
+      'mock@email.com'
     )
   }
 
@@ -102,7 +91,6 @@ export async function createGroupSSO(
     nonSSOMember,
     userHelper,
     enrollmentUrl,
-    certificates: baseSsoConfig.certificates,
   }
 }
 
@@ -110,20 +98,15 @@ export async function linkGroupMember(
   userEmail,
   userPassword,
   groupId,
-  externalUserId,
-  usingSettingsUKAMF
+  externalUserId
 ) {
-  const samlSettings = usingSettingsUKAMF
-    ? Settings.saml.ukamf
-    : Settings.saml.groupSSO
-
   // eslint-disable-next-line no-restricted-syntax
   const subscription = await SubscriptionModel.findById(groupId)
     .populate('ssoConfig')
     .exec()
   const userIdAttribute = subscription?.ssoConfig?.userIdAttribute
 
-  const internalProviderId = GroupUtils.getProviderId(groupId)
+  const internalProviderId = getProviderId(groupId)
   const enrollmentUrl = getEnrollmentUrl(groupId)
   const userHelper = await UserHelper.loginUser(
     {
@@ -138,7 +121,7 @@ export async function linkGroupMember(
   })
   if (
     !headers.get('location') ||
-    !headers.get('location').includes(samlSettings.initPath)
+    !headers.get('location').includes(Settings.saml.groupSSO.initPath)
   ) {
     throw new Error('invalid redirect when linking to group SSO')
   }
@@ -150,22 +133,18 @@ export async function linkGroupMember(
   // redirect to IdP
   const idpEntryPointUrl = new URL(initSSOResponse.headers.get('location'))
   const requestId = await SAMLHelper.getRequestId(idpEntryPointUrl)
-  const response = await userHelper.fetch(samlSettings.path, {
+  const response = await userHelper.fetch(Settings.saml.groupSSO.path, {
     method: 'POST',
     body: new URLSearchParams({
       SAMLResponse: SAMLHelper.createMockSamlResponse({
         requestId,
         userIdAttribute,
         uniqueId: externalUserId,
-        issuer: samlSettings.issuer,
+        issuer: 'https://www.overleaf.test/saml/group-sso/meta',
       }),
     }),
   })
-
-  if (
-    response.status !== 302 &&
-    response.headers.get('location').path !== '/project'
-  ) {
+  if (response.status !== 302) {
     throw new Error('failed to link group SSO')
   }
 
@@ -187,29 +166,6 @@ export async function linkGroupMember(
   }
 
   return userHelper
-}
-
-export async function checkUserHasSSOLinked(userId, groupId) {
-  const internalProviderId = GroupUtils.getProviderId(groupId)
-  const user = await UserGetter.promises.getUser(
-    { _id: userId },
-    { samlIdentifiers: 1, enrollment: 1 }
-  )
-
-  const { enrollment, samlIdentifiers } = user
-  const linkedToGroupSSO = samlIdentifiers.some(
-    identifier => identifier.providerId === internalProviderId
-  )
-  if (!linkedToGroupSSO) {
-    throw new Error('user saml identifiers are not linked to subscription')
-  }
-
-  const userIsEnrolledInSSO = enrollment.sso.some(
-    sso => sso.groupId.toString() === groupId.toString()
-  )
-  if (!userIsEnrolledInSSO) {
-    throw new Error('user is not enrolled in subscription')
-  }
 }
 
 export async function setConfigAndEnableSSO(

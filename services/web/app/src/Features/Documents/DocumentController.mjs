@@ -1,13 +1,12 @@
-import ChatApiHandler from '../Chat/ChatApiHandler.mjs'
-import ProjectGetter from '../Project/ProjectGetter.mjs'
-import ProjectLocator from '../Project/ProjectLocator.mjs'
-import ProjectEntityHandler from '../Project/ProjectEntityHandler.mjs'
-import ProjectEntityUpdateHandler from '../Project/ProjectEntityUpdateHandler.mjs'
+import ChatApiHandler from '../Chat/ChatApiHandler.js'
+import ProjectGetter from '../Project/ProjectGetter.js'
+import ProjectLocator from '../Project/ProjectLocator.js'
+import ProjectEntityHandler from '../Project/ProjectEntityHandler.js'
+import ProjectEntityUpdateHandler from '../Project/ProjectEntityUpdateHandler.js'
 import logger from '@overleaf/logger'
 import _ from 'lodash'
-import { plainTextResponse } from '../../infrastructure/Response.mjs'
+import { plainTextResponse } from '../../infrastructure/Response.js'
 import { expressify } from '@overleaf/promise-utils'
-import Modules from '../../infrastructure/Modules.mjs'
 
 async function getDocument(req, res) {
   const { Project_id: projectId, doc_id: docId } = req.params
@@ -93,33 +92,10 @@ async function setDocument(req, res) {
     { docId, projectId },
     'finished receiving set document request from api (docupdater)'
   )
-
-  await Modules.promises.hooks.fire(
-    'docModified',
-    projectId,
-    docId,
-    ranges,
-    lastUpdatedAt
-  )
-
   res.json(result)
-}
-
-async function trackChangesRejected(req, res) {
-  const { Project_id: projectId, doc_id: docId } = req.params
-  const { rejectedChangeAuthorIds, userId } = req.body
-  await Modules.promises.hooks.fire(
-    'trackChangesRejected',
-    projectId,
-    docId,
-    userId,
-    rejectedChangeAuthorIds
-  )
-  res.sendStatus(204)
 }
 
 export default {
   getDocument: expressify(getDocument),
   setDocument: expressify(setDocument),
-  trackChangesRejected: expressify(trackChangesRejected),
 }

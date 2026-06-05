@@ -1,29 +1,26 @@
-import AuthenticationController from '../Authentication/AuthenticationController.mjs'
-import SessionManager from '../Authentication/SessionManager.mjs'
-import TokenAccessHandler from './TokenAccessHandler.mjs'
+import AuthenticationController from '../Authentication/AuthenticationController.js'
+import SessionManager from '../Authentication/SessionManager.js'
+import TokenAccessHandler from './TokenAccessHandler.js'
 import Errors from '../Errors/Errors.js'
 import logger from '@overleaf/logger'
 import OError from '@overleaf/o-error'
 import { expressify } from '@overleaf/promise-utils'
-import AuthorizationManager from '../Authorization/AuthorizationManager.mjs'
-import PrivilegeLevels from '../Authorization/PrivilegeLevels.mjs'
-import ProjectAuditLogHandler from '../Project/ProjectAuditLogHandler.mjs'
+import AuthorizationManager from '../Authorization/AuthorizationManager.js'
+import PrivilegeLevels from '../Authorization/PrivilegeLevels.js'
+import ProjectAuditLogHandler from '../Project/ProjectAuditLogHandler.js'
 import CollaboratorsInviteHandler from '../Collaborators/CollaboratorsInviteHandler.mjs'
-import CollaboratorsHandler from '../Collaborators/CollaboratorsHandler.mjs'
-import EditorRealTimeController from '../Editor/EditorRealTimeController.mjs'
-import CollaboratorsGetter from '../Collaborators/CollaboratorsGetter.mjs'
-import ProjectGetter from '../Project/ProjectGetter.mjs'
-import AsyncFormHelper from '../Helpers/AsyncFormHelper.mjs'
-import AnalyticsManager from '../Analytics/AnalyticsManager.mjs'
-import AdminAuthorizationHelper from '../Helpers/AdminAuthorizationHelper.mjs'
-import UrlHelper from '../Helpers/UrlHelper.mjs'
-import UserGetter from '../User/UserGetter.mjs'
+import CollaboratorsHandler from '../Collaborators/CollaboratorsHandler.js'
+import EditorRealTimeController from '../Editor/EditorRealTimeController.js'
+import CollaboratorsGetter from '../Collaborators/CollaboratorsGetter.js'
+import ProjectGetter from '../Project/ProjectGetter.js'
+import AsyncFormHelper from '../Helpers/AsyncFormHelper.js'
+import AnalyticsManager from '../Analytics/AnalyticsManager.js'
+import { canRedirectToAdminDomain } from '../Helpers/AdminAuthorizationHelper.js'
+import { getSafeAdminDomainRedirect } from '../Helpers/UrlHelper.js'
+import UserGetter from '../User/UserGetter.js'
 import Settings from '@overleaf/settings'
-import LimitationsManager from '../Subscription/LimitationsManager.mjs'
-import SplitTestHandler from '../SplitTests/SplitTestHandler.mjs'
+import LimitationsManager from '../Subscription/LimitationsManager.js'
 
-const { getSafeAdminDomainRedirect } = UrlHelper
-const { canRedirectToAdminDomain } = AdminAuthorizationHelper
 const orderedPrivilegeLevels = [
   PrivilegeLevels.NONE,
   PrivilegeLevels.READ_ONLY,
@@ -114,15 +111,7 @@ async function tokenAccessPage(req, res, next) {
       }
     }
 
-    const { variant: sharingUpdates } =
-      await SplitTestHandler.promises.getAssignment(req, res, 'sharing-updates')
-
-    const viewPath =
-      sharingUpdates === 'enabled'
-        ? 'project/token/access-react'
-        : 'project/token/access-react-legacy'
-
-    res.render(viewPath, {
+    res.render('project/token/access-react', {
       postUrl: makePostUrl(token),
     })
   } catch (err) {
@@ -551,17 +540,13 @@ async function moveReadWriteToCollaborators(req, res, next) {
       userId,
       projectId
     )
-
-    const auditInfo = { ipAddress: req.ip, initiatorId: userId }
-
     await CollaboratorsHandler.promises.setCollaboratorPrivilegeLevel(
       projectId,
       userId,
       pendingEditor
         ? PrivilegeLevels.READ_ONLY
         : PrivilegeLevels.READ_AND_WRITE,
-      { pendingEditor },
-      auditInfo
+      { pendingEditor }
     )
   } else {
     // Normal case, not invited, joining via link sharing

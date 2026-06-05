@@ -1,5 +1,4 @@
 import TokenAccessPage from '@/features/token-access/components/token-access-root'
-import { SplitTestProvider } from '@/shared/context/split-test-context'
 import { location } from '@/shared/components/location'
 
 describe('<TokenAccessPage/>', function () {
@@ -10,9 +9,6 @@ describe('<TokenAccessPage/>', function () {
     cy.window().then(win => {
       win.metaAttributesCache.set('ol-postUrl', url)
       win.metaAttributesCache.set('ol-user', { email: 'test@example.com' })
-      win.metaAttributesCache.set('ol-splitTestVariants', {
-        'sharing-updates': 'enabled',
-      })
     })
   })
 
@@ -26,21 +22,15 @@ describe('<TokenAccessPage/>', function () {
       }
     ).as('grantRequest')
 
-    cy.mount(
-      <SplitTestProvider>
-        <TokenAccessPage />
-      </SplitTestProvider>
-    )
+    cy.mount(<TokenAccessPage />)
 
     cy.wait('@grantRequest').then(interception => {
       expect(interception.request.body.confirmedByUser).to.be.false
     })
 
-    cy.findByRole('heading', {
-      name: /you’re joining Test Project as test@example.com/i,
-    })
-    cy.findByText(
-      /your name and email address will be visible to project editors/i
+    cy.get('.link-sharing-invite-header').should(
+      'have.text',
+      ['You’re joining', 'Test Project', 'as test@example.com'].join('')
     )
 
     cy.intercept(
@@ -54,7 +44,7 @@ describe('<TokenAccessPage/>', function () {
 
     cy.stub(location, 'replace').as('replaceLocation')
 
-    cy.findByRole('button', { name: /join project/i }).click()
+    cy.findByRole('button', { name: 'OK, join project' }).click()
 
     cy.wait('@confirmedGrantRequest').then(interception => {
       expect(interception.request.body.confirmedByUser).to.be.true
@@ -71,24 +61,14 @@ describe('<TokenAccessPage/>', function () {
       'grantRequest'
     )
 
-    cy.mount(
-      <SplitTestProvider>
-        <TokenAccessPage />
-      </SplitTestProvider>
-    )
+    cy.mount(<TokenAccessPage />)
 
     cy.wait('@grantRequest')
 
-    cy.findByRole('heading', { name: /sorry, this project isn’t available/i })
-    cy.findByText(/the link may be broken or you may not have access rights/i)
+    cy.get('h3').should('have.text', 'Join Project')
+    cy.get('h4').should('have.text', 'Project not found')
+
     cy.findByRole('button', { name: 'Join Project' }).should('not.exist')
-    cy.contains(
-      new RegExp(
-        'you are currently logged in as test@example.com. ' +
-          'you might need to log in with a different email address',
-        'i'
-      )
-    )
   })
 
   it('handles a redirect response', function () {
@@ -103,11 +83,7 @@ describe('<TokenAccessPage/>', function () {
 
     cy.stub(location, 'replace').as('replaceLocation')
 
-    cy.mount(
-      <SplitTestProvider>
-        <TokenAccessPage />
-      </SplitTestProvider>
-    )
+    cy.mount(<TokenAccessPage />)
 
     cy.wait('@grantRequest')
 
@@ -126,11 +102,7 @@ describe('<TokenAccessPage/>', function () {
 
     cy.stub(location, 'replace').as('replaceLocation')
 
-    cy.mount(
-      <SplitTestProvider>
-        <TokenAccessPage />
-      </SplitTestProvider>
-    )
+    cy.mount(<TokenAccessPage />)
 
     cy.wait('@grantRequest')
 
@@ -153,11 +125,7 @@ describe('<TokenAccessPage/>', function () {
 
     cy.stub(location, 'replace').as('replaceLocation')
 
-    cy.mount(
-      <SplitTestProvider>
-        <TokenAccessPage />
-      </SplitTestProvider>
-    )
+    cy.mount(<TokenAccessPage />)
 
     cy.wait('@grantRequest')
 
@@ -181,11 +149,7 @@ describe('<TokenAccessPage/>', function () {
 
     cy.stub(location, 'replace').as('replaceLocation')
 
-    cy.mount(
-      <SplitTestProvider>
-        <TokenAccessPage />
-      </SplitTestProvider>
-    )
+    cy.mount(<TokenAccessPage />)
 
     cy.wait('@grantRequest')
 

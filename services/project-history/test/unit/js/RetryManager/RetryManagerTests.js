@@ -12,8 +12,6 @@ describe('RetryManager', function () {
     this.projectId2 = new ObjectId().toString()
     this.projectId3 = new ObjectId().toString()
     this.projectId4 = new ObjectId().toString()
-    this.projectId5 = new ObjectId().toString()
-    this.projectId6 = new ObjectId().toString()
     this.historyId = 12345
 
     this.WebApiManager = {
@@ -41,25 +39,13 @@ describe('RetryManager', function () {
           },
           {
             project_id: this.projectId3,
-            error: 'OpsOutOfOrderError: doc version out of order',
-            attempts: 5,
-            resyncAttempts: 1,
-          },
-          {
-            project_id: this.projectId4,
-            error: 'OpsOutOfOrderError: doc version out of order',
-            attempts: 5,
-            resyncAttempts: 2,
-          },
-          {
-            project_id: this.projectId5,
-            error: 'OError: sync ongoing',
+            error: 'sync ongoing',
             attempts: 10,
             resyncAttempts: 1,
           },
           {
-            project_id: this.projectId6,
-            error: 'OError: sync ongoing',
+            project_id: this.projectId4,
+            error: 'sync ongoing',
             attempts: 10,
             resyncAttempts: 2,
           },
@@ -89,6 +75,7 @@ describe('RetryManager', function () {
         },
       },
     }
+    this.request = {}
     this.RetryManager = await esmock(MODULE_PATH, {
       '../../../../app/js/WebApiManager.js': this.WebApiManager,
       '../../../../app/js/RedisManager.js': this.RedisManager,
@@ -96,6 +83,7 @@ describe('RetryManager', function () {
       '../../../../app/js/SyncManager.js': this.SyncManager,
       '../../../../app/js/UpdatesProcessor.js': this.UpdatesProcessor,
       '@overleaf/settings': this.settings,
+      request: this.request,
     })
   })
 
@@ -139,24 +127,6 @@ describe('RetryManager', function () {
         expect(
           this.SyncManager.promises.startHardResync
         ).not.to.have.been.calledWith(this.projectId4)
-      })
-
-      it('should use soft resync for sync ongoing failures regardless of resyncAttempts', function () {
-        expect(this.SyncManager.promises.startResync).to.have.been.calledWith(
-          this.projectId5
-        )
-        expect(
-          this.SyncManager.promises.startHardResync
-        ).not.to.have.been.calledWith(this.projectId5)
-      })
-
-      it('should retry stuck sync ongoing failures via soft resync', function () {
-        expect(this.SyncManager.promises.startResync).to.have.been.calledWith(
-          this.projectId6
-        )
-        expect(
-          this.SyncManager.promises.startHardResync
-        ).not.to.have.been.calledWith(this.projectId6)
       })
 
       it('should count the unprocessed updates', function () {

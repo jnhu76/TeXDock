@@ -13,7 +13,7 @@ interface Rule {
   contentRegex?: RegExp
   improvedTitle?: (
     currentTitle: string,
-    details?: string[]
+    details?: [string]
   ) => string | [string, JSX.Element]
   package?: string
   highlightCommand?: (contentDetails: string[]) => string | undefined
@@ -65,13 +65,10 @@ const rules: Rule[] = [
     regexToMatch: /Undefined control sequence/,
     // Match the last control sequence in the line
     contentRegex: /^[^\n]*(\\\S+)\s*[\n]/,
-    improvedTitle: (currentTitle: string, details?: string[]) => {
-      if (!details?.length) {
-        return currentTitle
-      }
-      const command = details[0]
-      const suggestion = packageSuggestionsForCommands.get(command)
-      if (suggestion) {
+    improvedTitle: (currentTitle: string, details?: [string]) => {
+      if (details?.length && packageSuggestionsForCommands.has(details[0])) {
+        const command = details[0]
+        const suggestion = packageSuggestionsForCommands.get(command)
         return [
           `Is ${suggestion.command} missing?`,
           // eslint-disable-next-line react/jsx-key
@@ -90,13 +87,13 @@ const rules: Rule[] = [
     ruleId: 'hint_undefined_environment',
     regexToMatch: /LaTeX Error: Environment .+ undefined/,
     contentRegex: /\\begin\{(\S+)\}/,
-    improvedTitle: (currentTitle: string, details?: string[]) => {
-      if (!details?.length) {
-        return currentTitle
-      }
-      const environment = details[0]
-      const suggestion = packageSuggestionsForEnvironments.get(environment)
-      if (suggestion) {
+    improvedTitle: (currentTitle: string, details?: [string]) => {
+      if (
+        details?.length &&
+        packageSuggestionsForEnvironments.has(details[0])
+      ) {
+        const environment = details[0]
+        const suggestion = packageSuggestionsForEnvironments.get(environment)
         return [
           `Is ${suggestion.command} missing?`,
           // eslint-disable-next-line react/jsx-key

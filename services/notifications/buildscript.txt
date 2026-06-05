@@ -1,14 +1,9 @@
 notifications
 --dependencies=mongo
---deploy-pipeline=notifications
+--docker-repos=us-east1-docker.pkg.dev/overleaf-ops/ol-docker
 --env-add=
 --env-pass-through=
 --esmock-loader=False
---node-version=24.14.1
---package-name=@overleaf/notifications
---pipeline-owner=32
+--node-version=22.15.1
 --public-repo=True
---test-acceptance-vitest=True
---test-unit-vitest=True
---ts-app=True
---tsconfig-extra-includes=vitest.config.unit.cjs,vitest.config.acceptance.cjs
+--script-version=4.7.0

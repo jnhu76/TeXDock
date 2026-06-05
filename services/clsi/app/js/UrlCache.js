@@ -10,13 +10,12 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import UrlFetcher from './UrlFetcher.js'
-
-import Settings from '@overleaf/settings'
-import fs from 'node:fs'
-import Path from 'node:path'
-import { callbackify } from 'node:util'
-import Metrics from '@overleaf/metrics'
+const UrlFetcher = require('./UrlFetcher')
+const Settings = require('@overleaf/settings')
+const fs = require('node:fs')
+const Path = require('node:path')
+const { callbackify } = require('node:util')
+const Metrics = require('./Metrics')
 
 const PENDING_DOWNLOADS = new Map()
 
@@ -121,7 +120,7 @@ async function download(url, fallbackURL, cachePath) {
   }
 }
 
-export default {
+module.exports = {
   clearProject: callbackify(clearProject),
   createProjectDir: callbackify(createProjectDir),
   downloadUrlToFile: callbackify(downloadUrlToFile),

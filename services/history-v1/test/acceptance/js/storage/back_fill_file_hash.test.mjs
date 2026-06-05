@@ -20,13 +20,66 @@ import {
   makeProjectKey,
 } from '../../../../storage/lib/blob_store/index.js'
 
-import { mockFilestore } from './support/MockFilestore.mjs'
+import express from 'express'
 
 chai.use(chaiExclude)
 const TIMEOUT = 20 * 1_000
 
 const projectsCollection = db.collection('projects')
 const deletedProjectsCollection = db.collection('deletedProjects')
+
+class MockFilestore {
+  constructor() {
+    this.host = process.env.FILESTORE_HOST || '127.0.0.1'
+    this.port = process.env.FILESTORE_PORT || 3009
+    // create a server listening on this.host and this.port
+    this.files = {}
+
+    this.app = express()
+
+    this.app.get('/project/:projectId/file/:fileId', (req, res) => {
+      const { projectId, fileId } = req.params
+      const content = this.files[projectId]?.[fileId]
+      if (!content) return res.status(404).end()
+      res.status(200).end(content)
+    })
+  }
+
+  start() {
+    // reset stored files
+    this.files = {}
+    // start the server
+    if (this.serverPromise) {
+      return this.serverPromise
+    } else {
+      this.serverPromise = new Promise((resolve, reject) => {
+        this.server = this.app.listen(this.port, this.host, err => {
+          if (err) return reject(err)
+          resolve()
+        })
+      })
+      return this.serverPromise
+    }
+  }
+
+  addFile(projectId, fileId, fileContent) {
+    if (!this.files[projectId]) {
+      this.files[projectId] = {}
+    }
+    this.files[projectId][fileId] = fileContent
+  }
+
+  deleteObject(projectId, fileId) {
+    if (this.files[projectId]) {
+      delete this.files[projectId][fileId]
+      if (Object.keys(this.files[projectId]).length === 0) {
+        delete this.files[projectId]
+      }
+    }
+  }
+}
+
+const mockFilestore = new MockFilestore()
 
 /**
  * @param {ObjectId} objectId
@@ -471,10 +524,6 @@ describe('back_fill_file_hash script', function () {
 
   async function prepareEnvironment() {
     await cleanup.everything()
-    // Manually remove the guard that is created after running the binary files migration.
-    await db
-      .collection('migrations')
-      .deleteOne({ name: '20250519101128_binary_files_migration' })
     await mockFilestore.start()
     await populateMongo()
     await populateHistoryV1()
@@ -523,7 +572,7 @@ describe('back_fill_file_hash script', function () {
   /**
    * @param {Array<string>} args
    * @param {boolean} shouldHaveWritten
-   * @return {Promise<{result, stats: any, migrationCreated: boolean}>}
+   * @return {Promise<{result, stats: any}>}
    */
   async function tryRunScript(args = [], shouldHaveWritten) {
     const result = await rawRunScript([
@@ -557,10 +606,7 @@ describe('back_fill_file_hash script', function () {
       'should not have any remaining deferred batches'
     )
     delete stats.deferredBatches
-    const migrationCreated = !!(await db
-      .collection('migrations')
-      .findOne({ name: '20250519101128_binary_files_migration' }))
-    return { stats, result, migrationCreated }
+    return { stats, result }
   }
 
   /**
@@ -569,15 +615,12 @@ describe('back_fill_file_hash script', function () {
    * @return {Promise<{result, stats: any}>}
    */
   async function runScript(args = [], shouldHaveWritten = true) {
-    const { stats, result, migrationCreated } = await tryRunScript(
-      args,
-      shouldHaveWritten
-    )
+    const { stats, result } = await tryRunScript(args, shouldHaveWritten)
     if (result.status !== 0) {
       console.log(result)
       expect(result).to.have.property('status', 0)
     }
-    return { stats, result, migrationCreated }
+    return { stats, result }
   }
 
   /**
@@ -823,7 +866,21 @@ describe('back_fill_file_hash script', function () {
         !processHashedFiles ? ['--skip-hashed-files'] : [],
         false
       )
-      expect(rerun.stats).deep.equal(statsForRerun(processHashedFiles))
+      let stats = {
+        ...STATS_ALL_ZERO,
+        // We still need to iterate over all the projects and blobs.
+        projects: 10,
+        blobs: 10,
+
+        badFileTrees: 4,
+      }
+      if (processHashedFiles) {
+        stats = sumStats(stats, {
+          ...STATS_ALL_ZERO,
+          blobs: 2,
+        })
+      }
+      expect(rerun.stats).deep.equal(stats)
     })
   }
 
@@ -925,24 +982,6 @@ describe('back_fill_file_hash script', function () {
     STATS_UP_FROM_PROJECT1_ONWARD
   )
 
-  function statsForRerun(processHashedFiles = true) {
-    let stats = {
-      ...STATS_ALL_ZERO,
-      // We still need to iterate over all the projects and blobs.
-      projects: 10,
-      blobs: 10,
-
-      badFileTrees: 4,
-    }
-    if (processHashedFiles) {
-      stats = sumStats(stats, {
-        ...STATS_ALL_ZERO,
-        blobs: 2,
-      })
-    }
-    return stats
-  }
-
   describe('error cases', function () {
     beforeEach('prepare environment', prepareEnvironment)
 
@@ -971,9 +1010,6 @@ describe('back_fill_file_hash script', function () {
         'failed to process file, trying again'
       )
       expect(t1 - t0).to.be.below(10_000)
-      expect(result.stderr).to.include(
-        'The binary files migration failed, see above.'
-      )
     })
 
     it('should retry on error', async function () {
@@ -1038,14 +1074,6 @@ describe('back_fill_file_hash script', function () {
     it('should print stats', function () {
       expect(output.stats).deep.equal(STATS_ALL)
     })
-    it('should print a warning message', () => {
-      expect(output.result.stderr).to.include(
-        'The binary files migration succeeded on a subset of files'
-      )
-    })
-    it('should not create the migration', () => {
-      expect(output.migrationCreated).to.equal(false)
-    })
     it('should have logged the bad file-tree', function () {
       expectBadFileTreeMessage(
         projectIdBadFileTree0,
@@ -1105,14 +1133,6 @@ describe('back_fill_file_hash script', function () {
         blobs: 10,
         badFileTrees: 4,
       })
-    })
-    it('should print a success message', () => {
-      expect(output2.result.stderr).to.include(
-        'The binary files migration succeeded.'
-      )
-    })
-    it('should create the migration', () => {
-      expect(output2.migrationCreated).to.equal(true)
     })
     commonAssertions(true)
   })
@@ -1293,30 +1313,7 @@ Sampled stats for deleted projects:
     it('should print stats for part 1', function () {
       expect(outputPart1.stats).to.deep.equal(STATS_UP_FROM_PROJECT1_ONWARD)
     })
-    it('should warn about split run', () => {
-      expect(outputPart0.result.stderr).to.include(
-        'The binary files migration succeeded on a subset of files'
-      )
-      expect(outputPart1.result.stderr).to.include(
-        'The binary files migration succeeded on a subset of files'
-      )
-    })
     commonAssertions()
-
-    describe('with a full run afterwards', () => {
-      let output
-      before('run script', async function () {
-        output = await runScript([])
-      })
-      it('should print stats', function () {
-        expect(output.stats).to.deep.equal(
-          sumStats(statsForRerun(false), STATS_FILES_HASHED_EXTRA)
-        )
-      })
-      it('should create the migration', () => {
-        expect(output.migrationCreated).to.equal(true)
-      })
-    })
   })
 
   describe('projectIds from file', function () {
@@ -1392,10 +1389,6 @@ Sampled stats for deleted projects:
     it('should print stats', function () {
       expect(outputPart0.stats).to.deep.equal(STATS_UP_TO_PROJECT1)
       expect(outputPart1.stats).to.deep.equal(STATS_UP_FROM_PROJECT1_ONWARD)
-    })
-    it('should not create the migration ', () => {
-      expect(outputPart0.migrationCreated).to.equal(false)
-      expect(outputPart1.migrationCreated).to.equal(false)
     })
     commonAssertions()
   })

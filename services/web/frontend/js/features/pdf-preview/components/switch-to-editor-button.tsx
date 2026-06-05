@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import MaterialIcon from '@/shared/components/material-icon'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import { useLayoutContext } from '../../../shared/context/layout-context'
 
 function SwitchToEditorButton() {
-  const { pdfLayout, restoreView, detachRole } = useLayoutContext()
+  const { pdfLayout, setView, detachRole } = useLayoutContext()
 
   const { t } = useTranslation()
 
@@ -17,7 +17,7 @@ function SwitchToEditorButton() {
   }
 
   function handleClick() {
-    restoreView()
+    setView('editor')
     window.setTimeout(() => {
       window.dispatchEvent(new Event('editor:focus'))
     })

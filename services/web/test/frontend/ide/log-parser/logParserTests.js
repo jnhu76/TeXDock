@@ -6,7 +6,7 @@ const fixturePath = '../../helpers/fixtures/logs/'
 const fs = require('fs')
 const path = require('path')
 
-describe('logParser', function () {
+describe('logParser', function (done) {
   it('should parse errors', function () {
     const { errors } = parseLatexLog('errors.log', { ignoreDuplicates: true })
     expect(errors.map(e => [e.line, e.message])).to.deep.equal([

@@ -1,28 +1,12 @@
 import CodeMirrorEditor from '../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import {
   EditorProviders,
-  makeProjectProvider,
   USER_EMAIL,
   USER_ID,
 } from '../../helpers/editor-providers'
 import { mockScope } from '../source-editor/helpers/mock-scope'
 import { TestContainer } from '../source-editor/helpers/test-container'
 import { docId } from '../source-editor/helpers/mock-doc'
-import { mockProject } from '../source-editor/helpers/mock-project'
-import { UserId } from '@ol-types/user'
-
-const userData = {
-  avatar_text: 'User',
-  email: USER_EMAIL,
-  hue: 180,
-  id: USER_ID,
-  isSelf: true,
-  first_name: 'Test',
-  last_name: 'User',
-}
-
-const resolvedThreadId = 'resolved-thread-id'
-const unresolvedThreadId = 'unresolved-thread-id'
 
 describe('<ReviewPanel />', function () {
   beforeEach(function () {
@@ -38,6 +22,19 @@ describe('<ReviewPanel />', function () {
         last_name: 'User',
       },
     ])
+
+    const userData = {
+      avatar_text: 'User',
+      email: USER_EMAIL,
+      hue: 180,
+      id: USER_ID,
+      isSelf: true,
+      first_name: 'Test',
+      last_name: 'User',
+    }
+
+    const resolvedThreadId = 'resolved-thread-id'
+    const unresolvedThreadId = 'unresolved-thread-id'
 
     cy.intercept('GET', '/project/*/threads', {
       // Resolved comment thread
@@ -184,29 +181,18 @@ describe('<ReviewPanel />', function () {
           removeChangeIds,
         },
       },
-    })
-    const project = mockProject({
-      projectOwner: {
-        _id: USER_ID,
-      },
-      projectFeatures: { trackChanges: false, trackChangesVisible: true },
+      projectFeatures: { trackChangesVisible: true },
     })
 
     cy.wrap(scope).as('scope')
 
     cy.mount(
       <TestContainer className="rp-size-expanded">
-        <EditorProviders
-          scope={scope}
-          providers={{ ProjectProvider: makeProjectProvider(project) }}
-        >
+        <EditorProviders scope={scope}>
           <CodeMirrorEditor />
         </EditorProviders>
       </TestContainer>
     )
-
-    // Wait for the editor to be ready before interacting with it
-    cy.get('.cm-content').should('have.css', 'opacity', '1')
 
     // Open the review panel with keyboard shortcut
     cy.findByText('contentLine 0').type('{command}j', { scrollBehavior: false })
@@ -277,7 +263,9 @@ describe('<ReviewPanel />', function () {
 
   describe('toggler', function () {
     it('should close panel when pressing close button', function () {
-      cy.findByLabelText('Close').click({ scrollBehavior: false })
+      cy.get('@review-panel').within(() => {
+        cy.findByLabelText('Close').click({ scrollBehavior: false })
+      })
       // We should collapse to the mini state
       cy.get('.review-panel-mini').should('exist')
     })
@@ -493,10 +481,10 @@ describe('<ReviewPanel />', function () {
   })
 
   describe('aggregate change entries', function () {
-    // eslint-disable-next-line mocha/no-pending-tests
+    // eslint-disable-next-line mocha/no-skipped-tests
     it.skip('renders changed entries in current file mode', function () {})
 
-    // eslint-disable-next-line mocha/no-pending-tests
+    // eslint-disable-next-line mocha/no-skipped-tests
     it.skip('renders changed entries in overview mode', function () {})
   })
 
@@ -537,35 +525,6 @@ describe('<ReviewPanel />', function () {
         cy.findByRole('button', { name: 'Cancel' }).click({
           scrollBehavior: false,
         })
-      })
-    })
-  })
-
-  describe('add comment tooltip visibility', function () {
-    beforeEach(function () {
-      cy.findByText('contentLine 12').type(
-        '{home}{shift}' + '{rightArrow}'.repeat(6),
-        { scrollBehavior: false }
-      )
-      cy.get('.review-tooltip-menu').should('exist')
-    })
-
-    it('hides the tooltip when clicking a toolbar button', function () {
-      cy.findByRole('button', { name: 'Undo' }).click({ scrollBehavior: false })
-      cy.get('.review-tooltip-menu').should('not.exist')
-    })
-
-    it('hides the tooltip when clicking outside the editor', function () {
-      cy.get('@review-panel').click({ scrollBehavior: false })
-      cy.get('.review-tooltip-menu').should('not.exist')
-    })
-
-    it('keeps the add comment button functional when clicked', function () {
-      cy.get('.review-tooltip-add-comment-button').click({
-        scrollBehavior: false,
-      })
-      cy.get('@review-panel').within(() => {
-        cy.get('.review-panel-add-comment-textarea').should('exist')
       })
     })
   })
@@ -622,26 +581,6 @@ describe('<ReviewPanel />', function () {
         ])
       })
     })
-
-    it('keeps the tooltip visible when cancelling the accept confirmation modal', function () {
-      cy.get('@accept-selected-changes').click({ scrollBehavior: false })
-      cy.findByRole('dialog').within(() => {
-        cy.findByRole('button', { name: 'Cancel' }).click({
-          scrollBehavior: false,
-        })
-      })
-      cy.get('.review-tooltip-menu').should('exist')
-    })
-
-    it('keeps the tooltip visible when cancelling the reject confirmation modal', function () {
-      cy.get('@reject-selected-changes').click({ scrollBehavior: false })
-      cy.findByRole('dialog').within(() => {
-        cy.findByRole('button', { name: 'Cancel' }).click({
-          scrollBehavior: false,
-        })
-      })
-      cy.get('.review-tooltip-menu').should('exist')
-    })
   })
 
   describe('overview mode', function () {
@@ -684,192 +623,10 @@ describe('<ReviewPanel />', function () {
   })
 })
 
-describe('<ReviewPanel /> in mini mode', function () {
-  function render({ comments = [], changes = [], threads = {} }: any) {
-    window.metaAttributesCache.set('ol-preventCompileOnLoad', true)
-
-    cy.interceptEvents()
-
-    cy.intercept('GET', '/project/*/changes/users', [
-      {
-        id: USER_ID,
-        email: USER_EMAIL,
-        first_name: 'Test',
-        last_name: 'User',
-      },
-    ])
-
-    const getChanges = cy.stub().as('getChanges').returns([])
-    const removeChangeIds = cy.stub().as('removeChangeIds')
-
-    const scope = mockScope(undefined, {
-      docOptions: {
-        rangesOptions: {
-          comments,
-          changes,
-          getChanges,
-          removeChangeIds,
-        },
-      },
-      projectFeatures: { trackChangesVisible: true },
-    })
-
-    const project = mockProject({
-      projectFeatures: { trackChangesVisible: true },
-    })
-
-    cy.intercept('GET', '/project/*/ranges', [
-      {
-        id: docId,
-        ranges: {
-          changes,
-          comments,
-          docId,
-        },
-      },
-    ])
-
-    cy.intercept('GET', '/project/*/threads', threads).as('loadThreads')
-
-    cy.intercept('POST', `/project/*/doc/${docId}/metadata`, {})
-
-    cy.wrap(scope).as('scope')
-
-    cy.mount(
-      <TestContainer>
-        <EditorProviders
-          scope={scope}
-          providers={{ ProjectProvider: makeProjectProvider(project) }}
-        >
-          <CodeMirrorEditor />
-        </EditorProviders>
-      </TestContainer>
-    )
-    // Wait for editor
-    cy.get('.cm-content').should('have.css', 'opacity', '1')
-
-    // Wait for the threads to load, since mini mode renders conditionally on
-    // the threads/ranges data being present
-    cy.wait('@loadThreads')
-
-    // Toggle the review panel twice to ensure data is loaded
-    cy.findByText('contentLine 0').type('{command}jj', {
-      scrollBehavior: false,
-    })
-    cy.findByText('contentLine 1').type('{ctrl}jj', { scrollBehavior: false })
-  }
-
-  it("doesn't render mini when no comments or changes are present in project", function () {
-    render({
-      comments: [],
-      changes: [],
-      threads: {},
-    })
-    cy.get('.review-panel-mini').should('not.exist')
-  })
-
-  it("doesn't render mini when no comments or changes are present in document", function () {
-    render({
-      comments: [],
-      changes: [],
-      threads: {
-        'random-unrelated-thread': {
-          messages: [
-            {
-              content: 'a comment',
-              id: 'random-unrelated-thread-1',
-              timestamp: new Date('2025-01-01T01:00:00.000Z'),
-              user: userData,
-              user_id: USER_ID,
-            },
-          ],
-        },
-      },
-    })
-    cy.get('.review-panel-mini').should('not.exist')
-  })
-
-  it("doesn't render mini when a resolved comment is present in document", function () {
-    render({
-      comments: [
-        {
-          id: resolvedThreadId,
-          op: { p: 161, c: 'Your introduction', t: resolvedThreadId },
-        },
-      ],
-      changes: [],
-      threads: {
-        [resolvedThreadId]: {
-          resolved: true,
-          resolved_at: new Date('2025-01-02T00:00:00.000Z').toISOString(),
-          resolved_by_user_id: USER_ID,
-          resolved_by_user: userData,
-          messages: [
-            {
-              content: 'a comment',
-              id: `${resolvedThreadId}-1`,
-              timestamp: new Date('2025-01-01T01:00:00.000Z'),
-              user: userData,
-              user_id: USER_ID,
-            },
-          ],
-        },
-      },
-    })
-    cy.get('.review-panel-mini').should('not.exist')
-  })
-
-  it('renders mini when an unresolved comment is present in document', function () {
-    render({
-      comments: [
-        {
-          id: unresolvedThreadId,
-          op: { p: 161, c: 'Your introduction', t: unresolvedThreadId },
-        },
-      ],
-      changes: [],
-      threads: {
-        [unresolvedThreadId]: {
-          messages: [
-            {
-              content: 'a comment',
-              id: `${unresolvedThreadId}-1`,
-              timestamp: new Date('2025-01-01T01:00:00.000Z'),
-              user: userData,
-              user_id: USER_ID,
-            },
-          ],
-        },
-      },
-    })
-    cy.get('.review-panel-mini').should('exist')
-  })
-
-  it('renders mini when a tracked change is present in document', function () {
-    render({
-      comments: [],
-      changes: [
-        {
-          metadata: {
-            user_id: USER_ID,
-            ts: new Date('2025-01-01T00:00:00.000Z'),
-          },
-          id: 'inserted-op-id',
-          op: { p: 166, t: 'inserted-op-id', i: 'introduction' },
-        },
-      ],
-      threads: {},
-    })
-    cy.get('.review-panel-mini').should('exist')
-  })
-})
-
 describe('<ReviewPanel /> for free users', function () {
   function mountEditor(ownerId = USER_ID) {
     const scope = mockScope(undefined, {
       permissions: { write: true, trackedWrite: false, comment: true },
-    })
-    const project = mockProject({
       projectFeatures: { trackChanges: false, trackChangesVisible: true },
       projectOwner: {
         _id: ownerId,
@@ -880,17 +637,11 @@ describe('<ReviewPanel /> for free users', function () {
 
     cy.mount(
       <TestContainer className="rp-size-expanded">
-        <EditorProviders
-          scope={scope}
-          providers={{ ProjectProvider: makeProjectProvider(project) }}
-        >
+        <EditorProviders scope={scope}>
           <CodeMirrorEditor />
         </EditorProviders>
       </TestContainer>
     )
-
-    // Wait for the editor to be ready before interacting with it
-    cy.get('.cm-content').should('have.css', 'opacity', '1')
 
     cy.findByLabelText('Editing').click()
     cy.findByRole('menu').within(() => {
@@ -908,7 +659,7 @@ describe('<ReviewPanel /> for free users', function () {
   it('renders modal', function () {
     mountEditor()
     cy.findByRole('dialog').within(() => {
-      cy.findByText('Upgrade to review').should('exist')
+      cy.findByText('Upgrade to Review').should('exist')
     })
   })
 
@@ -928,11 +679,11 @@ describe('<ReviewPanel /> for free users', function () {
     })
   })
 
-  // eslint-disable-next-line mocha/no-pending-tests
+  // eslint-disable-next-line mocha/no-skipped-tests
   it.skip('opens subscription page after clicking on `try it for free`', function () {})
 
   it('shows `ask project owner to upgrade` message', function () {
-    mountEditor('other-user-id' as UserId)
+    mountEditor('other-user-id')
     cy.findByRole('dialog').within(() => {
       cy.findByText(
         'Please ask the project owner to upgrade to use track changes'

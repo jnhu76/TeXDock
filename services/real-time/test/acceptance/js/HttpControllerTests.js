@@ -5,54 +5,59 @@
  * DS102: Remove unnecessary code created because of implicit returns
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import async from 'async'
-import {
-  fetchJson,
-  fetchNothing,
-  RequestFailedError,
-} from '@overleaf/fetch-utils'
-import { expect } from 'chai'
-import RealTimeClient from './helpers/RealTimeClient.js'
-import FixturesManager from './helpers/FixturesManager.js'
+const async = require('async')
+const { expect } = require('chai')
+const request = require('request').defaults({
+  baseUrl: 'http://127.0.0.1:3026',
+})
+
+const RealTimeClient = require('./helpers/RealTimeClient')
+const FixturesManager = require('./helpers/FixturesManager')
 
 describe('HttpControllerTests', function () {
   describe('without a user', function () {
-    it('should return 404 for the client view', async function () {
+    return it('should return 404 for the client view', function (done) {
       const clientId = 'not-existing'
-      try {
-        await fetchNothing(`http://127.0.0.1:3026/clients/${clientId}`)
-        expect.fail('request should have failed')
-      } catch (error) {
-        expect(error).to.be.instanceof(RequestFailedError)
-        expect(error.response.status).to.equal(404)
-      }
+      return request.get(
+        {
+          url: `/clients/${clientId}`,
+          json: true,
+        },
+        (error, response, data) => {
+          if (error) {
+            return done(error)
+          }
+          expect(response.statusCode).to.equal(404)
+          return done()
+        }
+      )
     })
   })
 
-  describe('with a user and after joining a project', function () {
+  return describe('with a user and after joining a project', function () {
     before(function (done) {
-      async.series(
+      return async.series(
         [
           cb => {
-            FixturesManager.setUpProject(
+            return FixturesManager.setUpProject(
               {
                 privilegeLevel: 'owner',
               },
               (error, { project_id: projectId, user_id: userId }) => {
                 this.project_id = projectId
                 this.user_id = userId
-                cb(error)
+                return cb(error)
               }
             )
           },
 
           cb => {
-            FixturesManager.setUpDoc(
+            return FixturesManager.setUpDoc(
               this.project_id,
               {},
               (error, { doc_id: docId }) => {
                 this.doc_id = docId
-                cb(error)
+                return cb(error)
               }
             )
           },
@@ -62,29 +67,39 @@ describe('HttpControllerTests', function () {
           },
 
           cb => {
-            this.client.emit('joinDoc', this.doc_id, cb)
+            return this.client.emit('joinDoc', this.doc_id, cb)
           },
         ],
         done
       )
     })
 
-    it('should send a client view', async function () {
-      const data = await fetchJson(
-        `http://127.0.0.1:3026/clients/${this.client.socket.sessionid}`
+    return it('should send a client view', function (done) {
+      return request.get(
+        {
+          url: `/clients/${this.client.socket.sessionid}`,
+          json: true,
+        },
+        (error, response, data) => {
+          if (error) {
+            return done(error)
+          }
+          expect(response.statusCode).to.equal(200)
+          expect(data.connected_time).to.exist
+          delete data.connected_time
+          // .email is not set in the session
+          delete data.email
+          expect(data).to.deep.equal({
+            client_id: this.client.socket.sessionid,
+            first_name: 'Joe',
+            last_name: 'Bloggs',
+            project_id: this.project_id,
+            user_id: this.user_id,
+            rooms: [this.project_id, this.doc_id],
+          })
+          return done()
+        }
       )
-      expect(data.connected_time).to.exist
-      delete data.connected_time
-      // .email is not set in the session
-      delete data.email
-      expect(data).to.deep.equal({
-        client_id: this.client.socket.sessionid,
-        first_name: 'Joe',
-        last_name: 'Bloggs',
-        project_id: this.project_id,
-        user_id: this.user_id,
-        rooms: [this.project_id, this.doc_id],
-      })
     })
   })
 })

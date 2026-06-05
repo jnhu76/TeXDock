@@ -2,7 +2,6 @@ import { Nullable } from './utils'
 
 export type Institution = {
   commonsAccount: boolean
-  enterpriseCommons: boolean
   writefullCommonsAccount: boolean
   confirmed: boolean
   id: number

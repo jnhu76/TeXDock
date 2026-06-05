@@ -9,13 +9,12 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import sinon from 'sinon'
-import express from 'express'
-import bodyParser from 'body-parser'
-
 let MockWebServer
+const sinon = require('sinon')
+const express = require('express')
+const bodyParser = require('body-parser')
 
-export default MockWebServer = {
+module.exports = MockWebServer = {
   projects: {},
   privileges: {},
   userMetadata: {},

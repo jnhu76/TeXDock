@@ -3,7 +3,7 @@ import useFetchMock from './hooks/use-fetch-mock'
 import ContactUsModal from '../../modules/support/frontend/js/components/contact-us-modal'
 import fixedHelpSuggestionSearch from '../../modules/support/test/frontend/util/fixed-help-suggestion-search'
 import { ScopeDecorator } from './decorators/scope'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
 
 type ContactUsModalProps = ComponentProps<typeof ContactUsModal>
 
@@ -69,7 +69,7 @@ const ContactUsModalWithAcknowledgement = (
 }
 
 export const WithAcknowledgement = (args: ContactUsModalProps) => {
-  const { show: _show, handleHide: _handleHide, ...rest } = args
+  const { show, handleHide, ...rest } = args
   return <ContactUsModalWithAcknowledgement {...rest} />
 }
 

@@ -1,9 +1,8 @@
 import Settings from '@overleaf/settings'
 import { expect } from 'chai'
 import UserHelper from './helpers/User.mjs'
-import UrlHelper from '../../../app/src/Features/Helpers/UrlHelper.mjs'
+import { getSafeAdminDomainRedirect } from '../../../app/src/Features/Helpers/UrlHelper.js'
 
-const { getSafeAdminDomainRedirect } = UrlHelper
 const User = UserHelper.promises
 
 describe('AdminPrivilegeAvailable', function () {
@@ -17,7 +16,6 @@ describe('AdminPrivilegeAvailable', function () {
     adminUser = new User()
     await adminUser.ensureUserExists()
     await adminUser.ensureAdmin()
-    await adminUser.ensureAdminRole('engineering')
     await adminUser.login()
   })
 

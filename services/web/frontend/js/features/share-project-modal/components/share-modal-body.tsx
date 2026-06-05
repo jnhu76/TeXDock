@@ -10,27 +10,10 @@ import { useProjectContext } from '@/shared/context/project-context'
 import { useMemo } from 'react'
 import RecaptchaConditions from '@/shared/components/recaptcha-conditions'
 import getMeta from '@/utils/meta'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
-import OLNotification from '@/shared/components/ol/ol-notification'
-import ErrorMessage from '@/features/share-project-modal/components/error-message'
-import ProjectAccess from '@/features/share-project-modal/components/project-access'
-import InvitedPeople from '@/features/share-project-modal/components/invited-people'
 
-type ShareModalBodyProps = {
-  isInvitedPeopleScreen: boolean
-  setIsInvitedPeopleScreen: React.Dispatch<React.SetStateAction<boolean>>
-  error?: string
-}
-
-export default function ShareModalBody({
-  isInvitedPeopleScreen,
-  setIsInvitedPeopleScreen,
-  error,
-}: ShareModalBodyProps) {
-  const { project, features } = useProjectContext()
-  const { members, invites } = project || {}
+export default function ShareModalBody() {
+  const { members, invites, features } = useProjectContext()
   const { isProjectOwner } = useEditorContext()
-  const isSharingUpdatesEnabled = useFeatureFlag('sharing-updates')
 
   // whether the project has not reached the collaborator limit
   const canAddCollaborators = useMemo(() => {
@@ -43,12 +26,12 @@ export default function ShareModalBody({
       return true
     }
 
-    const editorInvites =
-      invites?.filter(invite => invite.privileges !== 'readOnly').length || 0
+    const editorInvites = invites.filter(
+      invite => invite.privileges !== 'readOnly'
+    ).length
 
     return (
-      (members?.filter(member => member.privileges !== 'readOnly').length ||
-        0) +
+      members.filter(member => member.privileges !== 'readOnly').length +
         editorInvites <
       (features.collaborators ?? 1)
     )
@@ -57,11 +40,11 @@ export default function ShareModalBody({
   // determine if some but not all pending editors' permissions have been resolved,
   // for moving between warning and info notification states etc.
   const somePendingEditorsResolved = useMemo(() => {
-    return Boolean(
-      members?.some(member =>
+    return (
+      members.some(member =>
         ['readAndWrite', 'review'].includes(member.privileges)
       ) &&
-      members?.some(member => member.pendingEditor || member.pendingReviewer)
+      members.some(member => member.pendingEditor || member.pendingReviewer)
     )
   }, [members])
 
@@ -73,14 +56,13 @@ export default function ShareModalBody({
     if (features.collaborators === -1) {
       return false
     }
-    return (
-      members?.some(member => member.pendingEditor || member.pendingReviewer) ||
-      false
+    return members.some(
+      member => member.pendingEditor || member.pendingReviewer
     )
   }, [features, isProjectOwner, members])
 
   const hasExceededCollaboratorLimit = useMemo(() => {
-    if (!isProjectOwner || !features || !members) {
+    if (!isProjectOwner || !features) {
       return false
     }
 
@@ -95,9 +77,6 @@ export default function ShareModalBody({
   }, [features, isProjectOwner, members])
 
   const sortedMembers = useMemo(() => {
-    if (!members) {
-      return []
-    }
     return [
       ...members.filter(member => member.privileges === 'readAndWrite'),
       ...members.filter(member => member.pendingEditor),
@@ -124,67 +103,36 @@ export default function ShareModalBody({
       ) : (
         <SendInvitesNotice />
       )}
+      {isProjectOwner && <LinkSharing />}
 
-      {isSharingUpdatesEnabled ? (
-        <>
-          {error && (
-            <OLNotification
-              type="error"
-              content={<ErrorMessage error={error} />}
-            />
-          )}
-          {isInvitedPeopleScreen || !isProjectOwner ? (
-            <InvitedPeople
-              sortedMembers={sortedMembers}
-              invites={invites}
-              hasExceededCollaboratorLimit={hasExceededCollaboratorLimit}
-              hasTrackChangesFeature={Boolean(features.trackChanges)}
-              canAddCollaborators={canAddCollaborators}
-            />
-          ) : (
-            <ProjectAccess
-              setIsInvitedPeopleScreen={setIsInvitedPeopleScreen}
-              // adding +1 for the project owner
-              invitedPeopleCount={
-                sortedMembers.length + (invites || []).length + 1
-              }
-            />
-          )}
-        </>
-      ) : (
-        <>
-          {isProjectOwner && <LinkSharing />}
+      <OwnerInfo />
 
-          <OwnerInfo />
-
-          {sortedMembers.map(member =>
-            isProjectOwner ? (
-              <EditMember
-                key={member._id}
-                member={member}
-                hasExceededCollaboratorLimit={hasExceededCollaboratorLimit}
-                hasBeenDowngraded={Boolean(
-                  member.pendingEditor || member.pendingReviewer
-                )}
-                canAddCollaborators={canAddCollaborators}
-                isReviewerOnFreeProject={
-                  member.privileges === 'review' && !features.trackChanges
-                }
-              />
-            ) : (
-              <ViewMember key={member._id} member={member} />
-            )
-          )}
-
-          {(invites || []).map(invite => (
-            <Invite
-              key={invite._id}
-              invite={invite}
-              isProjectOwner={isProjectOwner}
-            />
-          ))}
-        </>
+      {sortedMembers.map(member =>
+        isProjectOwner ? (
+          <EditMember
+            key={member._id}
+            member={member}
+            hasExceededCollaboratorLimit={hasExceededCollaboratorLimit}
+            hasBeenDowngraded={Boolean(
+              member.pendingEditor || member.pendingReviewer
+            )}
+            canAddCollaborators={canAddCollaborators}
+            isReviewerOnFreeProject={
+              member.privileges === 'review' && !features.trackChanges
+            }
+          />
+        ) : (
+          <ViewMember key={member._id} member={member} />
+        )
       )}
+
+      {invites.map(invite => (
+        <Invite
+          key={invite._id}
+          invite={invite}
+          isProjectOwner={isProjectOwner}
+        />
+      ))}
 
       {!getMeta('ol-ExposedSettings').recaptchaDisabled?.invite && (
         <RecaptchaConditions />

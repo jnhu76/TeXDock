@@ -1,23 +1,17 @@
-import { ChangeEvent, FC, memo, useCallback, useId } from 'react'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import { ChangeEvent, FC, memo, useCallback } from 'react'
+import useScopeValue from '@/shared/hooks/use-scope-value'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
 import { sendMB } from '../../../infrastructure/event-tracking'
+import { isValidTeXFile } from '../../../main/is-valid-tex-file'
 import { useTranslation } from 'react-i18next'
-import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
-import { useEditorPropertiesContext } from '@/features/ide-react/context/editor-properties-context'
-import { getFileExtension } from '../utils/file'
-import { isVisualEditorAvailable } from '../utils/visual-editor'
+import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
 
 function EditorSwitch() {
   const { t } = useTranslation()
-  const { showVisual: visual, setShowVisual: setVisual } =
-    useEditorPropertiesContext()
-  const { openDocName } = useEditorOpenDocContext()
-  const inputId = useId()
+  const [visual, setVisual] = useScopeValue('editor.showVisual')
+  const { openDocName } = useEditorManagerContext()
 
-  const richTextAvailable = openDocName
-    ? isVisualEditorAvailable(openDocName)
-    : false
-  const extension = getFileExtension(openDocName || '') ?? ''
+  const richTextAvailable = openDocName ? isValidTeXFile(openDocName) : false
 
   const handleChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -33,9 +27,9 @@ function EditorSwitch() {
           break
       }
 
-      sendMB('editor-switch-change', { editorType, extension })
+      sendMB('editor-switch-change', { editorType })
     },
-    [extension, setVisual]
+    [setVisual]
   )
 
   return (
@@ -43,30 +37,28 @@ function EditorSwitch() {
       className="editor-toggle-switch"
       aria-label={t('toolbar_code_visual_editor_switch')}
     >
-      <form>
-        <fieldset className="toggle-switch">
-          <legend className="visually-hidden">Editor mode.</legend>
+      <fieldset className="toggle-switch">
+        <legend className="sr-only">Editor mode.</legend>
 
-          <input
-            type="radio"
-            name="editor"
-            value="cm6"
-            id={inputId}
-            className="toggle-switch-input"
-            checked={!richTextAvailable || !visual}
-            onChange={handleChange}
-          />
-          <label htmlFor={inputId} className="toggle-switch-label">
-            <span>{t('code')}</span>
-          </label>
+        <input
+          type="radio"
+          name="editor"
+          value="cm6"
+          id="editor-switch-cm6"
+          className="toggle-switch-input"
+          checked={!richTextAvailable || !visual}
+          onChange={handleChange}
+        />
+        <label htmlFor="editor-switch-cm6" className="toggle-switch-label">
+          <span>{t('code_editor')}</span>
+        </label>
 
-          <RichTextToggle
-            checked={richTextAvailable && visual}
-            disabled={!richTextAvailable}
-            handleChange={handleChange}
-          />
-        </fieldset>
-      </form>
+        <RichTextToggle
+          checked={richTextAvailable && visual}
+          disabled={!richTextAvailable}
+          handleChange={handleChange}
+        />
+      </fieldset>
     </div>
   )
 }
@@ -77,7 +69,6 @@ const RichTextToggle: FC<{
   handleChange: (event: ChangeEvent<HTMLInputElement>) => void
 }> = ({ checked, disabled, handleChange }) => {
   const { t } = useTranslation()
-  const inputId = useId()
 
   const toggle = (
     <span>
@@ -85,14 +76,14 @@ const RichTextToggle: FC<{
         type="radio"
         name="editor"
         value="rich-text"
-        id={inputId}
+        id="editor-switch-rich-text"
         className="toggle-switch-input"
         checked={checked}
         onChange={handleChange}
         disabled={disabled}
       />
-      <label htmlFor={inputId} className="toggle-switch-label">
-        <span>{t('visual')}</span>
+      <label htmlFor="editor-switch-rich-text" className="toggle-switch-label">
+        <span>{t('visual_editor')}</span>
       </label>
     </span>
   )
@@ -100,7 +91,7 @@ const RichTextToggle: FC<{
   if (disabled) {
     return (
       <OLTooltip
-        description={t('visual_editor_does_not_support_this_file_type')}
+        description={t('visual_editor_is_only_available_for_tex_files')}
         id="rich-text-toggle-tooltip"
         overlayProps={{ placement: 'bottom' }}
         tooltipProps={{ className: 'tooltip-wide' }}
@@ -110,16 +101,7 @@ const RichTextToggle: FC<{
     )
   }
 
-  return (
-    <OLTooltip
-      id="rich-text-toggle-tooltip"
-      description={t('toolbar_change_editor_mode')}
-      overlayProps={{ placement: 'bottom' }}
-      tooltipProps={{ className: 'tooltip-wide' }}
-    >
-      {toggle}
-    </OLTooltip>
-  )
+  return toggle
 }
 
 export default memo(EditorSwitch)

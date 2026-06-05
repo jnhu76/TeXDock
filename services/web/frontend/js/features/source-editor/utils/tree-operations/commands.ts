@@ -79,7 +79,6 @@ export const enterNode = (
 
     items.push({
       line: state.doc.lineAt(node.from).number,
-      toLine: state.doc.lineAt(node.to).number,
       title: commandName,
       from: node.from,
       to: node.to,
@@ -107,7 +106,6 @@ export const enterNode = (
 
     items.push({
       line: state.doc.lineAt(node.from).number,
-      toLine: state.doc.lineAt(node.to).number,
       title: commandName,
       from: node.from,
       to: node.to,
@@ -129,7 +127,6 @@ export const enterNode = (
     }
     items.push({
       line: state.doc.lineAt(node.from).number,
-      toLine: state.doc.lineAt(node.to).number,
       title: commandName,
       from: node.from,
       to: node.to,
@@ -183,7 +180,6 @@ export const enterNode = (
 
     items.push({
       line: state.doc.lineAt(commandNode.from).number,
-      toLine: state.doc.lineAt(commandNode.to).number,
       title: text,
       from: commandNode.from,
       to: commandNode.to,

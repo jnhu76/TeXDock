@@ -21,7 +21,11 @@ const hkdf = promisify(Crypto.hkdf)
 const AES256_KEY_LENGTH = 32
 
 /**
- * @typedef {Object} EncryptionSettings
+ * @typedef {import('aws-sdk').AWSError} AWSError
+ */
+
+/**
+ * @typedef {Object} Settings
  * @property {boolean} automaticallyRotateDEKEncryption
  * @property {string} dataEncryptionKeyBucketName
  * @property {boolean} ignoreErrorsFromDEKReEncryption
@@ -30,28 +34,14 @@ const AES256_KEY_LENGTH = 32
  */
 
 /**
- * @typedef {Object} S3PersistorSettings
- * @property {Object<string, import('@aws-sdk/client-s3').StorageClass>} [storageClass]
- * @property {string} [key]
- * @property {string} [secret]
- * @property {string} [region]
- * @property {string} [endpoint]
- * @property {boolean} [pathStyle]
- * @property {number} [maxRetries]
- * @property {Object} [httpOptions]
- * @property {string} [ca]
- * @property {number} [signedUrlExpiryInMs]
- * @property {number} [partSize]
- * @property {Object<string, {auth_key: string, auth_secret: string}>} [bucketCreds]
+ * Helper function to make TS happy when accessing error properties
+ * AWSError is not an actual class, so we cannot use instanceof.
+ * @param {any} err
+ * @return {err is AWSError}
  */
-
-/**
- * @typedef {S3PersistorSettings & EncryptionSettings} Settings
- */
-
-/**
- * @typedef {import('./types').ListDirectoryResult} ListDirectoryResult
- */
+function isAWSError(err) {
+  return !!err
+}
 
 /**
  * @param {any} err
@@ -61,8 +51,9 @@ function isForbiddenError(err) {
   if (!err || !(err instanceof ReadError || err instanceof NotFoundError)) {
     return false
   }
-  // @ts-ignore
-  return err?.cause.statusCode === 403 || err?.cause.Code === 'AccessDenied'
+  const cause = err.cause
+  if (!isAWSError(cause)) return false
+  return cause.statusCode === 403
 }
 
 class RootKeyEncryptionKey {
@@ -123,6 +114,10 @@ class PerProjectEncryptedS3Persistor extends S3Persistor {
         if (rootKEKs.length === 0) throw new Error('no root kek provided')
         return rootKEKs
       })
+  }
+
+  async ensureKeyEncryptionKeysLoaded() {
+    await this.#availableKeyEncryptionKeysPromise
   }
 
   /**
@@ -305,13 +300,6 @@ class PerProjectEncryptedS3Persistor extends S3Persistor {
     }
   }
 
-  /**
-   * @param {string} bucketName
-   * @param {string} path
-   * @param {NodeJS.ReadableStream} sourceStream
-   * @param {import('./S3Persistor.js').StreamOptions} opts
-   * @return {Promise<void>}
-   */
   async sendStream(bucketName, path, sourceStream, opts = {}) {
     const ssecOptions =
       opts.ssecOptions ||
@@ -322,13 +310,6 @@ class PerProjectEncryptedS3Persistor extends S3Persistor {
     })
   }
 
-  /**
-   * @param {string} bucketName
-   * @param {string} path
-   * @param {Object} opts
-   * @param {SSECOptions} [opts.ssecOptions]
-   * @return {Promise<NodeJS.ReadableStream>}
-   */
   async getObjectStream(bucketName, path, opts = {}) {
     const ssecOptions =
       opts.ssecOptions ||
@@ -339,13 +320,6 @@ class PerProjectEncryptedS3Persistor extends S3Persistor {
     })
   }
 
-  /**
-   * @param {string} bucketName
-   * @param {string} path
-   * @param {Object} opts
-   * @param {SSECOptions} [opts.ssecOptions]
-   * @return {Promise<number>}
-   */
   async getObjectSize(bucketName, path, opts = {}) {
     const ssecOptions =
       opts.ssecOptions ||
@@ -353,13 +327,6 @@ class PerProjectEncryptedS3Persistor extends S3Persistor {
     return await super.getObjectSize(bucketName, path, { ...opts, ssecOptions })
   }
 
-  /**
-   * @param {string} bucketName
-   * @param {string} path
-   * @param {Object} opts
-   * @param {SSECOptions} [opts.ssecOptions]
-   * @return {Promise<string | undefined>}
-   */
   async getObjectStorageClass(bucketName, path, opts = {}) {
     const ssecOptions =
       opts.ssecOptions ||
@@ -370,23 +337,11 @@ class PerProjectEncryptedS3Persistor extends S3Persistor {
     })
   }
 
-  /**
-   * @param {string} bucketName
-   * @param {string} path
-   * @param {string} [continuationToken]
-   * @return {Promise<number>}
-   */
   async directorySize(bucketName, path, continuationToken) {
     // Note: Listing a bucket does not require SSE-C credentials.
     return await super.directorySize(bucketName, path, continuationToken)
   }
 
-  /**
-   * @param {string} bucketName
-   * @param {string} path
-   * @param {string} [continuationToken]
-   * @return {Promise<void>}
-   */
   async deleteDirectory(bucketName, path, continuationToken) {
     // Let [Settings.pathToProjectFolder] validate the project path before deleting things.
     const { projectFolder, dekPath } = this.#buildProjectPaths(bucketName, path)
@@ -400,27 +355,12 @@ class PerProjectEncryptedS3Persistor extends S3Persistor {
     }
   }
 
-  /**
-   * @param {string} bucketName
-   * @param {string} path
-   * @param {Object} opts
-   * @return {Promise<string>}
-   */
   async getObjectMd5Hash(bucketName, path, opts = {}) {
     // The ETag in object metadata is not the MD5 content hash, skip the HEAD request.
     opts = { ...opts, etagIsNotMD5: true }
     return await super.getObjectMd5Hash(bucketName, path, opts)
   }
 
-  /**
-   * @param {string} bucketName
-   * @param {string} sourcePath
-   * @param {string} destinationPath
-   * @param {Object} opts
-   * @param {SSECOptions} [opts.ssecOptions]
-   * @param {SSECOptions} [opts.ssecSrcOptions]
-   * @return {Promise<void>}
-   */
   async copyObject(bucketName, sourcePath, destinationPath, opts = {}) {
     const ssecOptions =
       opts.ssecOptions ||
@@ -451,9 +391,9 @@ class PerProjectEncryptedS3Persistor extends S3Persistor {
  * A general "cache" for project keys is another alternative. For now, use a helper class.
  */
 class CachedPerProjectEncryptedS3Persistor {
-  /** @type SSECOptions  */
+  /** @type SSECOptions */
   #projectKeyOptions
-  /** @type PerProjectEncryptedS3Persistor  */
+  /** @type PerProjectEncryptedS3Persistor */
   #parent
 
   /**
@@ -485,26 +425,6 @@ class CachedPerProjectEncryptedS3Persistor {
   }
 
   /**
-   *
-   * @param {string} bucketName
-   * @param {string} path
-   * @return {Promise<string[]>}
-   */
-  async listDirectoryKeys(bucketName, path) {
-    return await this.#parent.listDirectoryKeys(bucketName, path)
-  }
-
-  /**
-   *
-   * @param {string} bucketName
-   * @param {string} path
-   * @return {Promise<Array<{key: string, size: number}>>}
-   */
-  async listDirectoryStats(bucketName, path) {
-    return await this.#parent.listDirectoryStats(bucketName, path)
-  }
-
-  /**
    * @param {string} bucketName
    * @param {string} path
    * @param {NodeJS.ReadableStream} sourceStream
@@ -514,6 +434,7 @@ class CachedPerProjectEncryptedS3Persistor {
    * @param {number} [opts.contentLength]
    * @param {'*'} [opts.ifNoneMatch]
    * @param {SSECOptions} [opts.ssecOptions]
+   * @param {string} [opts.sourceMd5]
    * @return {Promise<void>}
    */
   async sendStream(bucketName, path, sourceStream, opts = {}) {

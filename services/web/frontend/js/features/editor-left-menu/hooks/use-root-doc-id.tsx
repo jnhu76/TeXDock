@@ -1,18 +1,20 @@
 import { useCallback } from 'react'
-import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
-import { useProjectContext } from '@/shared/context/project-context'
+import { useEditorContext } from '../../../shared/context/editor-context'
+import useScopeValue from '../../../shared/hooks/use-scope-value'
 import type { ProjectSettings } from '../utils/api'
 import useSaveProjectSettings from './use-save-project-settings'
 
 export default function useRootDocId() {
-  const { project } = useProjectContext()
-  const rootDocId = project?.rootDocId
-  const { permissionsLevel } = useIdeReactContext()
+  const [rootDocId] =
+    useScopeValue<ProjectSettings['rootDocId']>('project.rootDoc_id')
+  const { permissionsLevel } = useEditorContext()
   const saveProjectSettings = useSaveProjectSettings()
 
   const setRootDocIdFunc = useCallback(
     async (newRootDocId: ProjectSettings['rootDocId']) => {
-      const allowUpdate = permissionsLevel !== 'readOnly'
+      // rootDocId will be undefined on angular scope on initialisation
+      const allowUpdate =
+        typeof rootDocId !== 'undefined' && permissionsLevel !== 'readOnly'
 
       if (allowUpdate) {
         try {
@@ -22,7 +24,7 @@ export default function useRootDocId() {
         }
       }
     },
-    [permissionsLevel, saveProjectSettings]
+    [permissionsLevel, rootDocId, saveProjectSettings]
   )
 
   return {

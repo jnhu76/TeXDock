@@ -1,15 +1,11 @@
 import { expect } from 'chai'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import * as eventTracking from '@/infrastructure/event-tracking'
 import { PaidSubscription } from '../../../../../../../../types/subscription/dashboard/subscription'
 import {
   annualActiveSubscription,
-  annualActiveSubscriptionEuro,
-  annualActiveSubscriptionWithAddons,
-  annualActiveSubscriptionWithCoupons,
   groupActiveSubscription,
   groupActiveSubscriptionWithPendingLicenseChange,
-  groupProfessionalActiveSubscription,
   monthlyActiveCollaborator,
   pendingSubscriptionChange,
   trialCollaboratorSubscription,
@@ -41,77 +37,44 @@ describe('<ActiveSubscription />', function () {
   })
 
   function expectedInActiveSubscription(subscription: PaidSubscription) {
-    if (subscription.plan.annual) {
-      within(screen.getByTestId('billing-period')).getByText((_, el) =>
-        Boolean(
-          el?.textContent?.includes(
-            `Billed annually at ${subscription.payment.displayPrice}`
-          )
-        )
-      )
-      within(screen.getByTestId('plan-only-price')).getByText((_, el) =>
-        Boolean(
-          el?.textContent?.includes(
-            `${subscription.payment.planOnlyDisplayPrice} per year`
-          )
-        )
-      )
-    } else {
-      within(screen.getByTestId('billing-period')).getByText((_, el) =>
-        Boolean(
-          el?.textContent?.includes(
-            `Billed monthly at ${subscription.payment.displayPrice}`
-          )
-        )
-      )
-      within(screen.getByTestId('plan-only-price')).getByText((_, el) =>
-        Boolean(
-          el?.textContent?.includes(
-            `${subscription.payment.planOnlyDisplayPrice} per month`
-          )
-        )
-      )
-    }
-    within(screen.getByTestId('renews-on')).getByText((_, el) =>
-      Boolean(
-        el?.textContent?.includes(
-          `Renews on ${subscription.payment.nextPaymentDueDate}`
-        )
-      )
-    )
+    // sentence broken up by bolding
+    screen.getByText('You are currently subscribed to the', { exact: false })
+    screen.getByText(subscription.plan.name, { exact: false })
 
-    screen.getByRole('heading', { name: subscription.plan.name, level: 3 })
+    screen.getByRole('button', { name: 'Change plan' })
+
+    // sentence broken up by bolding
+    screen.getByText('The next payment of', { exact: false })
+    screen.getByText(subscription.payment.displayPrice, {
+      exact: false,
+    })
+    screen.getByText('will be collected on', { exact: false })
+    const dates = screen.getAllByText(subscription.payment.nextPaymentDueAt, {
+      exact: false,
+    })
+    expect(dates.length).to.equal(2)
 
     screen.getByText(
       '* Prices may be subject to additional VAT, depending on your country.'
     )
 
-    screen.getByRole('link', { name: 'View invoices' })
-
-    if (subscription.payment.billingDetailsLink) {
-      screen.getByRole('link', { name: 'View billing details' })
-    }
+    screen.getByRole('link', { name: 'Update your billing details' })
+    screen.getByRole('link', { name: 'View your invoices' })
   }
 
   it('renders the dash annual active subscription', function () {
     renderActiveSubscription(annualActiveSubscription)
     expectedInActiveSubscription(annualActiveSubscription)
-
-    const button = screen.getByRole('button', { name: 'Change plan' })
-    expect(button).to.exist
-  })
-
-  it('renders the dash annual active subscription in EUR', function () {
-    renderActiveSubscription(annualActiveSubscriptionEuro)
-    expectedInActiveSubscription(annualActiveSubscriptionEuro)
   })
 
   it('shows change plan UI when button clicked', async function () {
     renderActiveSubscription(annualActiveSubscription)
-    expectedInActiveSubscription(annualActiveSubscription)
 
     const button = screen.getByRole('button', { name: 'Change plan' })
     fireEvent.click(button)
+
+    // confirm main dash UI still shown
+    screen.getByText('You are currently subscribed to the', { exact: false })
 
     await screen.findByRole('heading', { name: 'Change plan' })
     await waitFor(
@@ -123,9 +86,34 @@ describe('<ActiveSubscription />', function () {
     )
   })
 
+  it('notes when user is changing plan at end of current plan term', function () {
+    renderActiveSubscription(pendingSubscriptionChange)
+
+    expectedInActiveSubscription(pendingSubscriptionChange)
+
+    screen.getByText('Your plan is changing to', { exact: false })
+
+    screen.getByText(pendingSubscriptionChange.pendingPlan!.name)
+    screen.getByText(' at the end of the current billing period', {
+      exact: false,
+    })
+
+    screen.getByText(
+      'If you wish this change to apply before the end of your current billing period, please contact us.'
+    )
+
+    expect(screen.queryByRole('link', { name: 'contact Support' })).to.be.null
+    expect(screen.queryByText('if you wish to change your group subscription.'))
+      .to.be.null
+  })
+
   it('does not show "Change plan" option when past due', function () {
     // account is likely in expired state, but be sure to not show option if state is still active
-    const activePastDueSubscription = cloneDeep(annualActiveSubscription)
+    const activePastDueSubscription = Object.assign(
+      {},
+      JSON.parse(JSON.stringify(annualActiveSubscription))
+    )
+
     activePastDueSubscription.payment.hasPastDueInvoice = true
 
     renderActiveSubscription(activePastDueSubscription)
@@ -134,41 +122,23 @@ describe('<ActiveSubscription />', function () {
     expect(changePlan).to.be.null
   })
 
-  it('notes when user is changing plan at end of current plan term', function () {
-    renderActiveSubscription(pendingSubscriptionChange)
-
-    expectedInActiveSubscription(pendingSubscriptionChange)
-
-    within(screen.getByTestId('pending-plan-change')).getByText((_, el) =>
-      Boolean(
-        el?.textContent?.includes(
-          `Your plan is changing to ${pendingSubscriptionChange.pendingPlan!.name} at the end of the current billing period`
-        )
-      )
-    )
-
-    screen.getByText(
-      'If you wish this change to apply before the end of your current billing period, please contact us.'
-    )
-  })
-
   it('shows the pending license change message when plan change is pending', function () {
     renderActiveSubscription(groupActiveSubscriptionWithPendingLicenseChange)
 
-    within(screen.getByTestId('pending-plan-change')).getByText((_, el) =>
-      Boolean(
-        el?.textContent?.includes(
-          `Your subscription is changing to include ${groupActiveSubscriptionWithPendingLicenseChange.payment.pendingAdditionalLicenses} additional license(s) for a total of ${groupActiveSubscriptionWithPendingLicenseChange.payment.pendingTotalLicenses}`
-        )
-      )
+    screen.getByText('Your subscription is changing to include', {
+      exact: false,
+    })
+
+    screen.getByText(
+      groupActiveSubscriptionWithPendingLicenseChange.payment
+        .pendingAdditionalLicenses!
     )
 
-    within(screen.getByTestId('plan-licenses')).getByText((_, el) =>
-      Boolean(
-        el?.textContent?.includes(
-          `Supports up to ${groupActiveSubscriptionWithPendingLicenseChange.payment.totalLicenses}`
-        )
-      )
+    screen.getByText('additional license(s) for a total of', { exact: false })
+
+    screen.getByText(
+      groupActiveSubscriptionWithPendingLicenseChange.payment
+        .pendingTotalLicenses!
     )
 
     expect(
@@ -178,8 +148,8 @@ describe('<ActiveSubscription />', function () {
     ).to.be.null
   })
 
-  it('for legacy plans shows the pending license change message when plan change is not pending', function () {
-    const subscription = cloneDeep(groupActiveSubscription)
+  it('shows the pending license change message when plan change is not pending', function () {
+    const subscription = Object.assign({}, groupActiveSubscription)
     subscription.payment.additionalLicenses = 4
     subscription.payment.totalLicenses =
       subscription.payment.totalLicenses +
@@ -187,71 +157,42 @@ describe('<ActiveSubscription />', function () {
 
     renderActiveSubscription(subscription)
 
-    within(screen.getByTestId('plan-licenses')).getByText((_, el) =>
-      Boolean(
-        el?.textContent?.includes(
-          `Plus ${subscription.payment.additionalLicenses} additional license(s) for a total of ${subscription.payment.totalLicenses}`
-        )
-      )
-    )
+    screen.getByText('Your subscription includes', {
+      exact: false,
+    })
+
+    screen.getByText(subscription.payment.additionalLicenses)
+
+    screen.getByText('additional license(s) for a total of', { exact: false })
+
+    screen.getByText(subscription.payment.totalLicenses)
   })
 
   it('shows when trial ends and first payment collected and when subscription would become inactive if cancelled', function () {
     renderActiveSubscription(trialSubscription)
+    screen.getByText('You’re on a free trial which ends on', { exact: false })
 
-    within(screen.getByTestId('trial-ending')).getByText((_, el) =>
-      Boolean(
-        el?.textContent?.includes(
-          `You’re on a free trial which ends on ${trialSubscription.payment.trialEndsAtFormatted}`
-        )
-      )
+    const endDate = screen.getAllByText(
+      trialSubscription.payment.trialEndsAtFormatted!
     )
+    expect(endDate.length).to.equal(3)
   })
 
-  it('shows correct actions for group plan: professional ', function () {
-    renderActiveSubscription(groupProfessionalActiveSubscription)
-    screen.getByRole('link', { name: /buy more licenses/i })
-  })
-
-  it('shows correct actions for group plan: standard (collaborator)', function () {
-    renderActiveSubscription(groupActiveSubscription)
-    screen.getByRole('link', { name: /upgrade plan/i })
-    screen.getByRole('link', { name: /buy more licenses/i })
-  })
-
-  it('shows add-ons if present', function () {
-    renderActiveSubscription(annualActiveSubscriptionWithAddons)
-    screen.getByText('AI Assist')
-  })
-
-  it('hides the add-ons section when none are present', function () {
-    renderActiveSubscription(annualActiveSubscription)
-    expect(screen.queryByRole('heading', { name: 'Add-ons' })).to.be.null
-  })
-
-  it('shows multiple active coupons', function () {
-    renderActiveSubscription(annualActiveSubscriptionWithCoupons)
-    within(screen.getByTestId('active-coupons')).getByText(
-      'Coupon1 for 10% off',
-      { exact: false }
+  it('shows current discounts', function () {
+    const subscriptionWithActiveCoupons = cloneDeep(annualActiveSubscription)
+    subscriptionWithActiveCoupons.payment.activeCoupons = [
+      {
+        name: 'fake coupon name',
+        code: 'fake-coupon',
+        description: '',
+      },
+    ]
+    renderActiveSubscription(subscriptionWithActiveCoupons)
+    screen.getByText(
+      /this does not include your current discounts, which will be applied automatically before your next payment/i
     )
-    within(screen.getByTestId('active-coupons')).getByText(
-      'Coupon2 for 15% off',
-      { exact: false }
-    )
-  })
-
-  it('renders correct hrefs for invoice and billing details links', function () {
-    renderActiveSubscription(annualActiveSubscription)
-    const invoiceLink = screen.getByRole('link', { name: 'View invoices' })
-    expect(invoiceLink.getAttribute('href')).to.equal(
-      annualActiveSubscription.payment.accountManagementLink
-    )
-    const billingLink = screen.getByRole('link', {
-      name: 'View billing details',
-    })
-    expect(billingLink.getAttribute('href')).to.equal(
-      annualActiveSubscription.payment.billingDetailsLink
+    screen.getByText(
+      subscriptionWithActiveCoupons.payment.activeCoupons[0].name
     )
   })
 
@@ -581,6 +522,14 @@ describe('<ActiveSubscription />', function () {
 
       const changePlan = screen.queryByRole('button', { name: 'Change plan' })
       expect(changePlan).to.be.null
+    })
+
+    it('shows contact Support message for group plan change requests', function () {
+      renderActiveSubscription(groupActiveSubscription)
+      screen.getByRole('link', { name: 'contact Support' })
+      screen.getByText('if you wish to change your group subscription.', {
+        exact: false,
+      })
     })
   })
 })

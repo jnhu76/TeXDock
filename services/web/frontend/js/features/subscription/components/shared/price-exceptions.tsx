@@ -17,7 +17,7 @@ export function PriceExceptions({ subscription }: PriceExceptionsProps) {
       {activeCoupons.length > 0 && (
         <>
           <i>* {t('coupons_not_included')}:</i>
-          <ul data-testid="active-coupons">
+          <ul>
             {activeCoupons.map(coupon => (
               <li key={coupon.code}>
                 <i>{coupon.description || coupon.name}</i>

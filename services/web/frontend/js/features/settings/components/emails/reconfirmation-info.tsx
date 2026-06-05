@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect, useLayoutEffect } from 'react'
 import { UserEmailData } from '../../../../../../types/user-email'
 import getMeta from '../../../../utils/meta'
 import ReconfirmationInfoSuccess from './reconfirmation-info/reconfirmation-info-success'
 import ReconfirmationInfoPromptText from './reconfirmation-info/reconfirmation-info-prompt-text'
-import OLRow from '@/shared/components/ol/ol-row'
-import OLCol from '@/shared/components/ol/ol-col'
-import OLNotification from '@/shared/components/ol/ol-notification'
+import OLRow from '@/features/ui/components/ol/ol-row'
+import OLCol from '@/features/ui/components/ol/ol-col'
+import OLNotification from '@/features/ui/components/ol/ol-notification'
 import { useUserEmailsContext } from '@/features/settings/context/user-email-context'
+import { FetchError, postJSON } from '@/infrastructure/fetch-json'
+import { debugConsole } from '@/utils/debugging'
 import { ssoAvailableForInstitution } from '@/features/settings/utils/sso'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
+import useAsync from '@/shared/hooks/use-async'
 import { useLocation } from '@/shared/hooks/use-location'
-import OLButton from '@/shared/components/ol/ol-button'
-import ResendConfirmationCodeModal from '@/features/settings/components/emails/resend-confirmation-code-modal'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import LoadingSpinner from '@/shared/components/loading-spinner'
 
 type ReconfirmationInfoProps = {
   userEmailData: UserEmailData
@@ -19,21 +22,50 @@ type ReconfirmationInfoProps = {
 
 function ReconfirmationInfo({ userEmailData }: ReconfirmationInfoProps) {
   const reconfirmedViaSAML = getMeta('ol-reconfirmedViaSAML')
-  const affiliation = userEmailData.affiliation
+
   const { t } = useTranslation()
   const { samlInitPath } = getMeta('ol-ExposedSettings')
-  const {
-    state,
-    setLoading: setUserEmailsContextLoading,
-    getEmails,
-  } = useUserEmailsContext()
+  const { error, isLoading, isError, isSuccess, runAsync } = useAsync()
+  const { state, setLoading: setUserEmailsContextLoading } =
+    useUserEmailsContext()
+  const [hasSent, setHasSent] = useState(false)
   const [isPending, setIsPending] = useState(false)
   const location = useLocation()
   const ssoAvailable = Boolean(
-    ssoAvailableForInstitution(affiliation?.institution ?? null)
+    ssoAvailableForInstitution(userEmailData.affiliation?.institution ?? null)
   )
 
-  if (!affiliation) {
+  const handleRequestReconfirmation = () => {
+    if (userEmailData.affiliation?.institution && ssoAvailable) {
+      setIsPending(true)
+      location.assign(
+        `${samlInitPath}?university_id=${userEmailData.affiliation.institution.id}&reconfirm=/user/settings`
+      )
+    } else {
+      runAsync(
+        postJSON('/user/emails/send-reconfirmation', {
+          body: {
+            email: userEmailData.email,
+          },
+        })
+      ).catch(debugConsole.error)
+    }
+  }
+
+  useEffect(() => {
+    setUserEmailsContextLoading(isLoading)
+  }, [setUserEmailsContextLoading, isLoading])
+
+  useLayoutEffect(() => {
+    if (isSuccess) {
+      setHasSent(true)
+    }
+  }, [isSuccess])
+
+  const rateLimited =
+    isError && error instanceof FetchError && error.response?.status === 429
+
+  if (!userEmailData.affiliation) {
     return null
   }
 
@@ -48,7 +80,7 @@ function ReconfirmationInfo({ userEmailData }: ReconfirmationInfoProps) {
             type="info"
             content={
               <ReconfirmationInfoSuccess
-                institution={affiliation.institution}
+                institution={userEmailData.affiliation.institution}
               />
             }
           />
@@ -57,45 +89,86 @@ function ReconfirmationInfo({ userEmailData }: ReconfirmationInfoProps) {
     )
   }
 
-  if (!affiliation.inReconfirmNotificationPeriod) {
-    return null
+  if (userEmailData.affiliation.inReconfirmNotificationPeriod) {
+    return (
+      <OLRow>
+        <OLCol lg={12}>
+          <OLNotification
+            type="info"
+            content={
+              <>
+                {hasSent ? (
+                  <Trans
+                    i18nKey="please_check_your_inbox_to_confirm"
+                    values={{
+                      institutionName:
+                        userEmailData.affiliation.institution.name,
+                    }}
+                    shouldUnescape
+                    tOptions={{ interpolation: { escapeValue: true } }}
+                    components={
+                      /* eslint-disable-next-line jsx-a11y/anchor-has-content, react/jsx-key */
+                      [<strong />]
+                    }
+                  />
+                ) : (
+                  <ReconfirmationInfoPromptText
+                    institutionName={userEmailData.affiliation.institution.name}
+                    primary={userEmailData.default}
+                  />
+                )}
+                <br />
+                {isError && (
+                  <div className="text-danger">
+                    {rateLimited
+                      ? t('too_many_requests')
+                      : t('generic_something_went_wrong')}
+                  </div>
+                )}
+              </>
+            }
+            action={
+              hasSent ? (
+                <>
+                  {isLoading ? (
+                    <>
+                      <LoadingSpinner loadingText={`${t('sending')}…`} />
+                    </>
+                  ) : (
+                    <OLButton
+                      variant="link"
+                      disabled={state.isLoading}
+                      onClick={handleRequestReconfirmation}
+                      className="btn-inline-link"
+                    >
+                      {t('resend_confirmation_email')}
+                    </OLButton>
+                  )}
+                </>
+              ) : (
+                <OLButton
+                  variant="secondary"
+                  disabled={isPending}
+                  isLoading={isLoading}
+                  onClick={handleRequestReconfirmation}
+                >
+                  {isLoading ? (
+                    <>
+                      <LoadingSpinner loadingText={`${t('sending')}…`} />
+                    </>
+                  ) : (
+                    t('confirm_affiliation')
+                  )}
+                </OLButton>
+              )
+            }
+          />
+        </OLCol>
+      </OLRow>
+    )
   }
 
-  return (
-    <OLNotification
-      type="info"
-      content={
-        <ReconfirmationInfoPromptText
-          institutionName={affiliation.institution.name}
-          primary={userEmailData.default}
-        />
-      }
-      action={
-        affiliation?.institution && ssoAvailable ? (
-          <OLButton
-            variant="secondary"
-            disabled={isPending}
-            onClick={() => {
-              setIsPending(true)
-              location.assign(
-                `${samlInitPath}?university_id=${affiliation.institution.id}&reconfirm=/user/settings`
-              )
-            }}
-          >
-            {t('confirm_affiliation')}
-          </OLButton>
-        ) : (
-          <ResendConfirmationCodeModal
-            email={userEmailData.email}
-            setGroupLoading={setUserEmailsContextLoading}
-            groupLoading={state.isLoading}
-            onSuccess={getEmails}
-            triggerVariant="secondary"
-          />
-        )
-      }
-    />
-  )
+  return null
 }
 
 export default ReconfirmationInfo

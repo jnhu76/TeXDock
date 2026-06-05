@@ -1,8 +1,8 @@
-import * as chai from 'chai'
-import sinon from 'sinon'
-import chaiAsPromised from 'chai-as-promised'
-import sinonChai from 'sinon-chai'
-import '../app.js'
+const chai = require('chai')
+const SandboxedModule = require('sandboxed-module')
+const sinon = require('sinon')
+const chaiAsPromised = require('chai-as-promised')
+const sinonChai = require('sinon-chai')
 
 // Chai configuration
 chai.should()
@@ -22,8 +22,21 @@ const stubs = {
   },
 }
 
+// SandboxedModule configuration
+SandboxedModule.configure({
+  requires: {
+    '@overleaf/logger': stubs.logger,
+  },
+  globals: { Buffer, JSON, console, process },
+  sourceTransformers: {
+    removeNodePrefix: function (source) {
+      return source.replace(/require\(['"]node:/g, "require('")
+    },
+  },
+})
+
 // Mocha hooks
-export const mochaHooks = {
+exports.mochaHooks = {
   beforeEach() {
     this.logger = stubs.logger
   },

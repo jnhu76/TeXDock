@@ -15,10 +15,10 @@ import { useTranslation } from 'react-i18next'
 import { useCodeMirrorViewContext } from '../../codemirror-context'
 import { waitForFileTreeUpdate } from '../../../extensions/figure-modal'
 import getMeta from '@/utils/meta'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import MaterialIcon from '@/shared/components/material-icon'
-import OLSpinner from '@/shared/components/ol/ol-spinner'
+import OLSpinner from '@/features/ui/components/ol/ol-spinner'
 
 /* eslint-disable no-unused-vars */
 export enum FileUploadStatus {
@@ -34,7 +34,7 @@ export const FigureModalUploadFileSource: FC = () => {
   const { t } = useTranslation()
   const view = useCodeMirrorViewContext()
   const { dispatch, pastedImageData } = useFigureModalContext()
-  const { projectId } = useProjectContext()
+  const { _id: projectId } = useProjectContext()
   const { rootFile } = useCurrentProjectFolders()
   const [folder, setFolder] = useState<File | null>(null)
   const [nameDirty, setNameDirty] = useState<boolean>(false)
@@ -49,7 +49,7 @@ export const FigureModalUploadFileSource: FC = () => {
       restrictions: {
         maxNumberOfFiles: 1,
         maxFileSize: getMeta('ol-ExposedSettings').maxUploadSize,
-        allowedFileTypes: ['image/*', '.pdf', '.eps', '.svg'],
+        allowedFileTypes: ['image/*', '.pdf'],
       },
       autoProceed: false,
     })
@@ -331,10 +331,10 @@ const FileSize: FC<{ size: number; className?: string }> = ({
     ['TB', 1e12],
     ['PB', 1e15],
   ]
-  const labelIndex =
-    size > 0
-      ? Math.min(Math.floor(Math.log10(size) / 3), BYTE_UNITS.length - 1)
-      : 0
+  const labelIndex = Math.min(
+    Math.floor(Math.log10(size) / 3),
+    BYTE_UNITS.length - 1
+  )
 
   const [label, bytesPerUnit] = BYTE_UNITS[labelIndex]
   const sizeInUnits = Math.round(size / bytesPerUnit)

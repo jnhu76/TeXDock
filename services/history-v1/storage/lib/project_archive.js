@@ -21,6 +21,7 @@ const assert = require('./assert')
 // The maximum safe concurrency appears to be 1.
 // https://github.com/overleaf/issues/issues/1909
 const FETCH_CONCURRENCY = 1 // number of files to fetch at once
+const DEFAULT_ZIP_TIMEOUT = 25000 // ms
 
 class DownloadError extends OError {
   constructor(hash) {
@@ -48,14 +49,14 @@ class ProjectArchive {
   /**
    * @constructor
    * @param {Snapshot} snapshot
-   * @param {number} timeout in ms
+   * @param {number} [timeout] in ms
    * @classdesc
    * Writes the project snapshot to a zip file.
    */
   constructor(snapshot, timeout) {
     assert.instance(snapshot, Snapshot)
     this.snapshot = snapshot
-    this.timeout = timeout
+    this.timeout = timeout || DEFAULT_ZIP_TIMEOUT
   }
 
   /**

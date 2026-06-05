@@ -5,10 +5,7 @@ const assert = require('../assert')
 const knex = require('../knex')
 const knexReadOnly = require('../knex_read_only')
 const { ChunkVersionConflictError } = require('./errors')
-const {
-  updateProjectRecord,
-  lookupMongoProjectIdFromHistoryId,
-} = require('./mongo')
+const { updateProjectRecord } = require('./mongo')
 
 const DUPLICATE_KEY_ERROR_CODE = '23505'
 
@@ -56,6 +53,64 @@ async function getChunkForVersion(projectId, version, opts = {}) {
     .first()
   if (!record) {
     throw new Chunk.VersionNotFoundError(projectId, version)
+  }
+  return chunkFromRecord(record)
+}
+
+/**
+ * Get the metadata for the chunk that contains the given version.
+ *
+ * @param {string} projectId
+ * @param {Date} timestamp
+ */
+async function getFirstChunkBeforeTimestamp(projectId, timestamp) {
+  assert.date(timestamp, 'bad timestamp')
+
+  const recordActive = await getChunkForVersion(projectId, 0)
+
+  // projectId must be valid if getChunkForVersion did not throw
+  if (recordActive && recordActive.endTimestamp <= timestamp) {
+    return recordActive
+  }
+
+  // fallback to deleted chunk
+  const recordDeleted = await knex('old_chunks')
+    .where('doc_id', parseInt(projectId, 10))
+    .where('start_version', '=', 0)
+    .where('end_timestamp', '<=', timestamp)
+    .orderBy('end_version', 'desc')
+    .first()
+  if (recordDeleted) {
+    return chunkFromRecord(recordDeleted)
+  }
+  throw new Chunk.BeforeTimestampNotFoundError(projectId, timestamp)
+}
+
+/**
+ * Get the metadata for the chunk that contains the version that was current at
+ * the given timestamp.
+ *
+ * @param {string} projectId
+ * @param {Date} timestamp
+ */
+async function getLastActiveChunkBeforeTimestamp(projectId, timestamp) {
+  assert.date(timestamp, 'bad timestamp')
+  assert.postgresId(projectId, 'bad projectId')
+
+  const query = knex('chunks')
+    .where('doc_id', parseInt(projectId, 10))
+    .where(function () {
+      this.where('end_timestamp', '<=', timestamp).orWhere(
+        'end_timestamp',
+        null
+      )
+    })
+    .orderBy('end_version', 'desc', 'last')
+
+  const record = await query.first()
+
+  if (!record) {
+    throw new Chunk.BeforeTimestampNotFoundError(projectId, timestamp)
   }
   return chunkFromRecord(record)
 }
@@ -134,47 +189,6 @@ async function getProjectChunks(projectId) {
     .where('doc_id', parseInt(projectId, 10))
     .orderBy('end_version')
   return records.map(chunkFromRecord)
-}
-/**
- * Copy the data structures for a given project.
- * @param {string} sourceProjectId
- * @param {string} targetProjectId
- */
-async function clone(sourceProjectId, targetProjectId) {
-  assert.postgresId(targetProjectId, 'bad target projectId')
-  assert.postgresId(sourceProjectId, 'bad source projectId')
-
-  const cursor = knex('chunks')
-    .select()
-    .where('doc_id', parseInt(sourceProjectId, 10))
-    .stream()
-
-  const chunkIds = new Map()
-  const batch = []
-  async function flushBatch() {
-    const newIds = await knex.raw(
-      "SELECT nextval('chunks_id_seq'::regclass)::integer AS chunk_id FROM generate_series(1, ?)",
-      batch.length
-    )
-    const newRecords = []
-    for (const [i, chunk] of batch.entries()) {
-      const newId = newIds.rows[i].chunk_id
-      chunkIds.set(chunk.id.toString(), newId.toString())
-      newRecords.push({
-        ...chunk,
-        id: newId,
-        doc_id: parseInt(targetProjectId, 10),
-      })
-    }
-    await knex('chunks').insert(newRecords)
-    batch.length = 0
-  }
-  for await (const chunk of cursor) {
-    batch.push(chunk)
-    if (batch.length > 100) await flushBatch()
-  }
-  if (batch.length > 0) await flushBatch()
-  return chunkIds
 }
 
 /**
@@ -371,7 +385,7 @@ async function _closeChunk(tx, projectId, chunkId) {
  */
 async function deleteChunk(projectId, chunkId) {
   assert.postgresId(projectId, 'bad projectId')
-  assert.chunkId(chunkId, 'bad chunkId')
+  assert.integer(chunkId, 'bad chunkId')
 
   await _deleteChunks(knex, {
     doc_id: parseInt(projectId, 10),
@@ -458,13 +472,10 @@ async function generateProjectId() {
   return record.doc_id.toString()
 }
 
-async function resolveHistoryIdToMongoProjectId(projectId) {
-  return await lookupMongoProjectIdFromHistoryId(parseInt(projectId, 10))
-}
-
 module.exports = {
-  clone,
   getLatestChunk,
+  getFirstChunkBeforeTimestamp,
+  getLastActiveChunkBeforeTimestamp,
   getChunkForVersion,
   getChunkForTimestamp,
   getProjectChunkIds,
@@ -477,5 +488,4 @@ module.exports = {
   getOldChunksBatch,
   deleteOldChunks,
   generateProjectId,
-  resolveHistoryIdToMongoProjectId,
 }

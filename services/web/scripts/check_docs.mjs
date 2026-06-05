@@ -6,8 +6,8 @@ import {
   db,
   ObjectId,
   READ_PREFERENCE_SECONDARY,
-} from '../app/src/infrastructure/mongodb.mjs'
-import DocstoreManager from '../app/src/Features/Docstore/DocstoreManager.mjs'
+} from '../app/src/infrastructure/mongodb.js'
+import DocstoreManager from '../app/src/Features/Docstore/DocstoreManager.js'
 import { NotFoundError } from '../app/src/Features/Errors/Errors.js'
 import { scriptRunner } from './lib/ScriptRunner.mjs'
 
@@ -16,7 +16,7 @@ const OPTS = parseArgs()
 function parseArgs() {
   const args = minimist(process.argv.slice(2), {
     string: ['min-project-id', 'max-project-id', 'project-modified-since'],
-    boolean: ['help', 'dangling-comments', 'tracked-changes', 'any-comments'],
+    boolean: ['help', 'dangling-comments', 'tracked-changes'],
   })
 
   if (args.help) {
@@ -26,10 +26,9 @@ function parseArgs() {
 
   const danglingComments = Boolean(args['dangling-comments'])
   const trackedChanges = Boolean(args['tracked-changes'])
-  const anyComments = Boolean(args['any-comments'])
-  if (!danglingComments && !trackedChanges && !anyComments) {
+  if (!danglingComments && !trackedChanges) {
     console.log(
-      'At least one of --dangling-comments, --tracked-changes, or --any-comments must be enabled'
+      'At least one of --dangling-comments or --tracked-changes must be enabled'
     )
     process.exit(1)
   }
@@ -42,13 +41,12 @@ function parseArgs() {
       : null,
     danglingComments,
     trackedChanges,
-    anyComments,
     concurrency: parseInt(args.concurrency ?? '1', 10),
   }
 }
 
 function usage() {
-  console.log(`Usage: check_docs.mjs [OPTS]
+  console.log(`Usage: find_dangling_comments.mjs [OPTS]
 
 Options:
 
@@ -58,7 +56,6 @@ Options:
                               Example: 2020-01-01
     --dangling-comments       Report projects with dangling comments
     --tracked-changes         Report projects with tracked changes
-    --any-comments            Report projects with any comments
     --concurrency             How many projects can be processed in parallel
     `)
 }
@@ -68,8 +65,6 @@ async function main() {
   let projectsProcessed = 0
   let danglingCommentsFound = 0
   let trackedChangesFound = 0
-  let anyCommentsFound = 0
-
   for await (const projectId of getProjectIds()) {
     await queue.onEmpty()
     queue.add(async () => {
@@ -92,13 +87,6 @@ async function main() {
         }
       }
 
-      if (OPTS.anyComments) {
-        if (docsHaveAnyComments(docs)) {
-          console.log(`Project ${projectId} has comments`)
-          anyCommentsFound += 1
-        }
-      }
-
       projectsProcessed += 1
       if (projectsProcessed % 100000 === 0) {
         console.log(
@@ -117,10 +105,6 @@ async function main() {
 
   if (OPTS.trackedChanges) {
     console.log(`${trackedChangesFound} projects with tracked changes found`)
-  }
-
-  if (OPTS.anyComments) {
-    console.log(`${anyCommentsFound} projects with any comments found`)
   }
 }
 
@@ -149,9 +133,6 @@ function getProjectIds() {
     .map(x => x._id.toString())
 }
 
-/**
- * @param {any} projectId
- */
 async function getDocs(projectId) {
   const mongoDocs = db.docs.find(
     {
@@ -195,10 +176,6 @@ async function getDocs(projectId) {
   return docs
 }
 
-/**
- * @param {any} projectId
- * @param {any} docs
- */
 async function findDanglingThreadIds(projectId, docs) {
   const threadIds = new Set()
   for (const doc of docs) {
@@ -212,7 +189,7 @@ async function findDanglingThreadIds(projectId, docs) {
     return []
   }
 
-  const rooms = db.rooms.find(
+  const rooms = await db.rooms.find(
     { project_id: new ObjectId(projectId), thread_id: { $exists: true } },
     { readPreference: READ_PREFERENCE_SECONDARY }
   )
@@ -226,26 +203,10 @@ async function findDanglingThreadIds(projectId, docs) {
   return Array.from(threadIds)
 }
 
-/**
- * @param {any} docs
- */
 function docsHaveTrackedChanges(docs) {
   for (const doc of docs) {
     const changes = doc.ranges?.changes ?? []
     if (changes.length > 0) {
-      return true
-    }
-  }
-  return false
-}
-
-/**
- * @param {any} docs
- */
-function docsHaveAnyComments(docs) {
-  for (const doc of docs) {
-    const comments = doc.ranges?.comments ?? []
-    if (comments.length > 0) {
       return true
     }
   }

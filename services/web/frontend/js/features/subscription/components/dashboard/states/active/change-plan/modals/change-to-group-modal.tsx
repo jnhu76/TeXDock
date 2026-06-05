@@ -2,35 +2,27 @@ import { useEffect, useState } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import { PaidSubscription } from '../../../../../../../../../../types/subscription/dashboard/subscription'
 import { PriceForDisplayData } from '../../../../../../../../../../types/subscription/plan'
-import {
-  postJSON,
-  FetchError,
-} from '../../../../../../../../infrastructure/fetch-json'
+import { postJSON } from '../../../../../../../../infrastructure/fetch-json'
 import getMeta from '../../../../../../../../utils/meta'
 import { useSubscriptionDashboardContext } from '../../../../../../context/subscription-dashboard-context'
 import GenericErrorAlert from '../../../../generic-error-alert'
-import {
-  subscriptionUpdateUrl,
-  reloadWithoutHasSubscription,
-} from '../../../../../../data/subscription-url'
+import { subscriptionUpdateUrl } from '../../../../../../data/subscription-url'
 import { getRecurlyGroupPlanCode } from '../../../../../../util/recurly-group-plan-code'
 import { useLocation } from '../../../../../../../../shared/hooks/use-location'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLFormSelect from '@/shared/components/ol/ol-form-select'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
-import OLFormLabel from '@/shared/components/ol/ol-form-label'
-import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
+} from '@/features/ui/components/ol/ol-modal'
+import OLFormSelect from '@/features/ui/components/ol/ol-form-select'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
+import OLFormLabel from '@/features/ui/components/ol/ol-form-label'
+import OLFormCheckbox from '@/features/ui/components/ol/ol-form-checkbox'
 import { useContactUsModal } from '@/shared/hooks/use-contact-us-modal'
 import { UserProvider } from '@/shared/context/user-context'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLNotification from '@/shared/components/ol/ol-notification'
-import handleStripePaymentAction from '@/features/subscription/util/handle-stripe-payment-action'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLNotification from '@/features/ui/components/ol/ol-notification'
 
 const educationalPercentDiscount = 40
 
@@ -38,7 +30,13 @@ function GroupPlanCollaboratorCount({ planCode }: { planCode: string }) {
   const { t } = useTranslation()
 
   if (planCode === 'collaborator') {
-    return <>{t('collabs_per_proj', { count: 10 })}</>
+    return (
+      <>
+        {t('collabs_per_proj', {
+          collabcount: 10,
+        })}
+      </>
+    )
   } else if (planCode === 'professional') {
     return <>{t('unlimited_collabs')}</>
   }
@@ -71,7 +69,7 @@ function GroupPrice({
       <span aria-hidden>
         {totalPrice} <span className="small">/ {t('year')}</span>
       </span>
-      <span className="visually-hidden">
+      <span className="sr-only">
         {queryingGroupPlanToChangeToPrice
           ? t('loading_prices')
           : t('x_price_per_year', {
@@ -85,7 +83,7 @@ function GroupPrice({
             price: perUserPrice,
           })}
         </span>
-        <span className="visually-hidden">
+        <span className="sr-only">
           {queryingGroupPlanToChangeToPrice
             ? t('loading_prices')
             : t('x_price_per_user', {
@@ -136,13 +134,8 @@ export function ChangeToGroupModal() {
           ),
         },
       })
-      reloadWithoutHasSubscription(location)
+      location.reload()
     } catch (e) {
-      const { handled } = await handleStripePaymentAction(e as FetchError)
-      if (handled) {
-        reloadWithoutHasSubscription(location)
-        return
-      }
       setError(true)
       setInflight(false)
     }
@@ -173,7 +166,7 @@ export function ChangeToGroupModal() {
         onHide={handleCloseModal}
         backdrop="static"
       >
-        <OLModalHeader>
+        <OLModalHeader closeButton>
           <OLModalTitle className="lh-sm">
             {t('customize_your_group_subscription')}
             {showGroupDiscount && (
@@ -214,7 +207,7 @@ export function ChangeToGroupModal() {
                   <li>{t('track_changes')}</li>
                   <li>
                     <span aria-hidden>+ {t('more').toLowerCase()}</span>
-                    <span className="visually-hidden">{t('plus_more')}</span>
+                    <span className="sr-only">{t('plus_more')}</span>
                   </li>
                 </ul>
               </div>

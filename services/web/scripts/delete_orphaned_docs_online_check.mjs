@@ -1,11 +1,11 @@
-import DocstoreManager from '../app/src/Features/Docstore/DocstoreManager.mjs'
+import DocstoreManager from '../app/src/Features/Docstore/DocstoreManager.js'
 import { promisify } from 'node:util'
 import mongodb from 'mongodb-legacy'
 import {
   db,
   READ_PREFERENCE_PRIMARY,
   READ_PREFERENCE_SECONDARY,
-} from '../app/src/infrastructure/mongodb.mjs'
+} from '../app/src/infrastructure/mongodb.js'
 import { promiseMapWithLimit } from '@overleaf/promise-utils'
 import DeleteOrphanedDataHelper from './delete_orphaned_data_helper.mjs'
 import { scriptRunner } from './lib/ScriptRunner.mjs'

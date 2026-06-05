@@ -28,7 +28,6 @@ describe('institution managers', function () {
       win.metaAttributesCache.set('ol-users', [JOHN_DOE, BOBBY_LAPOINTE])
       win.metaAttributesCache.set('ol-groupId', GROUP_ID)
       win.metaAttributesCache.set('ol-groupName', 'My Awesome Institution')
-      win.metaAttributesCache.set('ol-hasWriteAccess', true)
     })
 
     cy.mount(<InstitutionManagers />)
@@ -68,10 +67,8 @@ describe('institution managers', function () {
     })
 
     cy.findByTestId('add-members-form').within(() => {
-      cy.findByLabelText(/Add more manager emails/i).type(
-        'someone.else@test.com'
-      )
-      cy.findByRole('button', { name: /add/i }).click()
+      cy.findByRole('textbox').type('someone.else@test.com')
+      cy.findByRole('button').click()
     })
 
     cy.findByTestId('managed-entities-table')
@@ -96,10 +93,8 @@ describe('institution managers', function () {
     })
 
     cy.findByTestId('add-members-form').within(() => {
-      cy.findByLabelText(/Add more manager emails/i).type(
-        'someone.else@test.com'
-      )
-      cy.findByRole('button', { name: /add/i }).click()
+      cy.findByRole('textbox').type('someone.else@test.com')
+      cy.findByRole('button').click()
     })
     cy.findByRole('alert').should('contain.text', 'Error: User already added')
   })

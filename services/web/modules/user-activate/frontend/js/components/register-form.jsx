@@ -1,14 +1,10 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import PropTypes from 'prop-types'
 import { postJSON } from '@/infrastructure/fetch-json'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLForm from '@/shared/components/ol/ol-form'
-import OLFormControl from '@/shared/components/ol/ol-form-control'
-import OLFormLabel from '@/shared/components/ol/ol-form-label'
-import OLFormText from '@/shared/components/ol/ol-form-text'
-import OLCol from '@/shared/components/ol/ol-col'
-import OLRow from '@/shared/components/ol/ol-row'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLForm from '@/features/ui/components/ol/ol-form'
+import OLFormControl from '@/features/ui/components/ol/ol-form-control'
+
 function RegisterForm({
   setRegistrationSuccess,
   setEmails,
@@ -16,8 +12,6 @@ function RegisterForm({
   setFailedEmails,
 }) {
   const [isLoading, setIsLoading] = useState(false)
-  const { t } = useTranslation()
-
   function handleRegister(event) {
     event.preventDefault()
     const formData = new FormData(event.target)
@@ -59,34 +53,25 @@ function RegisterForm({
 
   return (
     <OLForm onSubmit={handleRegister}>
-      <OLRow>
-        <OLCol lg={8}>
-          <OLFormLabel htmlFor="register-new-user-email">
-            Emails to register new users
-          </OLFormLabel>
+      <div className="d-flex gap-2 flex-wrap">
+        <div className="flex-grow-1 max-width">
           <OLFormControl
-            id="register-new-user-email"
+            className="form-control"
             name="email"
             type="text"
-            aria-describedby="register-new-user-email-helper"
+            placeholder="jane@example.com, joe@example.com"
+            aria-label="emails to register"
+            aria-describedby="input-details"
           />
-          <OLFormText id="register-new-user-email-helper">
-            {t('add_comma_separated_emails_help')}
-          </OLFormText>
-        </OLCol>
-        <OLCol
-          lg={4}
-          className="mt-3 mt-lg-0 d-flex align-items-center flex-column flex-lg-row"
-        >
-          <OLButton
-            type="submit"
-            isLoading={isLoading}
-            loadingLabel={t('registering')}
-          >
-            Register
-          </OLButton>
-        </OLCol>
-      </OLRow>
+          <p id="input-details" className="sr-only">
+            Enter the emails you would like to register and separate them using
+            commas
+          </p>
+        </div>
+        <OLButton type="submit" className="ms-auto" isLoading={isLoading}>
+          Register
+        </OLButton>
+      </div>
     </OLForm>
   )
 }

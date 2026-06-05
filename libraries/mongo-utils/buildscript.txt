@@ -1,11 +1,10 @@
 mongo-utils
 --dependencies=None
+--docker-repos=gcr.io/overleaf-ops
 --env-add=
 --env-pass-through=
 --esmock-loader=False
 --is-library=True
---node-version=24.14.1
---package-name=@overleaf/mongo-utils
---pipeline-owner=32
+--node-version=22.15.1
 --public-repo=False
---tsconfig-no-implicit-any=True
+--script-version=4.7.0

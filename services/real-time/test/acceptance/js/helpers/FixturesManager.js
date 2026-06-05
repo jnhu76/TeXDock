@@ -6,14 +6,12 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import RealTimeClient from './RealTimeClient.js'
-import MockWebServer from './MockWebServer.js'
-import MockDocUpdaterServer from './MockDocUpdaterServer.js'
-import crypto from 'node:crypto'
-
 let FixturesManager
+const RealTimeClient = require('./RealTimeClient')
+const MockWebServer = require('./MockWebServer')
+const MockDocUpdaterServer = require('./MockDocUpdaterServer')
 
-export default FixturesManager = {
+module.exports = FixturesManager = {
   setUpProject(options, callback) {
     if (options == null) {
       options = {}
@@ -153,7 +151,7 @@ export default FixturesManager = {
   },
 
   getRandomId() {
-    return crypto
+    return require('node:crypto')
       .createHash('sha1')
       .update(Math.random().toString())
       .digest('hex')

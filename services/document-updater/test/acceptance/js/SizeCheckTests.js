@@ -1,15 +1,13 @@
 const { expect } = require('chai')
-const { setTimeout } = require('node:timers/promises')
 const Settings = require('@overleaf/settings')
 
 const MockWebApi = require('./helpers/MockWebApi')
 const DocUpdaterClient = require('./helpers/DocUpdaterClient')
 const DocUpdaterApp = require('./helpers/DocUpdaterApp')
-const { RequestFailedError } = require('@overleaf/fetch-utils')
 
 describe('SizeChecks', function () {
-  before(async function () {
-    await DocUpdaterApp.ensureRunning()
+  before(function (done) {
+    DocUpdaterApp.ensureRunning(done)
   })
   beforeEach(function () {
     this.version = 0
@@ -36,27 +34,40 @@ describe('SizeChecks', function () {
       })
     })
 
-    it('should error when fetching the doc', async function () {
-      await expect(DocUpdaterClient.getDoc(this.project_id, this.doc_id))
-        .to.be.rejectedWith(RequestFailedError)
-        .and.eventually.have.nested.property('response.status', 500)
+    it('should error when fetching the doc', function (done) {
+      DocUpdaterClient.getDoc(this.project_id, this.doc_id, (error, res) => {
+        if (error) return done(error)
+        expect(res.statusCode).to.equal(500)
+        done()
+      })
     })
 
     describe('when trying to update', function () {
-      beforeEach(async function () {
+      beforeEach(function (done) {
         const update = {
           doc: this.doc_id,
           op: this.update.op,
           v: this.version,
         }
-        await DocUpdaterClient.sendUpdate(this.project_id, this.doc_id, update)
-        await setTimeout(200)
+        DocUpdaterClient.sendUpdate(
+          this.project_id,
+          this.doc_id,
+          update,
+          error => {
+            if (error != null) {
+              throw error
+            }
+            setTimeout(done, 200)
+          }
+        )
       })
 
-      it('should still error when fetching the doc', async function () {
-        await expect(DocUpdaterClient.getDoc(this.project_id, this.doc_id))
-          .to.be.rejectedWith(RequestFailedError)
-          .and.eventually.have.nested.property('response.status', 500)
+      it('should still error when fetching the doc', function (done) {
+        DocUpdaterClient.getDoc(this.project_id, this.doc_id, (error, res) => {
+          if (error) return done(error)
+          expect(res.statusCode).to.equal(500)
+          done()
+        })
       })
     })
   })
@@ -80,25 +91,48 @@ describe('SizeChecks', function () {
       })
     })
 
-    it('should be able to fetch the doc', async function () {
-      const doc = await DocUpdaterClient.getDoc(this.project_id, this.doc_id)
-      expect(doc.lines).to.deep.equal(this.lines)
+    it('should be able to fetch the doc', function (done) {
+      DocUpdaterClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        (error, res, doc) => {
+          if (error) return done(error)
+          expect(doc.lines).to.deep.equal(this.lines)
+          done()
+        }
+      )
     })
 
     describe('when trying to update', function () {
-      beforeEach(async function () {
+      beforeEach(function (done) {
         const update = {
           doc: this.doc_id,
           op: this.update.op,
           v: this.version,
         }
-        await DocUpdaterClient.sendUpdate(this.project_id, this.doc_id, update)
-        await setTimeout(200)
+        DocUpdaterClient.sendUpdate(
+          this.project_id,
+          this.doc_id,
+          update,
+          error => {
+            if (error != null) {
+              throw error
+            }
+            setTimeout(done, 200)
+          }
+        )
       })
 
-      it('should not update the doc', async function () {
-        const doc = await DocUpdaterClient.getDoc(this.project_id, this.doc_id)
-        expect(doc.lines).to.deep.equal(this.lines)
+      it('should not update the doc', function (done) {
+        DocUpdaterClient.getDoc(
+          this.project_id,
+          this.doc_id,
+          (error, res, doc) => {
+            if (error) return done(error)
+            expect(doc.lines).to.deep.equal(this.lines)
+            done()
+          }
+        )
       })
     })
   })
@@ -112,25 +146,48 @@ describe('SizeChecks', function () {
       })
     })
 
-    it('should be able to fetch the doc', async function () {
-      const doc = await DocUpdaterClient.getDoc(this.project_id, this.doc_id)
-      expect(doc.lines).to.deep.equal(this.lines)
+    it('should be able to fetch the doc', function (done) {
+      DocUpdaterClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        (error, res, doc) => {
+          if (error) return done(error)
+          expect(doc.lines).to.deep.equal(this.lines)
+          done()
+        }
+      )
     })
 
     describe('when trying to update', function () {
-      beforeEach(async function () {
+      beforeEach(function (done) {
         const update = {
           doc: this.doc_id,
           op: this.update.op,
           v: this.version,
         }
-        await DocUpdaterClient.sendUpdate(this.project_id, this.doc_id, update)
-        await setTimeout(200)
+        DocUpdaterClient.sendUpdate(
+          this.project_id,
+          this.doc_id,
+          update,
+          error => {
+            if (error != null) {
+              throw error
+            }
+            setTimeout(done, 200)
+          }
+        )
       })
 
-      it('should not update the doc', async function () {
-        const doc = await DocUpdaterClient.getDoc(this.project_id, this.doc_id)
-        expect(doc.lines).to.deep.equal(this.lines)
+      it('should not update the doc', function (done) {
+        DocUpdaterClient.getDoc(
+          this.project_id,
+          this.doc_id,
+          (error, res, doc) => {
+            if (error) return done(error)
+            expect(doc.lines).to.deep.equal(this.lines)
+            done()
+          }
+        )
       })
     })
   })

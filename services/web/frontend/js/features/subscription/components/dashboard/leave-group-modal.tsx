@@ -4,14 +4,13 @@ import { deleteJSON } from '../../../../infrastructure/fetch-json'
 import { useSubscriptionDashboardContext } from '../../context/subscription-dashboard-context'
 import { useLocation } from '../../../../shared/hooks/use-location'
 import { debugConsole } from '@/utils/debugging'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+} from '@/features/ui/components/ol/ol-modal'
+import OLButton from '@/features/ui/components/ol/ol-button'
 
 export const LEAVE_GROUP_MODAL_ID = 'leave-group'
 

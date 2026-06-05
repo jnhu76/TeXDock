@@ -1,6 +1,5 @@
 import { ReactNode } from 'react'
-import MaterialIcon from '@/shared/components/material-icon'
-import OLSpinner from '@/shared/components/ol/ol-spinner'
+import Icon from '../../../../shared/components/icon'
 
 type Status = 'pending' | 'success' | 'error'
 
@@ -29,20 +28,29 @@ function StatusIcon({ status }: StatusIconProps) {
   switch (status) {
     case 'success':
       return (
-        <MaterialIcon
-          type="check_circle"
+        <Icon
+          type="check-circle"
+          fw
           className="settings-widget-status-icon status-success"
         />
       )
     case 'error':
       return (
-        <MaterialIcon
-          type="cancel"
+        <Icon
+          type="times-circle"
+          fw
           className="settings-widget-status-icon status-error"
         />
       )
     case 'pending':
-      return <OLSpinner size="sm" />
+      return (
+        <Icon
+          type="circle"
+          fw
+          className="settings-widget-status-icon status-pending"
+          spin
+        />
+      )
     default:
       return null
   }

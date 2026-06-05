@@ -24,7 +24,7 @@ module.exports = {
     ? JSON.parse(process.env.ADMIN_DOMAINS)
     : ['example.com'],
 
-  statusPageUrl: 'https://status.example.com',
+  statusPageUrl: 'status.example.com',
   cdn: {
     web: {
       host: 'cdn.example.com',
@@ -67,10 +67,12 @@ module.exports = {
     },
     clsi: {
       url: 'http://127.0.0.1:23013',
-      downloadHost: 'http://127.0.0.1:23080',
     },
     realTime: {
       url: 'http://127.0.0.1:23026',
+    },
+    contacts: {
+      url: 'http://127.0.0.1:23036',
     },
     notifications: {
       url: 'http://127.0.0.1:23042',
@@ -113,7 +115,6 @@ module.exports = {
       compileGroup: 'standard',
       trackChanges: false,
       symbolPalette: false,
-      aiUsageQuota: 'basic',
       aiErrorAssistant: false,
     },
     personal: {
@@ -131,7 +132,6 @@ module.exports = {
       compileGroup: 'standard',
       trackChanges: false,
       symbolPalette: false,
-      aiUsageQuota: 'basic',
       aiErrorAssistant: false,
     },
     collaborator: {
@@ -149,7 +149,6 @@ module.exports = {
       compileGroup: 'priority',
       trackChanges: true,
       symbolPalette: true,
-      aiUsageQuota: 'basic',
       aiErrorAssistant: false,
     },
     professional: {
@@ -167,7 +166,6 @@ module.exports = {
       compileGroup: 'priority',
       trackChanges: true,
       symbolPalette: true,
-      aiUsageQuota: 'basic',
       aiErrorAssistant: false,
     },
   }),
@@ -191,39 +189,15 @@ module.exports = {
     },
     {
       planCode: 'collaborator',
-      name: 'Standard monthly',
+      name: 'Collaborator',
       price_in_cents: 1500,
       features: features.collaborator,
     },
     {
       planCode: 'professional',
-      name: 'Pro monthly',
+      name: 'Professional',
       price_in_cents: 3000,
       features: features.professional,
-    },
-    {
-      planCode: 'group_professional',
-      name: 'Pro group',
-      hideFromUsers: true,
-      price_in_cents: 0,
-      annual: true,
-      features: features.professional,
-      groupPlan: true,
-      membersLimit: 0,
-      membersLimitAddOn: 'additional-license',
-      canUseFlexibleLicensing: true,
-    },
-    {
-      planCode: 'group_collaborator',
-      name: 'Standard group',
-      hideFromUsers: true,
-      price_in_cents: 0,
-      annual: true,
-      features: features.collaborator,
-      groupPlan: true,
-      membersLimit: 0,
-      membersLimitAddOn: 'additional-license',
-      canUseFlexibleLicensing: true,
     },
   ],
 

@@ -13,8 +13,8 @@ import { SSOLinkingWidget } from '../../../../../../frontend/js/features/setting
 describe('<SSOLinkingWidget />', function () {
   const defaultProps = {
     providerId: 'integration_id',
-    title: 'Integration',
-    description: 'Integration description',
+    title: 'integration',
+    description: 'integration description',
     helpPath: '/help/integration',
     linkPath: '/integration/link',
     onUnlink: () => Promise.resolve(),
@@ -22,12 +22,10 @@ describe('<SSOLinkingWidget />', function () {
 
   it('should render', function () {
     render(<SSOLinkingWidget {...defaultProps} />)
-    screen.getByText('Integration')
-    screen.getByText('Integration description')
+    screen.getByText('integration')
+    screen.getByText('integration description')
     expect(
-      screen
-        .getByRole('link', { name: 'Learn more about Integration' })
-        .getAttribute('href')
+      screen.getByRole('link', { name: /learn more/i }).getAttribute('href')
     ).to.equal('/help/integration')
   })
 
@@ -35,9 +33,7 @@ describe('<SSOLinkingWidget />', function () {
     it('should render a link to `linkPath`', function () {
       render(<SSOLinkingWidget {...defaultProps} linked={false} />)
       expect(
-        screen
-          .getByRole('link', { name: 'Link Integration' })
-          .getAttribute('href')
+        screen.getByRole('link', { name: /link/i }).getAttribute('href')
       ).to.equal('/integration/link?intent=link')
     })
   })
@@ -53,23 +49,19 @@ describe('<SSOLinkingWidget />', function () {
     })
 
     it('should display an `unlink` button', function () {
-      screen.getByRole('button', { name: 'Unlink Integration' })
+      screen.getByRole('button', { name: /unlink/i })
     })
 
     it('should open a modal to confirm integration unlinking', function () {
-      fireEvent.click(
-        screen.getByRole('button', { name: 'Unlink Integration' })
-      )
-      screen.getByText('Unlink Integration Account')
+      fireEvent.click(screen.getByRole('button', { name: /unlink/i }))
+      screen.getByText('Unlink integration Account')
       screen.getByText(
-        'Warning: When you unlink your account from Integration you will not be able to sign in using Integration anymore.'
+        'Warning: When you unlink your account from integration you will not be able to sign in using integration anymore.'
       )
     })
 
     it('should cancel unlinking when clicking cancel in the confirmation modal', async function () {
-      fireEvent.click(
-        screen.getByRole('button', { name: 'Unlink Integration' })
-      )
+      fireEvent.click(screen.getByRole('button', { name: /unlink/i }))
       const cancelBtn = screen.getByRole('button', {
         name: 'Cancel',
         hidden: false,
@@ -88,11 +80,9 @@ describe('<SSOLinkingWidget />', function () {
       render(
         <SSOLinkingWidget {...defaultProps} linked onUnlink={unlinkFunction} />
       )
-      fireEvent.click(
-        screen.getByRole('button', { name: 'Unlink Integration' })
-      )
+      fireEvent.click(screen.getByRole('button', { name: /unlink/i }))
       confirmBtn = within(screen.getByRole('dialog')).getByRole('button', {
-        name: 'Unlink',
+        name: /unlink/i,
         hidden: false,
       })
     })
@@ -110,8 +100,8 @@ describe('<SSOLinkingWidget />', function () {
         })
       )
       fireEvent.click(confirmBtn)
-      await waitFor(
-        () => expect(screen.getByRole('button', { name: 'Unlinking' })).to.exist
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Unlinking' }))
       )
     })
   })
@@ -124,13 +114,11 @@ describe('<SSOLinkingWidget />', function () {
       render(
         <SSOLinkingWidget {...defaultProps} linked onUnlink={unlinkFunction} />
       )
-      fireEvent.click(
-        screen.getByRole('button', { name: 'Unlink Integration' })
-      )
+      fireEvent.click(screen.getByRole('button', { name: /unlink/i }))
       const confirmBtn = within(screen.getByRole('dialog')).getByRole(
         'button',
         {
-          name: 'Unlink',
+          name: /unlink/i,
           hidden: false,
         }
       )
@@ -142,7 +130,7 @@ describe('<SSOLinkingWidget />', function () {
     })
 
     it('should display the unlink button ', async function () {
-      await screen.findByRole('button', { name: 'Unlink Integration' })
+      await screen.findByRole('button', { name: /unlink/i })
     })
   })
 })

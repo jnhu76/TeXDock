@@ -6,31 +6,10 @@ import { debugConsole } from '@/utils/debugging'
 import { useCallback, useEffect, useRef } from 'react'
 import useEventListener from '@/shared/hooks/use-event-listener'
 import useDomEventListener from '@/shared/hooks/use-dom-event-listener'
-import {
-  IdeLayout,
-  IdeView,
-  useLayoutContext,
-} from '@/shared/context/layout-context'
-import {
-  RailTabKey,
-  useRailContext,
-} from '@/features/ide-react/context/rail-context'
 
-function createEditingSessionHeartbeatData(
-  editorType: EditorType,
-  view: IdeView | null,
-  layout: IdeLayout,
-  railOpen: boolean,
-  railTab: RailTabKey,
-  hasDetachedPdf: boolean
-) {
-  const newEditorSegmentation = { railOpen, railTab }
+function createEditingSessionHeartbeatData(editorType: EditorType) {
   return {
     editorType,
-    editorView: view,
-    editorLayout: layout,
-    hasDetachedPdf,
-    ...newEditorSegmentation,
   }
 }
 
@@ -46,8 +25,6 @@ function sendEditingSessionHeartbeat(
 export function useEditingSessionHeartbeat() {
   const { projectId } = useIdeReactContext()
   const { getEditorType } = useEditorManagerContext()
-  const { view, pdfLayout: layout, detachIsLinked } = useLayoutContext()
-  const { isOpen: railIsOpen, selectedTab: selectedRailTab } = useRailContext()
 
   // Keep track of how many heartbeats we've sent so that we can calculate how
   // long to wait until the next one
@@ -74,14 +51,7 @@ export function useEditingSessionHeartbeat() {
 
     heartBeatSentRecentlyRef.current = true
 
-    const segmentation = createEditingSessionHeartbeatData(
-      editorType,
-      view,
-      layout,
-      railIsOpen,
-      selectedRailTab,
-      detachIsLinked
-    )
+    const segmentation = createEditingSessionHeartbeatData(editorType)
 
     debugConsole.log('[Event] send heartbeat request', segmentation)
     sendEditingSessionHeartbeat(projectId, segmentation)
@@ -101,15 +71,7 @@ export function useEditingSessionHeartbeat() {
     heartBeatResetTimerRef.current = window.setTimeout(() => {
       heartBeatSentRecentlyRef.current = false
     }, backoffSecs * 1000)
-  }, [
-    getEditorType,
-    projectId,
-    view,
-    layout,
-    railIsOpen,
-    selectedRailTab,
-    detachIsLinked,
-  ])
+  }, [getEditorType, projectId])
 
   // Hook the heartbeat up to editor events
   useEventListener('cursor:editor:update', editingSessionHeartbeat)

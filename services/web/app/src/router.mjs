@@ -1,7 +1,7 @@
-import AdminController from './Features/ServerAdmin/AdminController.mjs'
-import ErrorController from './Features/Errors/ErrorController.mjs'
-import Features from './infrastructure/Features.mjs'
-import ProjectController from './Features/Project/ProjectController.mjs'
+import AdminController from './Features/ServerAdmin/AdminController.js'
+import ErrorController from './Features/Errors/ErrorController.js'
+import Features from './infrastructure/Features.js'
+import ProjectController from './Features/Project/ProjectController.js'
 import ProjectApiController from './Features/Project/ProjectApiController.mjs'
 import ProjectListController from './Features/Project/ProjectListController.mjs'
 import SpellingController from './Features/Spelling/SpellingController.mjs'
@@ -12,20 +12,21 @@ import SubscriptionRouter from './Features/Subscription/SubscriptionRouter.mjs'
 import UploadsRouter from './Features/Uploads/UploadsRouter.mjs'
 import metrics from '@overleaf/metrics'
 import ReferalController from './Features/Referal/ReferalController.mjs'
-import AuthenticationController from './Features/Authentication/AuthenticationController.mjs'
-import PermissionsController from './Features/Authorization/PermissionsController.mjs'
-import SessionManager from './Features/Authentication/SessionManager.mjs'
+import AuthenticationController from './Features/Authentication/AuthenticationController.js'
+import PermissionsController from './Features/Authorization/PermissionsController.js'
+import SessionManager from './Features/Authentication/SessionManager.js'
 import TagsController from './Features/Tags/TagsController.mjs'
 import NotificationsController from './Features/Notifications/NotificationsController.mjs'
 import CollaboratorsRouter from './Features/Collaborators/CollaboratorsRouter.mjs'
-import UserInfoController from './Features/User/UserInfoController.mjs'
-import UserController from './Features/User/UserController.mjs'
-import UserEmailsController from './Features/User/UserEmailsController.mjs'
+import UserInfoController from './Features/User/UserInfoController.js'
+import UserController from './Features/User/UserController.js'
+import UserEmailsController from './Features/User/UserEmailsController.js'
 import UserPagesController from './Features/User/UserPagesController.mjs'
 import TutorialController from './Features/Tutorial/TutorialController.mjs'
 import DocumentController from './Features/Documents/DocumentController.mjs'
-import CompileManager from './Features/Compile/CompileManager.mjs'
-import CompileController from './Features/Compile/CompileController.mjs'
+import CompileManager from './Features/Compile/CompileManager.js'
+import CompileController from './Features/Compile/CompileController.js'
+import ClsiCookieManagerFactory from './Features/Compile/ClsiCookieManager.js'
 import HealthCheckController from './Features/HealthCheck/HealthCheckController.mjs'
 import ProjectDownloadsController from './Features/Downloads/ProjectDownloadsController.mjs'
 import FileStoreController from './Features/FileStore/FileStoreController.mjs'
@@ -34,38 +35,41 @@ import HistoryRouter from './Features/History/HistoryRouter.mjs'
 import ExportsController from './Features/Exports/ExportsController.mjs'
 import PasswordResetRouter from './Features/PasswordReset/PasswordResetRouter.mjs'
 import StaticPagesRouter from './Features/StaticPages/StaticPagesRouter.mjs'
-import ChatController from './Features/Chat/ChatController.mjs'
-import Modules from './infrastructure/Modules.mjs'
+import ChatController from './Features/Chat/ChatController.js'
+import Modules from './infrastructure/Modules.js'
 import {
   RateLimiter,
   openProjectRateLimiter,
   overleafLoginRateLimiter,
-} from './infrastructure/RateLimiter.mjs'
-import RateLimiterMiddleware from './Features/Security/RateLimiterMiddleware.mjs'
+} from './infrastructure/RateLimiter.js'
+import RateLimiterMiddleware from './Features/Security/RateLimiterMiddleware.js'
 import InactiveProjectController from './Features/InactiveData/InactiveProjectController.mjs'
 import ContactRouter from './Features/Contacts/ContactRouter.mjs'
 import ReferencesController from './Features/References/ReferencesController.mjs'
-import AuthorizationMiddleware from './Features/Authorization/AuthorizationMiddleware.mjs'
+import AuthorizationMiddleware from './Features/Authorization/AuthorizationMiddleware.js'
 import BetaProgramController from './Features/BetaProgram/BetaProgramController.mjs'
 import AnalyticsRouter from './Features/Analytics/AnalyticsRouter.mjs'
 import MetaController from './Features/Metadata/MetaController.mjs'
 import TokenAccessController from './Features/TokenAccess/TokenAccessController.mjs'
 import TokenAccessRouter from './Features/TokenAccess/TokenAccessRouter.mjs'
 import LinkedFilesRouter from './Features/LinkedFiles/LinkedFilesRouter.mjs'
-import TemplatesRouter from './Features/Templates/TemplatesRouter.mjs'
+import TemplatesRouter from './Features/Templates/TemplatesRouter.js'
 import UserMembershipRouter from './Features/UserMembership/UserMembershipRouter.mjs'
-import SystemMessageController from './Features/SystemMessages/SystemMessageController.mjs'
-import AnalyticsRegistrationSourceMiddleware from './Features/Analytics/AnalyticsRegistrationSourceMiddleware.mjs'
+import SystemMessageController from './Features/SystemMessages/SystemMessageController.js'
+import AnalyticsRegistrationSourceMiddleware from './Features/Analytics/AnalyticsRegistrationSourceMiddleware.js'
 import AnalyticsUTMTrackingMiddleware from './Features/Analytics/AnalyticsUTMTrackingMiddleware.mjs'
-import CaptchaMiddleware from './Features/Captcha/CaptchaMiddleware.mjs'
-import UnsupportedBrowserMiddleware from './infrastructure/UnsupportedBrowserMiddleware.mjs'
+import CaptchaMiddleware from './Features/Captcha/CaptchaMiddleware.js'
+import { Joi, validate } from './infrastructure/Validation.js'
+import UnsupportedBrowserMiddleware from './infrastructure/UnsupportedBrowserMiddleware.js'
 import logger from '@overleaf/logger'
 import _ from 'lodash'
-import { plainTextResponse } from './infrastructure/Response.mjs'
+import { plainTextResponse } from './infrastructure/Response.js'
+import PublicAccessLevels from './Features/Authorization/PublicAccessLevels.js'
 import SocketDiagnostics from './Features/SocketDiagnostics/SocketDiagnostics.mjs'
-import ClsiCacheController from './Features/Compile/ClsiCacheController.mjs'
-import AsyncLocalStorage from './infrastructure/AsyncLocalStorage.mjs'
-
+import ClsiCacheController from './Features/Compile/ClsiCacheController.js'
+const ClsiCookieManager = ClsiCookieManagerFactory(
+  Settings.apis.clsi != null ? Settings.apis.clsi.backendGroupName : undefined
+)
 const { renderUnsupportedBrowserPage, unsupportedBrowserMiddleware } =
   UnsupportedBrowserMiddleware
 
@@ -91,8 +95,8 @@ const rateLimiters = {
     duration: 60,
   }),
   compileProjectHttp: new RateLimiter('compile-project-http', {
-    points: 200,
-    duration: 10 * 60,
+    points: 800,
+    duration: 60 * 60,
   }),
   confirmEmail: new RateLimiter('confirm-email', {
     points: 10,
@@ -178,7 +182,7 @@ const rateLimiters = {
     duration: 60,
   }),
   sendConfirmation: new RateLimiter('send-confirmation', {
-    points: 2,
+    points: 1,
     duration: 60,
   }),
   sendChatMessage: new RateLimiter('send-chat-message', {
@@ -193,14 +197,6 @@ const rateLimiters = {
     points: 10,
     duration: 60,
   }),
-  documentExport: new RateLimiter('document-export', {
-    points: 5,
-    duration: 60,
-  }),
-  documentExportDownload: new RateLimiter('document-export-download', {
-    points: 30,
-    duration: 60,
-  }),
 }
 
 async function initialize(webRouter, privateApiRouter, publicApiRouter) {
@@ -212,21 +208,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   webRouter.get('*', AnalyticsRegistrationSourceMiddleware.setInbound())
   webRouter.get('*', AnalyticsUTMTrackingMiddleware.recordUTMTags())
-
-  if (process.env.NODE_ENV === 'development' && global.__coverage__) {
-    // Expose code coverage via an endpoint when running with code coverage enabled
-    webRouter.get('/coverage', (req, res) => {
-      const coverage = {}
-      for (const [key, value] of Object.entries(global.__coverage__)) {
-        coverage[key] = {
-          ...value,
-          // Transform for Jenkins sourcemap
-          path: value.path.replace('/overleaf/', '/workspace/'),
-        }
-      }
-      res.json({ coverage })
-    })
-  }
 
   // Mount onto /login in order to get the deviceHistory cookie.
   webRouter.post(
@@ -281,7 +262,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/read-only/one-time-login'
   )
 
-  webRouter.get('/logout', UserPagesController.logout)
   webRouter.post('/logout', UserController.logout)
 
   webRouter.get('/restricted', AuthorizationMiddleware.restricted)
@@ -327,6 +307,12 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   webRouter.post(
     '/user/settings',
     AuthenticationController.requireLogin(),
+    validate({
+      body: Joi.object({
+        first_name: Joi.string().allow(null, '').max(255),
+        last_name: Joi.string().allow(null, '').max(255),
+      }).unknown(),
+    }),
     UserController.updateUserSettings
   )
   webRouter.post(
@@ -339,7 +325,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   webRouter.get(
     '/user/emails',
     AuthenticationController.requireLogin(),
-    AsyncLocalStorage.middleware,
     PermissionsController.useCapabilities(),
     UserController.ensureAffiliationMiddleware,
     UserEmailsController.list
@@ -360,8 +345,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/user/emails/send-confirmation-code',
     AuthenticationController.requireLogin(),
     RateLimiterMiddleware.rateLimit(rateLimiters.sendConfirmation),
-    await Modules.middleware('confirmationEmailMiddleware'),
-    UserEmailsController.sendExistingEmailConfirmationCode
+    UserEmailsController.sendExistingSecondaryEmailConfirmationCode
   )
 
   webRouter.post(
@@ -378,6 +362,14 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     UserEmailsController.checkExistingEmailConfirmationCode
   )
 
+  webRouter.post(
+    '/user/emails/resend_confirmation',
+    AuthenticationController.requireLogin(),
+    RateLimiterMiddleware.rateLimit(rateLimiters.resendConfirmation),
+    await Modules.middleware('resendConfirmationEmail'),
+    UserEmailsController.resendConfirmation
+  )
+
   webRouter.get(
     '/user/emails/primary-email-check',
     AuthenticationController.requireLogin(),
@@ -392,6 +384,15 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   )
 
   if (Features.hasFeature('affiliations')) {
+    webRouter.post(
+      '/user/emails',
+      AuthenticationController.requireLogin(),
+      PermissionsController.requirePermission('add-secondary-email'),
+      RateLimiterMiddleware.rateLimit(rateLimiters.addEmail),
+      CaptchaMiddleware.validateCaptcha('addEmail'),
+      UserEmailsController.add
+    )
+
     webRouter.post(
       '/user/emails/delete',
       AuthenticationController.requireLogin(),
@@ -529,8 +530,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/project',
     AuthenticationController.requireLogin(),
     RateLimiterMiddleware.rateLimit(rateLimiters.openDashboard),
-    AsyncLocalStorage.middleware,
-    await Modules.middleware('domainCaptureTestSession'),
     PermissionsController.useCapabilities(),
     ProjectListController.projectListPage
   )
@@ -558,7 +557,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       RateLimiterMiddleware.rateLimit(openProjectRateLimiter, {
         params: ['Project_id'],
       }),
-      AsyncLocalStorage.middleware,
       PermissionsController.useCapabilities(),
       AuthorizationMiddleware.ensureUserCanReadProject,
       ProjectController.loadEditor
@@ -582,6 +580,13 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   )
   webRouter.post(
     '/project/:Project_id/settings',
+    validate({
+      body: Joi.object({
+        publicAccessLevel: Joi.string()
+          .valid(PublicAccessLevels.PRIVATE, PublicAccessLevels.TOKEN_BASED)
+          .optional(),
+      }),
+    }),
     AuthorizationMiddleware.ensureUserCanWriteProjectSettings,
     ProjectController.updateProjectSettings
   )
@@ -597,7 +602,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     RateLimiterMiddleware.rateLimit(rateLimiters.compileProjectHttp, {
       params: ['Project_id'],
     }),
-    AsyncLocalStorage.middleware,
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.compile
   )
@@ -610,13 +614,12 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   webRouter.get(
     '/project/:Project_id/output/cached/output.overleaf.json',
-    AsyncLocalStorage.middleware,
     AuthorizationMiddleware.ensureUserCanReadProject,
     ClsiCacheController.getLatestBuildFromCache
   )
 
   webRouter.get(
-    '/download/project/:Project_id/build/:editorBuildId/output/cached/:filename(.*)',
+    '/download/project/:Project_id/build/:buildId/output/cached/:filename',
     AuthorizationMiddleware.ensureUserCanReadProject,
     ClsiCacheController.downloadFromCache
   )
@@ -634,23 +637,18 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     { params: ['Project_id'] }
   )
 
-  // Download all the output files of a specific build
-  webRouter.get(
-    '/project/:Project_id/build/:build_id/output/output.zip',
-    rateLimiterMiddlewareOutputFiles,
-    AuthorizationMiddleware.ensureUserCanReadProject,
-    CompileController.getOutputZipFromClsi
-  )
-  webRouter.get(
-    '/project/:Project_id/user/:user_id/build/:build_id/output/output.zip',
-    rateLimiterMiddlewareOutputFiles,
-    AuthorizationMiddleware.ensureUserCanReadProject,
-    CompileController.getOutputZipFromClsi
-  )
-
   // direct url access to output files for a specific build
   webRouter.get(
-    '/project/:Project_id/build/:build_id/output/:file(.*)',
+    /^\/project\/([^/]*)\/build\/([0-9a-f-]+)\/output\/(.*)$/,
+    function (req, res, next) {
+      const params = {
+        Project_id: req.params[0],
+        build_id: req.params[1],
+        file: req.params[2],
+      }
+      req.params = params
+      next()
+    },
     rateLimiterMiddlewareOutputFiles,
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.getFileFromClsi
@@ -658,7 +656,17 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   // direct url access to output files for a specific user and build
   webRouter.get(
-    '/project/:Project_id/user/:user_id/build/:build_id/output/:file(.*)',
+    /^\/project\/([^/]*)\/user\/([0-9a-f]+)\/build\/([0-9a-f-]+)\/output\/(.*)$/,
+    function (req, res, next) {
+      const params = {
+        Project_id: req.params[0],
+        user_id: req.params[1],
+        build_id: req.params[2],
+        file: req.params[3],
+      }
+      req.params = params
+      next()
+    },
     rateLimiterMiddlewareOutputFiles,
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.getFileFromClsi
@@ -666,23 +674,23 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   webRouter.delete(
     '/project/:Project_id/output',
+    validate({ query: { clsiserverid: Joi.string() } }),
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.deleteAuxFiles
   )
   webRouter.get(
     '/project/:Project_id/sync/code',
-    AsyncLocalStorage.middleware,
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.proxySyncCode
   )
   webRouter.get(
     '/project/:Project_id/sync/pdf',
-    AsyncLocalStorage.middleware,
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.proxySyncPdf
   )
   webRouter.get(
     '/project/:Project_id/wordcount',
+    validate({ query: { clsiserverid: Joi.string() } }),
     AuthorizationMiddleware.ensureUserCanReadProject,
     CompileController.wordCount
   )
@@ -753,27 +761,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     ExportsController.exportDownload
   )
 
-  if (Settings.enablePandocConversions) {
-    webRouter.get(
-      '/project/:Project_id/download/conversion/:type',
-      AuthenticationController.requireLogin(),
-      RateLimiterMiddleware.rateLimit(rateLimiters.documentExport, {
-        params: ['Project_id'],
-      }),
-      AuthorizationMiddleware.ensureUserCanReadProject,
-      ProjectDownloadsController.exportProjectConversion
-    )
-    webRouter.get(
-      '/project/:Project_id/download/conversion/:conversionId/:type/build/:buildId/output/:file(.*)',
-      AuthenticationController.requireLogin(),
-      RateLimiterMiddleware.rateLimit(rateLimiters.documentExportDownload, {
-        params: ['Project_id'],
-      }),
-      AuthorizationMiddleware.ensureUserCanReadProject,
-      ProjectDownloadsController.downloadPreparedProjectExport
-    )
-  }
-
   webRouter.get(
     '/Project/:Project_id/download/zip',
     RateLimiterMiddleware.rateLimit(rateLimiters.zipDownload, {
@@ -792,7 +779,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   webRouter.get(
     '/project/:project_id/metadata',
-    AsyncLocalStorage.middleware,
     AuthorizationMiddleware.ensureUserCanReadProject,
     Settings.allowAnonymousReadAndWriteSharing
       ? (req, res, next) => {
@@ -803,7 +789,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   )
   webRouter.post(
     '/project/:project_id/doc/:doc_id/metadata',
-    AsyncLocalStorage.middleware,
     AuthorizationMiddleware.ensureUserCanReadProject,
     Settings.allowAnonymousReadAndWriteSharing
       ? (req, res, next) => {
@@ -847,18 +832,35 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/tag',
     AuthenticationController.requireLogin(),
     RateLimiterMiddleware.rateLimit(rateLimiters.createTag),
+    validate({
+      body: Joi.object({
+        name: Joi.string().required(),
+        color: Joi.string(),
+      }),
+    }),
     TagsController.createTag
   )
   webRouter.post(
     '/tag/:tagId/rename',
     AuthenticationController.requireLogin(),
     RateLimiterMiddleware.rateLimit(rateLimiters.renameTag),
+    validate({
+      body: Joi.object({
+        name: Joi.string().required(),
+      }),
+    }),
     TagsController.renameTag
   )
   webRouter.post(
     '/tag/:tagId/edit',
     AuthenticationController.requireLogin(),
     RateLimiterMiddleware.rateLimit(rateLimiters.renameTag),
+    validate({
+      body: Joi.object({
+        name: Joi.string().required(),
+        color: Joi.string(),
+      }),
+    }),
     TagsController.editTag
   )
   webRouter.delete(
@@ -877,6 +879,11 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/tag/:tagId/projects',
     AuthenticationController.requireLogin(),
     RateLimiterMiddleware.rateLimit(rateLimiters.addProjectsToTag),
+    validate({
+      body: Joi.object({
+        projectIds: Joi.array().items(Joi.string()).required(),
+      }),
+    }),
     TagsController.addProjectsToTag
   )
   webRouter.delete(
@@ -889,6 +896,11 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/tag/:tagId/projects/remove',
     AuthenticationController.requireLogin(),
     RateLimiterMiddleware.rateLimit(rateLimiters.removeProjectsFromTag),
+    validate({
+      body: Joi.object({
+        projectIds: Joi.array().items(Joi.string()).required(),
+      }),
+    }),
     TagsController.removeProjectsFromTag
   )
 
@@ -901,12 +913,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/notifications/:notificationId',
     AuthenticationController.requireLogin(),
     NotificationsController.markNotificationAsRead
-  )
-
-  webRouter.get(
-    '/user/notification/:notificationId',
-    AuthenticationController.requireLogin(),
-    NotificationsController.getNotification
   )
 
   // Deprecated in favour of /internal/project/:project_id but still used by versioning
@@ -954,11 +960,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthenticationController.requirePrivateApiAuth(),
     DocumentController.setDocument
   )
-  privateApiRouter.post(
-    '/project/:Project_id/doc/:doc_id/changes/reject',
-    AuthenticationController.requirePrivateApiAuth(),
-    DocumentController.trackChangesRejected
-  )
 
   privateApiRouter.post(
     '/user/:user_id/project/new',
@@ -1004,12 +1005,22 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   webRouter.post(
     '/spelling/learn',
+    validate({
+      body: Joi.object({
+        word: Joi.string().required(),
+      }),
+    }),
     AuthenticationController.requireLogin(),
     SpellingController.learn
   )
 
   webRouter.post(
     '/spelling/unlearn',
+    validate({
+      body: Joi.object({
+        word: Joi.string().required(),
+      }),
+    }),
     AuthenticationController.requireLogin(),
     SpellingController.unlearn
   )
@@ -1029,22 +1040,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       PermissionsController.requirePermission('chat'),
       RateLimiterMiddleware.rateLimit(rateLimiters.sendChatMessage),
       ChatController.sendMessage
-    )
-    webRouter.delete(
-      '/project/:project_id/messages/:message_id',
-      AuthorizationMiddleware.blockRestrictedUserFromProject,
-      AuthorizationMiddleware.ensureUserCanReadProject,
-      AuthorizationMiddleware.ensureUserIsMessageAuthor,
-      PermissionsController.requirePermission('chat'),
-      ChatController.deleteMessage
-    )
-    webRouter.post(
-      '/project/:project_id/messages/:message_id/edit',
-      AuthorizationMiddleware.blockRestrictedUserFromProject,
-      AuthorizationMiddleware.ensureUserCanReadProject,
-      AuthorizationMiddleware.ensureUserIsMessageAuthor,
-      PermissionsController.requirePermission('chat'),
-      ChatController.editMessage
     )
   }
 
@@ -1149,6 +1144,11 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     plainTextResponse(res, res.locals.csrfToken)
   })
 
+  publicApiRouter.get(
+    '/health_check',
+    HealthCheckController.checkActiveHandles,
+    HealthCheckController.check
+  )
   privateApiRouter.get(
     '/health_check',
     HealthCheckController.checkActiveHandles,
@@ -1163,6 +1163,16 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/health_check/api',
     HealthCheckController.checkActiveHandles,
     HealthCheckController.checkApi
+  )
+  publicApiRouter.get(
+    '/health_check/full',
+    HealthCheckController.checkActiveHandles,
+    HealthCheckController.check
+  )
+  privateApiRouter.get(
+    '/health_check/full',
+    HealthCheckController.checkActiveHandles,
+    HealthCheckController.check
   )
 
   publicApiRouter.get('/health_check/redis', HealthCheckController.checkRedis)
@@ -1179,47 +1189,33 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       const projectId = req.params.Project_id
       // use a valid user id for testing
       const testUserId = '123456789012345678901234'
-      const sendRes = _.once(function (statusCode, message, clsiServerId) {
+      const sendRes = _.once(function (statusCode, message) {
         res.status(statusCode)
         plainTextResponse(res, message)
-        // Force every compile to a new server and do not leave cruft behind.
-        CompileManager.promises
-          .deleteAuxFiles(projectId, testUserId, clsiServerId)
+        ClsiCookieManager.promises
+          .clearServerId(projectId, testUserId)
           .catch(() => {})
-      })
+      }) // force every compile to a new server
+      // set a timeout
       let handler = setTimeout(function () {
-        CompileManager.promises
-          .stopCompile(projectId, testUserId)
-          .catch(() => {})
         sendRes(500, 'Compiler timed out')
         handler = null
       }, 10000)
+      // run the compile
       CompileManager.compile(
         projectId,
         testUserId,
-        {
-          metricsPath: 'health-check',
-          compileFromHistory: true,
-          rootResourcePath: 'main.tex',
-        },
-        function (error, status, _outputFiles, clsiServerId) {
+        {},
+        function (error, status) {
           if (handler) {
             clearTimeout(handler)
           }
           if (error) {
-            sendRes(
-              500,
-              `Compiler returned error ${error.message}`,
-              clsiServerId
-            )
+            sendRes(500, `Compiler returned error ${error.message}`)
           } else if (status === 'success') {
-            sendRes(
-              200,
-              'Compiler returned in less than 10 seconds',
-              clsiServerId
-            )
+            sendRes(200, 'Compiler returned in less than 10 seconds')
           } else {
-            sendRes(500, `Compiler returned failure ${status}`, clsiServerId)
+            sendRes(500, `Compiler returned failure ${status}`)
           }
         }
       )
@@ -1235,41 +1231,39 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     res.sendStatus(204)
   })
 
-  if (Features.hasFeature('link-sharing')) {
-    webRouter.get(
-      `/read/:token(${TokenAccessController.READ_ONLY_TOKEN_PATTERN})`,
-      RateLimiterMiddleware.rateLimit(rateLimiters.readOnlyToken),
-      AnalyticsRegistrationSourceMiddleware.setSource(
-        'collaboration',
-        'link-sharing'
-      ),
-      TokenAccessController.tokenAccessPage,
-      AnalyticsRegistrationSourceMiddleware.clearSource()
-    )
+  webRouter.get(
+    `/read/:token(${TokenAccessController.READ_ONLY_TOKEN_PATTERN})`,
+    RateLimiterMiddleware.rateLimit(rateLimiters.readOnlyToken),
+    AnalyticsRegistrationSourceMiddleware.setSource(
+      'collaboration',
+      'link-sharing'
+    ),
+    TokenAccessController.tokenAccessPage,
+    AnalyticsRegistrationSourceMiddleware.clearSource()
+  )
 
-    webRouter.get(
-      `/:token(${TokenAccessController.READ_AND_WRITE_TOKEN_PATTERN})`,
-      RateLimiterMiddleware.rateLimit(rateLimiters.readAndWriteToken),
-      AnalyticsRegistrationSourceMiddleware.setSource(
-        'collaboration',
-        'link-sharing'
-      ),
-      TokenAccessController.tokenAccessPage,
-      AnalyticsRegistrationSourceMiddleware.clearSource()
-    )
+  webRouter.get(
+    `/:token(${TokenAccessController.READ_AND_WRITE_TOKEN_PATTERN})`,
+    RateLimiterMiddleware.rateLimit(rateLimiters.readAndWriteToken),
+    AnalyticsRegistrationSourceMiddleware.setSource(
+      'collaboration',
+      'link-sharing'
+    ),
+    TokenAccessController.tokenAccessPage,
+    AnalyticsRegistrationSourceMiddleware.clearSource()
+  )
 
-    webRouter.post(
-      `/:token(${TokenAccessController.READ_AND_WRITE_TOKEN_PATTERN})/grant`,
-      RateLimiterMiddleware.rateLimit(rateLimiters.grantTokenAccessReadWrite),
-      TokenAccessController.grantTokenAccessReadAndWrite
-    )
+  webRouter.post(
+    `/:token(${TokenAccessController.READ_AND_WRITE_TOKEN_PATTERN})/grant`,
+    RateLimiterMiddleware.rateLimit(rateLimiters.grantTokenAccessReadWrite),
+    TokenAccessController.grantTokenAccessReadAndWrite
+  )
 
-    webRouter.post(
-      `/read/:token(${TokenAccessController.READ_ONLY_TOKEN_PATTERN})/grant`,
-      RateLimiterMiddleware.rateLimit(rateLimiters.grantTokenAccessReadOnly),
-      TokenAccessController.grantTokenAccessReadOnly
-    )
-  }
+  webRouter.post(
+    `/read/:token(${TokenAccessController.READ_ONLY_TOKEN_PATTERN})/grant`,
+    RateLimiterMiddleware.rateLimit(rateLimiters.grantTokenAccessReadOnly),
+    TokenAccessController.grantTokenAccessReadOnly
+  )
 
   webRouter.get('/unsupported-browser', renderUnsupportedBrowserPage)
 

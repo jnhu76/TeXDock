@@ -1,17 +1,7 @@
 // Run babel on tests to allow support for import/export statements in Node
 require('@babel/register')({
   extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs'],
-  plugins: [
-    [
-      'module-resolver',
-      {
-        alias: {
-          '^@/(.+)': './frontend/js/\\1',
-          '^@modules/(.+)': './modules/\\1',
-        },
-      },
-    ],
-  ],
+  plugins: [['module-resolver', { alias: { '^@/(.+)': './frontend/js/\\1' } }]],
 })
 
 // Load JSDOM to mock the DOM in Node
@@ -57,6 +47,7 @@ globalThis.MutationObserver = global.MutationObserver = window.MutationObserver
 globalThis.StorageEvent = global.StorageEvent = window.StorageEvent
 globalThis.SVGElement = global.SVGElement = window.SVGElement
 globalThis.localStorage = global.localStorage = window.localStorage
+globalThis.performance = global.performance = window.performance
 globalThis.cancelAnimationFrame = global.cancelAnimationFrame =
   window.cancelAnimationFrame
 globalThis.requestAnimationFrame = global.requestAnimationFrame =
@@ -74,12 +65,8 @@ globalThis.BroadcastChannel =
   global.BroadcastChannel =
   window.BroadcastChannel =
     class BroadcastChannel {
-      // Unused arguments left to document the signature of the stubbed function.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       addEventListener(type, listener) {}
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       removeEventListener(type, listener) {}
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       postMessage(message) {}
     }
 
@@ -101,7 +88,7 @@ globalThis.fetch =
 // ignore style/image files
 const { addHook } = require('pirates')
 addHook(() => '', {
-  exts: ['.css', '.scss', '.svg', '.png', '.gif', '.mp4'],
+  exts: ['.css', '.less', '.svg', '.png', '.gif', '.mp4'],
   ignoreNodeModules: false,
 })
 

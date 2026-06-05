@@ -29,7 +29,7 @@ const RangesManager = {
    * @param {string[]} newDocLines - the document lines after the updates were applied
    * @param {object} opts
    * @param {boolean} [opts.historyRangesSupport] - whether history ranges support is enabled
-   * @returns {{ newRanges: Ranges, rangesWereCollapsed: boolean, historyUpdates: HistoryUpdate[], removedChangeIds: string[] }}
+   * @returns {{ newRanges: Ranges, rangesWereCollapsed: boolean, historyUpdates: HistoryUpdate[] }}
    */
   applyUpdate(projectId, docId, ranges, updates, newDocLines, opts = {}) {
     if (ranges == null) {
@@ -114,9 +114,6 @@ const RangesManager = {
       )
     }
     const newRanges = RangesManager._getRanges(rangesTracker)
-    const removedChangeIds = Object.keys(
-      rangesTracker.getDirtyState().change.removed
-    )
     logger.debug(
       {
         projectId,
@@ -127,7 +124,7 @@ const RangesManager = {
       },
       'applied updates to ranges'
     )
-    return { newRanges, rangesWereCollapsed, historyUpdates, removedChangeIds }
+    return { newRanges, rangesWereCollapsed, historyUpdates }
   },
 
   acceptChanges(projectId, docId, changeIds, ranges, lines) {

@@ -1,9 +1,4 @@
-import { StripeCurrencyCode } from './currency'
-
-export type Features = {
-  aiUsageQuota: 'free' | 'basic' | 'standard' | 'unlimited'
-  // todo: quota clean-up: remove aiErrorAssistant once migration finishes
-  aiErrorAssistant?: boolean
+type Features = {
   collaborators: number
   compileGroup: string
   compileTimeout: number
@@ -65,7 +60,6 @@ export type Plan = {
   name: string
   planCode: string
   price_in_cents: number
-  canUseFlexibleLicensing?: boolean
 }
 
 export type PriceForDisplayData = {
@@ -91,34 +85,15 @@ export type RecurlyPlanCode =
   | 'group_professional_educational'
   | 'group_collaborator'
   | 'group_collaborator_educational'
-  | 'assistant'
-  | 'assistant-annual'
 
-export type RecurlyAddOnCode = 'assistant'
-
-export type StripeBaseLookupKey =
+export type StripeLookupKey =
   | 'standard_monthly'
   | 'standard_annual'
   | 'professional_monthly'
   | 'professional_annual'
   | 'student_monthly'
   | 'student_annual'
-  | 'assistant_annual'
-  | 'assistant_monthly'
-  // TODO: change all group plans' lookup_keys to match the UK account after they have been added
   | 'group_standard_enterprise'
   | 'group_professional_enterprise'
   | 'group_standard_educational'
   | 'group_professional_educational'
-
-// Keep in sync with LATEST_STRIPE_LOOKUP_KEY_VERSION in PlansLocator.mjs
-export type StripeLookupKeyVersion = 'feb2026'
-
-export type StripeLookupKey =
-  `${StripeBaseLookupKey}_${StripeLookupKeyVersion}_${StripeCurrencyCode}`
-
-export type IndividualPlanKey = 'collaborator' | 'professional' | 'student'
-export type LocalIndividualPlans = Record<
-  IndividualPlanKey | 'free',
-  { monthly: number; annual: number }
->

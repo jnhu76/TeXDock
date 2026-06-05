@@ -1,42 +1,48 @@
-import Settings from '@overleaf/settings'
-import { callbackify } from 'node:util'
-import fs from 'node:fs'
-import _PersistorManager from './PersistorManager.js'
-import LocalFileWriter from './LocalFileWriter.js'
-import FileConverter from './FileConverter.js'
-import KeyBuilder from './KeyBuilder.js'
-import ImageOptimiser from './ImageOptimiser.js'
-import Errors from './Errors.js'
-import metrics from '@overleaf/metrics'
+const Settings = require('@overleaf/settings')
+const { callbackify } = require('node:util')
+const fs = require('node:fs')
+let PersistorManager = require('./PersistorManager')
+const LocalFileWriter = require('./LocalFileWriter')
+const FileConverter = require('./FileConverter')
+const KeyBuilder = require('./KeyBuilder')
+const ImageOptimiser = require('./ImageOptimiser')
+const { ConversionError, InvalidParametersError } = require('./Errors')
+const metrics = require('@overleaf/metrics')
 
-const { ConversionError, InvalidParametersError } = Errors
-
-const FileHandler = {
+module.exports = {
+  copyObject: callbackify(copyObject),
   insertFile: callbackify(insertFile),
+  deleteFile: callbackify(deleteFile),
+  deleteProject: callbackify(deleteProject),
   getFile: callbackify(getFile),
   getRedirectUrl: callbackify(getRedirectUrl),
   getFileSize: callbackify(getFileSize),
+  getDirectorySize: callbackify(getDirectorySize),
   promises: {
+    copyObject,
     getFile,
     getRedirectUrl,
     insertFile,
+    deleteFile,
+    deleteProject,
     getFileSize,
+    getDirectorySize,
   },
 }
 
-let PersistorManager = _PersistorManager
-
 if (process.env.NODE_ENV === 'test') {
-  FileHandler._TESTONLYSwapPersistorManager = _PersistorManager => {
+  module.exports._TESTONLYSwapPersistorManager = _PersistorManager => {
     PersistorManager = _PersistorManager
   }
 }
 
+async function copyObject(bucket, sourceKey, destinationKey) {
+  await PersistorManager.copyObject(bucket, sourceKey, destinationKey)
+}
+
 async function insertFile(bucket, key, stream) {
   const convertedKey = KeyBuilder.getConvertedFolderKey(key)
-  if (
-    !convertedKey.match(/^[0-9a-f]{24}\/([0-9a-f]{24}|v\/[0-9]+\/[a-z0-9]+)/i)
-  ) {
+  if (!convertedKey.match(/^[0-9a-f]{24}\/([0-9a-f]{24}|v\/[0-9]+\/[a-z]+)/i)) {
     throw new InvalidParametersError('key does not match validation regex', {
       bucket,
       key,
@@ -44,6 +50,35 @@ async function insertFile(bucket, key, stream) {
     })
   }
   await PersistorManager.sendStream(bucket, key, stream)
+}
+
+async function deleteFile(bucket, key) {
+  const convertedKey = KeyBuilder.getConvertedFolderKey(key)
+  if (!convertedKey.match(/^[0-9a-f]{24}\/([0-9a-f]{24}|v\/[0-9]+\/[a-z]+)/i)) {
+    throw new InvalidParametersError('key does not match validation regex', {
+      bucket,
+      key,
+      convertedKey,
+    })
+  }
+  const jobs = [PersistorManager.deleteObject(bucket, key)]
+  if (
+    Settings.enableConversions &&
+    bucket === Settings.filestore.stores.template_files
+  ) {
+    jobs.push(PersistorManager.deleteDirectory(bucket, convertedKey))
+  }
+  await Promise.all(jobs)
+}
+
+async function deleteProject(bucket, key) {
+  if (!key.match(/^[0-9a-f]{24}\//i)) {
+    throw new InvalidParametersError('key does not match validation regex', {
+      bucket,
+      key,
+    })
+  }
+  await PersistorManager.deleteDirectory(bucket, key)
 }
 
 async function getFile(bucket, key, opts) {
@@ -92,6 +127,10 @@ async function getRedirectUrl(bucket, key, opts) {
 
 async function getFileSize(bucket, key) {
   return await PersistorManager.getObjectSize(bucket, key)
+}
+
+async function getDirectorySize(bucket, projectId) {
+  return await PersistorManager.directorySize(bucket, projectId)
 }
 
 async function _getConvertedFile(bucket, key, opts) {
@@ -187,5 +226,3 @@ async function _writeFileToDisk(bucket, key, opts) {
   const fileStream = await PersistorManager.getObjectStream(bucket, key, opts)
   return await LocalFileWriter.promises.writeStream(fileStream, key)
 }
-
-export default FileHandler

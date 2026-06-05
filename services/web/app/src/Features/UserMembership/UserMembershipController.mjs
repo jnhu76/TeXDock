@@ -1,19 +1,18 @@
-import SessionManager from '../Authentication/SessionManager.mjs'
-import UserMembershipHandler from './UserMembershipHandler.mjs'
+import SessionManager from '../Authentication/SessionManager.js'
+import UserMembershipHandler from './UserMembershipHandler.js'
 import Errors from '../Errors/Errors.js'
-import EmailHelper from '../Helpers/EmailHelper.mjs'
-import { csvAttachment } from '../../infrastructure/Response.mjs'
-import UserMembershipErrors from './UserMembershipErrors.mjs'
-import { SSOConfig } from '../../models/SSOConfig.mjs'
+import EmailHelper from '../Helpers/EmailHelper.js'
+import { csvAttachment } from '../../infrastructure/Response.js'
+import {
+  UserIsManagerError,
+  UserAlreadyAddedError,
+  UserNotFoundError,
+} from './UserMembershipErrors.js'
+import { SSOConfig } from '../../models/SSOConfig.js'
 import { Parser as CSVParser } from 'json2csv'
 import { expressify } from '@overleaf/promise-utils'
-import logger from '@overleaf/logger'
-import PlansLocator from '../Subscription/PlansLocator.mjs'
-import RecurlyClient from '../Subscription/RecurlyClient.mjs'
-import Modules from '../../infrastructure/Modules.mjs'
-import UserMembershipAuthorization from './UserMembershipAuthorization.mjs'
-import SplitTestHandler from '../SplitTests/SplitTestHandler.mjs'
-import _ from 'lodash'
+import PlansLocator from '../Subscription/PlansLocator.js'
+import RecurlyClient from '../Subscription/RecurlyClient.js'
 
 async function manageGroupMembers(req, res, next) {
   const { entity: subscription, entityConfig } = req
@@ -32,36 +31,19 @@ async function manageGroupMembers(req, res, next) {
   )
   const ssoConfig = await SSOConfig.findById(subscription.ssoConfig).exec()
   const plan = PlansLocator.findLocalPlanInSettings(subscription.planCode)
-  const userId = SessionManager.getLoggedInUserId(req.session)?.toString()
+  const userId = SessionManager.getLoggedInUserId(req.session)
   const isAdmin = subscription.admin_id.toString() === userId
-  const isUserGroupManager =
-    Boolean(subscription.manager_ids?.some(id => id.toString() === userId)) &&
-    !isAdmin
-
-  let recurlySubscription
-  try {
-    if (subscription.recurlySubscription_id) {
-      recurlySubscription = await RecurlyClient.promises.getSubscription(
+  const recurlySubscription = subscription.recurlySubscription_id
+    ? await RecurlyClient.promises.getSubscription(
         subscription.recurlySubscription_id
       )
-    }
-  } catch (err) {
-    // do not block page rendering
-    logger.error(
-      {
-        err,
-        subscription: {
-          _id: subscription._id,
-          recurlySubscription_id: subscription.recurlySubscription_id,
-        },
-      },
-      'Error fetching Recurly subscription'
-    )
-  }
+    : undefined
 
-  const canUseAddSeatsFeature = Boolean(
-    plan?.canUseFlexibleLicensing && isAdmin && recurlySubscription
-  )
+  const canUseAddSeatsFeature =
+    plan?.canUseFlexibleLicensing &&
+    isAdmin &&
+    recurlySubscription &&
+    !recurlySubscription.pendingChange
 
   res.render('user_membership/group-members-react', {
     name: entityName,
@@ -69,11 +51,9 @@ async function manageGroupMembers(req, res, next) {
     users,
     groupSize: subscription.membersLimit,
     managedUsersActive: subscription.managedUsersEnabled,
-    isUserGroupManager,
     groupSSOActive: ssoConfig?.enabled,
     canUseFlexibleLicensing: plan?.canUseFlexibleLicensing,
     canUseAddSeatsFeature,
-    entityAccess: UserMembershipAuthorization.hasEntityAccess()(req),
   })
 }
 
@@ -134,236 +114,131 @@ async function _renderManagersPage(req, res, next, template) {
     name: entityName,
     users,
     groupId: entityPrimaryKey,
-    entityAccess: UserMembershipAuthorization.hasEntityAccess()(req),
   })
-}
-
-async function manageGroupUsers(req, res) {
-  const combinedUserManagement = await SplitTestHandler.promises.getAssignment(
-    req,
-    res,
-    'combined-user-management'
-  )
-  const { entity: subscription, entityConfig } = req
-
-  const entityPrimaryKey =
-    subscription[entityConfig.fields.primaryKey].toString()
-
-  if (combinedUserManagement.variant !== 'enabled') {
-    return res.redirect(`/manage/groups/${entityPrimaryKey}/members`)
-  }
-
-  let entityName
-  if (entityConfig.fields.name) {
-    entityName = subscription[entityConfig.fields.name]
-  }
-  const userId = SessionManager.getLoggedInUserId(req.session)?.toString()
-  const plan = PlansLocator.findLocalPlanInSettings(subscription.planCode)
-  const isAdmin = subscription.admin_id.toString() === userId
-  const recurlySubscription = subscription.recurlySubscription_id
-    ? await RecurlyClient.promises.getSubscription(
-        subscription.recurlySubscription_id
-      )
-    : undefined
-  const canUseAddSeatsFeature =
-    plan?.canUseFlexibleLicensing &&
-    isAdmin &&
-    recurlySubscription &&
-    !recurlySubscription.pendingChange
-  const ssoConfig = await SSOConfig.findById(subscription.ssoConfig).exec()
-
-  const users = await UserMembershipHandler.promises.getUsers(
-    subscription,
-    entityConfig
-  )
-
-  const { usersNoInvites, invites } = Object.groupBy(users, user =>
-    user.invite ? 'invites' : 'usersNoInvites'
-  )
-
-  const deduplicatedUsers = _.uniqBy(usersNoInvites, 'email')
-  for (const invite of invites) {
-    const alreadyAdded = deduplicatedUsers.find(
-      user => user.email === invite.email
-    )
-    if (alreadyAdded) {
-      alreadyAdded.invite = true
-    } else {
-      deduplicatedUsers.unshift(invite)
-    }
-  }
-
-  res.render('user_membership/group-users-react', {
-    name: entityName,
-    groupId: entityPrimaryKey,
-    users: deduplicatedUsers,
-    groupSize: subscription.membersLimit,
-    managedUsersActive: subscription.managedUsersEnabled,
-    entityAccess: UserMembershipAuthorization.hasEntityAccess()(req),
-    canUseAddSeatsFeature,
-    groupSSOActive: ssoConfig?.enabled,
-  })
-}
-
-async function exportCsv(req, res) {
-  let ssoEnabled
-  const { entity, entityConfig } = req
-  const fields = ['email', 'last_logged_in_at', 'last_active_at']
-
-  const { managedUsersEnabled } = entity
-
-  let users = await UserMembershipHandler.promises.getUsers(
-    entity,
-    entityConfig
-  )
-
-  if (entity.ssoConfig) {
-    const ssoEnabledResult = await Modules.promises.hooks.fire(
-      'hasGroupSSOEnabled',
-      entity
-    )
-    ssoEnabled = ssoEnabledResult?.[0]
-  }
-
-  if (managedUsersEnabled) {
-    fields.push('managed')
-  }
-
-  if (ssoEnabled) {
-    fields.push('sso')
-  }
-
-  if (managedUsersEnabled || ssoEnabled) {
-    users = users.map(user => {
-      if (managedUsersEnabled) {
-        user.managed =
-          user.enrollment?.managedBy?.toString() === entity._id.toString()
-      }
-
-      if (ssoEnabled) {
-        user.sso = !!user.enrollment?.sso?.some(
-          groupLinked =>
-            groupLinked.groupId.toString() === entity._id.toString()
-        )
-      }
-      return user
-    })
-  }
-
-  const csvParser = new CSVParser({ fields })
-
-  csvAttachment(res, csvParser.parse(users), 'Group.csv')
-}
-
-async function add(req, res) {
-  const { entity, entityConfig } = req
-  const email = EmailHelper.parseEmail(req.body.email)
-  if (email == null) {
-    return res.status(400).json({
-      error: {
-        code: 'invalid_email',
-        message: req.i18n.translate('invalid_email'),
-      },
-    })
-  }
-  if (entityConfig.readOnly) {
-    throw new Errors.NotFoundError('Cannot add users to entity')
-  }
-  let user
-  try {
-    const auditInfo = {
-      ipAddress: req.ip,
-      initiatorId: SessionManager.getLoggedInUserId(req.session),
-    }
-    user = await UserMembershipHandler.promises.addUser(
-      entity,
-      entityConfig,
-      email,
-      auditInfo
-    )
-  } catch (err) {
-    if (err instanceof UserMembershipErrors.UserAlreadyAddedError) {
-      return res.status(400).json({
-        error: {
-          code: 'user_already_added',
-          message: req.i18n.translate('user_already_added'),
-        },
-      })
-    }
-    if (err instanceof UserMembershipErrors.UserNotFoundError) {
-      return res.status(404).json({
-        error: {
-          code: 'user_not_found',
-          message: req.i18n.translate('add_manager_user_not_found'),
-        },
-      })
-    }
-    throw err
-  }
-  res.json({ user })
-}
-
-async function remove(req, res) {
-  const { entity, entityConfig } = req
-  const { userId } = req.params
-  if (entityConfig.readOnly) {
-    throw new Errors.NotFoundError('Cannot remove users from entity')
-  }
-  const loggedInUserId = SessionManager.getLoggedInUserId(req.session)
-  if (loggedInUserId === userId) {
-    return res.status(400).json({
-      error: {
-        code: 'managers_cannot_remove_self',
-        message: req.i18n.translate('managers_cannot_remove_self'),
-      },
-    })
-  }
-  try {
-    const auditInfo = {
-      ipAddress: req.ip,
-      initiatorId: loggedInUserId,
-    }
-    await UserMembershipHandler.promises.removeUser(
-      entity,
-      entityConfig,
-      userId,
-      auditInfo
-    )
-  } catch (err) {
-    if (err instanceof UserMembershipErrors.UserIsManagerError) {
-      return res.status(400).json({
-        error: {
-          code: 'managers_cannot_remove_admin',
-          message: req.i18n.translate('managers_cannot_remove_admin'),
-        },
-      })
-    }
-    throw err
-  }
-  res.sendStatus(200)
-}
-
-async function create(req, res) {
-  const entityId = req.params.id
-  const entityConfig = req.entityConfig
-  await UserMembershipHandler.promises.createEntity(entityId, entityConfig)
-  res.redirect(entityConfig.pathsFor(entityId).index)
 }
 
 export default {
   manageGroupMembers: expressify(manageGroupMembers),
   manageGroupManagers: expressify(manageGroupManagers),
-  manageGroupUsers: expressify(manageGroupUsers),
   manageInstitutionManagers: expressify(manageInstitutionManagers),
   managePublisherManagers: expressify(managePublisherManagers),
-  add: expressify(add),
-  remove: expressify(remove),
-  exportCsv: expressify(exportCsv),
+  add(req, res, next) {
+    const { entity, entityConfig } = req
+    const email = EmailHelper.parseEmail(req.body.email)
+    if (email == null) {
+      return res.status(400).json({
+        error: {
+          code: 'invalid_email',
+          message: req.i18n.translate('invalid_email'),
+        },
+      })
+    }
+
+    if (entityConfig.readOnly) {
+      return next(new Errors.NotFoundError('Cannot add users to entity'))
+    }
+
+    UserMembershipHandler.addUser(
+      entity,
+      entityConfig,
+      email,
+      function (error, user) {
+        if (error && error instanceof UserAlreadyAddedError) {
+          return res.status(400).json({
+            error: {
+              code: 'user_already_added',
+              message: req.i18n.translate('user_already_added'),
+            },
+          })
+        }
+        if (error && error instanceof UserNotFoundError) {
+          return res.status(404).json({
+            error: {
+              code: 'user_not_found',
+              message: req.i18n.translate('user_not_found'),
+            },
+          })
+        }
+        if (error != null) {
+          return next(error)
+        }
+        res.json({ user })
+      }
+    )
+  },
+  remove(req, res, next) {
+    const { entity, entityConfig } = req
+    const { userId } = req.params
+
+    if (entityConfig.readOnly) {
+      return next(new Errors.NotFoundError('Cannot remove users from entity'))
+    }
+
+    const loggedInUserId = SessionManager.getLoggedInUserId(req.session)
+    if (loggedInUserId === userId) {
+      return res.status(400).json({
+        error: {
+          code: 'managers_cannot_remove_self',
+          message: req.i18n.translate('managers_cannot_remove_self'),
+        },
+      })
+    }
+
+    UserMembershipHandler.removeUser(
+      entity,
+      entityConfig,
+      userId,
+      function (error, user) {
+        if (error && error instanceof UserIsManagerError) {
+          return res.status(400).json({
+            error: {
+              code: 'managers_cannot_remove_admin',
+              message: req.i18n.translate('managers_cannot_remove_admin'),
+            },
+          })
+        }
+        if (error != null) {
+          return next(error)
+        }
+        res.sendStatus(200)
+      }
+    )
+  },
+  exportCsv(req, res, next) {
+    const { entity, entityConfig } = req
+    const fields = ['email', 'last_logged_in_at', 'last_active_at']
+
+    UserMembershipHandler.getUsers(
+      entity,
+      entityConfig,
+      function (error, users) {
+        if (error != null) {
+          return next(error)
+        }
+        const csvParser = new CSVParser({ fields })
+        csvAttachment(res, csvParser.parse(users), 'Group.csv')
+      }
+    )
+  },
   new(req, res, next) {
     res.render('user_membership/new', {
       entityName: req.params.name,
       entityId: req.params.id,
     })
   },
-  create: expressify(create),
+  create(req, res, next) {
+    const entityId = req.params.id
+    const entityConfig = req.entityConfig
+
+    UserMembershipHandler.createEntity(
+      entityId,
+      entityConfig,
+      function (error, entity) {
+        if (error != null) {
+          return next(error)
+        }
+        res.redirect(entityConfig.pathsFor(entityId).index)
+      }
+    )
+  },
 }

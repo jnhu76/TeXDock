@@ -10,9 +10,11 @@ const ProjectFlusher = require('../app/js/ProjectFlusher')
 const ProjectManager = require('../app/js/ProjectManager')
 const RedisManager = require('../app/js/RedisManager')
 const Settings = require('@overleaf/settings')
-const { fetchNothing, fetchJson } = require('@overleaf/fetch-utils')
+const request = require('requestretry').defaults({
+  maxAttempts: 2,
+  retryDelay: 10,
+})
 
-const ONLY_PROJECT_ID = process.env.ONLY_PROJECT_ID
 const AUTO_FIX_VERSION_MISMATCH =
   process.env.AUTO_FIX_VERSION_MISMATCH === 'true'
 const AUTO_FIX_PARTIALLY_DELETED_DOC_METADATA =
@@ -73,22 +75,33 @@ async function updateDocVersionInRedis(docId, redisDoc, mongoDoc) {
 }
 
 async function fixPartiallyDeletedDocMetadata(projectId, docId, pathname) {
-  try {
-    await fetchNothing(
-      `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016/project/${projectId}/doc/${docId}`,
+  await new Promise((resolve, reject) => {
+    request(
       {
         method: 'PATCH',
-        signal: AbortSignal.timeout(60_000),
+        url: `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016/project/${projectId}/doc/${docId}`,
+        timeout: 60 * 1000,
         json: {
           name: Path.basename(pathname),
           deleted: true,
           deletedAt: new Date(),
         },
+      },
+      (err, res, body) => {
+        if (err) return reject(err)
+        const { statusCode } = res
+        if (statusCode !== 204) {
+          return reject(
+            new OError('patch request to docstore failed', {
+              statusCode,
+              body,
+            })
+          )
+        }
+        resolve()
       }
     )
-  } catch (error) {
-    throw OError.tag(error, 'patch request to docstore failed')
-  }
+  })
 }
 
 async function getDocFromMongo(projectId, docId) {
@@ -99,25 +112,50 @@ async function getDocFromMongo(projectId, docId) {
       throw err
     }
   }
-  let docstoreDoc
-  try {
-    docstoreDoc = await fetchJson(
-      `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016/project/${projectId}/doc/${docId}/peek`,
-      { signal: AbortSignal.timeout(60_000) }
+  const docstoreDoc = await new Promise((resolve, reject) => {
+    request(
+      {
+        url: `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016/project/${projectId}/doc/${docId}/peek`,
+        timeout: 60 * 1000,
+        json: true,
+      },
+      (err, res, body) => {
+        if (err) return reject(err)
+        const { statusCode } = res
+        if (statusCode !== 200) {
+          return reject(
+            new OError('fallback request to docstore failed', {
+              statusCode,
+              body,
+            })
+          )
+        }
+        resolve(body)
+      }
     )
-  } catch (err) {
-    throw OError.tag(err, 'fallback request to docstore failed')
-  }
-  let deletedDocName
-  try {
-    const body = await fetchJson(
-      `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016/project/${projectId}/doc-deleted`,
-      { signal: AbortSignal.timeout(60_000) }
+  })
+  const deletedDocName = await new Promise((resolve, reject) => {
+    request(
+      {
+        url: `http://${process.env.DOCSTORE_HOST || '127.0.0.1'}:3016/project/${projectId}/doc-deleted`,
+        timeout: 60 * 1000,
+        json: true,
+      },
+      (err, res, body) => {
+        if (err) return reject(err)
+        const { statusCode } = res
+        if (statusCode !== 200) {
+          return reject(
+            new OError('list deleted docs request to docstore failed', {
+              statusCode,
+              body,
+            })
+          )
+        }
+        resolve(body.find(doc => doc._id === docId)?.name)
+      }
     )
-    deletedDocName = body.find(doc => doc._id === docId)?.name
-  } catch (err) {
-    throw OError.tag(err, 'list deleted docs request to docstore failed')
-  }
+  })
   if (docstoreDoc.deleted && deletedDocName) {
     return {
       ...docstoreDoc,
@@ -281,12 +319,10 @@ async function processProject(projectId) {
  * @return {Promise<{perIterationOutOfSync: number, done: boolean}>}
  */
 async function scanOnce(processed, outOfSync) {
-  const projectIds = ONLY_PROJECT_ID
-    ? [ONLY_PROJECT_ID]
-    : await ProjectFlusher.promises.flushAllProjects({
-        limit: LIMIT,
-        dryRun: true,
-      })
+  const projectIds = await ProjectFlusher.promises.flushAllProjects({
+    limit: LIMIT,
+    dryRun: true,
+  })
 
   let perIterationOutOfSync = 0
   for (const projectId of projectIds) {

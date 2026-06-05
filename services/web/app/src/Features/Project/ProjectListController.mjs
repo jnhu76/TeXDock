@@ -1,64 +1,44 @@
-// @ts-check
+// ts-check
 import _ from 'lodash'
-import moment from 'moment'
 
 import Metrics from '@overleaf/metrics'
 import Settings from '@overleaf/settings'
-import ProjectHelper from './ProjectHelper.mjs'
-import ProjectGetter from './ProjectGetter.mjs'
-import PrivilegeLevels from '../Authorization/PrivilegeLevels.mjs'
-import SessionManager from '../Authentication/SessionManager.mjs'
-import Sources from '../Authorization/Sources.mjs'
-import UserGetter from '../User/UserGetter.mjs'
+import ProjectHelper from './ProjectHelper.js'
+import ProjectGetter from './ProjectGetter.js'
+import PrivilegeLevels from '../Authorization/PrivilegeLevels.js'
+import SessionManager from '../Authentication/SessionManager.js'
+import Sources from '../Authorization/Sources.js'
+import UserGetter from '../User/UserGetter.js'
 import SurveyHandler from '../Survey/SurveyHandler.mjs'
-import TagsHandler from '../Tags/TagsHandler.mjs'
+import TagsHandler from '../Tags/TagsHandler.js'
 import { expressify } from '@overleaf/promise-utils'
 import logger from '@overleaf/logger'
-import Features from '../../infrastructure/Features.mjs'
-import SubscriptionViewModelBuilder from '../Subscription/SubscriptionViewModelBuilder.mjs'
-import NotificationsHandler from '../Notifications/NotificationsHandler.mjs'
-import Modules from '../../infrastructure/Modules.mjs'
+import Features from '../../infrastructure/Features.js'
+import SubscriptionViewModelBuilder from '../Subscription/SubscriptionViewModelBuilder.js'
+import NotificationsHandler from '../Notifications/NotificationsHandler.js'
+import Modules from '../../infrastructure/Modules.js'
 import { OError, V1ConnectionError } from '../Errors/Errors.js'
-import { User } from '../../models/User.mjs'
-import UserPrimaryEmailCheckHandler from '../User/UserPrimaryEmailCheckHandler.mjs'
-import UserController from '../User/UserController.mjs'
-import NotificationsBuilder from '../Notifications/NotificationsBuilder.mjs'
-import GeoIpLookup from '../../infrastructure/GeoIpLookup.mjs'
-import SplitTestHandler from '../SplitTests/SplitTestHandler.mjs'
-import SplitTestSessionHandler from '../SplitTests/SplitTestSessionHandler.mjs'
-import TutorialHandler from '../Tutorial/TutorialHandler.mjs'
-import SubscriptionHelper from '../Subscription/SubscriptionHelper.mjs'
-import CustomerIoPlanHelpers from '../Subscription/CustomerIoPlanHelpers.mjs'
-import PermissionsManager from '../Authorization/PermissionsManager.mjs'
-import AnalyticsManager from '../Analytics/AnalyticsManager.mjs'
-import { OnboardingDataCollection } from '../../models/OnboardingDataCollection.mjs'
-import UserSettingsHelper from './UserSettingsHelper.mjs'
+import { User } from '../../models/User.js'
+import UserPrimaryEmailCheckHandler from '../User/UserPrimaryEmailCheckHandler.js'
+import UserController from '../User/UserController.js'
+import NotificationsBuilder from '../Notifications/NotificationsBuilder.js'
+import GeoIpLookup from '../../infrastructure/GeoIpLookup.js'
+import SplitTestHandler from '../SplitTests/SplitTestHandler.js'
+import SplitTestSessionHandler from '../SplitTests/SplitTestSessionHandler.js'
+import TutorialHandler from '../Tutorial/TutorialHandler.js'
 
 /**
- * @import { GetProjectsRequest, GetProjectsResponse, AllUsersProjects, MongoProject, FormattedProject, MongoTag, SubscriptionRecord } from "./types"
- * @import { Project, ProjectApi, ProjectAccessLevel, Filters, Page, Sort, UserRef } from "../../../../types/project/dashboard/api"
- * @import { Affiliation } from "../../../../types/affiliation"
- * @import { Source } from "../Authorization/types"
+ * @import { GetProjectsRequest, GetProjectsResponse, AllUsersProjects, MongoProject } from "./types"
+ * @import { ProjectApi, Filters, Page, Sort } from "../../../../types/project/dashboard/api"
+ * @import { Tag } from "../Tags/types"
  */
 
-/**
- * @param {Affiliation} affiliation
- * @param {any} session
- * @param {string[]} linkedInstitutionIds
- * @returns {boolean}
- * @private
- */
 const _ssoAvailable = (affiliation, session, linkedInstitutionIds) => {
   if (!affiliation.institution) return false
 
   // institution.confirmed is for the domain being confirmed, not the email
   // Do not show SSO UI for unconfirmed domains
   if (!affiliation.institution.confirmed) return false
-
-  // If ssoEnabled = true and group.domainCaptureEnabled = true
-  // then Commons is migrating to group subscription and we do not want to prompt
-  // linking through Commons SSO
-  if (affiliation?.group?.domainCaptureEnabled) return false
 
   // Could have multiple emails at the same institution, and if any are
   // linked to the institution then do not show notification for others
@@ -72,10 +52,6 @@ const _ssoAvailable = (affiliation, session, linkedInstitutionIds) => {
   return false
 }
 
-/**
- * @param {Affiliation[]} affiliations
- * @returns {Array<{ name: string, url: string }>}
- */
 const _buildPortalTemplatesList = affiliations => {
   if (affiliations == null) {
     affiliations = []
@@ -85,7 +61,7 @@ const _buildPortalTemplatesList = affiliations => {
   const uniqueAffiliations = _.uniqBy(affiliations, 'institution.id')
   for (const aff of uniqueAffiliations) {
     const hasSlug = aff.portal?.slug
-    const hasTemplates = (aff.portal?.templates_count || 0) > 0
+    const hasTemplates = aff.portal?.templates_count > 0
 
     if (hasSlug && hasTemplates) {
       const portalPath = aff.institution.isUniversity ? '/edu/' : '/org/'
@@ -100,9 +76,6 @@ const _buildPortalTemplatesList = affiliations => {
   return portalTemplates
 }
 
-/**
- * @param {any} req
- */
 function cleanupSession(req) {
   // cleanup redirects at the end of the redirect chain
   delete req.session.postCheckoutRedirect
@@ -128,61 +101,22 @@ async function projectListPage(req, res, next) {
   // - object - the subscription data object
   let usersBestSubscription
   let usersIndividualSubscription
-  /** @type {any[]} */
   let usersGroupSubscriptions = []
-  /** @type {any[]} */
-  let usersManagedGroupSubscriptions = []
   let survey
   let userIsMemberOfGroupSubscription = false
-  /** @type {any[]} */
   let groupSubscriptionsPendingEnrollment = []
 
   const isSaas = Features.hasFeature('saas')
 
   const userId = SessionManager.getLoggedInUserId(req.session)
-
-  if (isSaas) {
-    const { variant: domainCaptureRedirect } =
-      await SplitTestHandler.promises.getAssignment(
-        req,
-        res,
-        'domain-capture-redirect'
-      )
-
-    if (domainCaptureRedirect === 'enabled') {
-      const groupsWithEmails = (
-        await Modules.promises.hooks.fire(
-          'findDomainCaptureGroupsUserCouldBePartOf',
-          userId
-        )
-      )?.[0]
-
-      if (groupsWithEmails && groupsWithEmails.length > 0) {
-        if (
-          groupsWithEmails.some(
-            (/** @type {any} */ { subscription }) =>
-              subscription.managedUsersEnabled
-          )
-        ) {
-          return res.redirect('/domain-capture')
-        } else {
-          // TODO show notification or anything else
-        }
-      }
-    }
-  }
-
   const projectsBlobPending = _getProjects(userId).catch(err => {
     logger.err({ err, userId }, 'projects listing in background failed')
     return undefined
   })
-
   const user = await User.findById(
     userId,
-    `email isAdmin emails features alphaProgram betaProgram lastPrimaryEmailCheck lastActive signUpDate ace refProviders${
-      isSaas
-        ? ' enrollment writefull completedTutorials aiFeatures aiErrorAssistant labsProgram'
-        : ''
+    `email emails features alphaProgram betaProgram lastPrimaryEmailCheck signUpDate refProviders${
+      isSaas ? ' enrollment writefull completedTutorials' : ''
     }`
   )
 
@@ -194,16 +128,7 @@ async function projectListPage(req, res, next) {
 
   user.refProviders = _.mapValues(user.refProviders, Boolean)
 
-  let onboardingDataCollection
-  let customerIoEnabled = false
-  let subjectArea
-  let usedLatex
-  let primaryOccupation
-  let role
-
   if (isSaas) {
-    if (user.isAdmin) await _checkForOldDebugProjects(userId)
-
     await SplitTestSessionHandler.promises.sessionMaintenance(req, user)
 
     try {
@@ -211,7 +136,6 @@ async function projectListPage(req, res, next) {
         bestSubscription: usersBestSubscription,
         individualSubscription: usersIndividualSubscription,
         memberGroupSubscriptions: usersGroupSubscriptions,
-        managedGroupSubscriptions: usersManagedGroupSubscriptions,
       } = await SubscriptionViewModelBuilder.promises.getUsersSubscriptionDetails(
         { _id: userId }
       ))
@@ -221,16 +145,20 @@ async function projectListPage(req, res, next) {
         "Failed to get user's best subscription"
       )
     }
+    try {
+      userIsMemberOfGroupSubscription = usersGroupSubscriptions?.length > 0
 
-    userIsMemberOfGroupSubscription =
-      usersGroupSubscriptions.length > 0 ||
-      usersManagedGroupSubscriptions.length > 0
-
-    // TODO use helper function
-    if (!user.enrollment?.managedBy) {
-      groupSubscriptionsPendingEnrollment = usersGroupSubscriptions.filter(
-        subscription =>
-          subscription.groupPlan && subscription.managedUsersEnabled
+      // TODO use helper function
+      if (!user.enrollment?.managedBy) {
+        groupSubscriptionsPendingEnrollment = usersGroupSubscriptions.filter(
+          subscription =>
+            subscription.groupPlan && subscription.managedUsersEnabled
+        )
+      }
+    } catch (error) {
+      logger.error(
+        { err: error },
+        'Failed to check whether user is a member of group subscription'
       )
     }
 
@@ -240,45 +168,14 @@ async function projectListPage(req, res, next) {
       logger.err({ err: error, userId }, 'Failed to load the active survey')
     }
 
-    if (
-      user &&
-      UserPrimaryEmailCheckHandler.requiresPrimaryEmailCheck({
-        email: user.email,
-        emails: user.emails,
-        lastPrimaryEmailCheck: user.lastPrimaryEmailCheck,
-        signUpDate: user.signUpDate,
-      })
-    ) {
+    if (user && UserPrimaryEmailCheckHandler.requiresPrimaryEmailCheck(user)) {
       return res.redirect('/user/emails/primary-email-check')
     }
-
-    onboardingDataCollection = await OnboardingDataCollection.findById(
-      userId,
-      'subjectArea usedLatex primaryOccupation role'
-    )
-
-    if (onboardingDataCollection) {
-      subjectArea = onboardingDataCollection.subjectArea
-      usedLatex = onboardingDataCollection.usedLatex
-      primaryOccupation = onboardingDataCollection.primaryOccupation
-      role = onboardingDataCollection.role
-    }
-
-    customerIoEnabled = true
-
-    AnalyticsManager.setUserPropertyForUserInBackground(
-      userId,
-      'customer-io-integration',
-      true
-    )
   }
 
   const tags = await TagsHandler.promises.getAllTags(userId)
 
-  /** @type {{ list: any[], allInReconfirmNotificationPeriods?: any[], error?: any }} */
-  let userEmailsData = {
-    list: [],
-  }
+  let userEmailsData = { list: [], allInReconfirmNotificationPeriods: [] }
 
   try {
     const fullEmails = await UserGetter.promises.getUserFullEmails(userId)
@@ -299,7 +196,7 @@ async function projectListPage(req, res, next) {
           allInReconfirmNotificationPeriods,
         }
       } catch (error) {
-        userEmailsData.error = error
+        userEmailsData = error
       }
     }
   } catch (error) {
@@ -318,10 +215,6 @@ async function projectListPage(req, res, next) {
       return result
     })
 
-  const commonsInstitution = userAffiliations.find(
-    affiliation => affiliation.institution?.commonsAccount
-  )?.institution?.name
-
   const portalTemplates = _buildPortalTemplatesList(userAffiliations)
 
   const { allInReconfirmNotificationPeriods } = userEmailsData
@@ -339,14 +232,11 @@ async function projectListPage(req, res, next) {
   const notificationsInstitution = []
   // Institution and group SSO Notifications
   let groupSsoSetupSuccess
-  let viaDomainCapture
-  let joinedGroupName = ''
   let reconfirmedViaSAML
   if (Features.hasFeature('saml')) {
     reconfirmedViaSAML = _.get(req.session, ['saml', 'reconfirmed'])
     const samlSession = req.session.saml
     // Notification: SSO Available
-    /** @type {string[]} */
     const linkedInstitutionIds = []
     userEmails.forEach(email => {
       if (email.samlProviderId) {
@@ -369,31 +259,18 @@ async function projectListPage(req, res, next) {
     if (samlSession) {
       // Notification institution SSO: After SSO Linked
       if (samlSession.linked) {
-        let templateKey = 'notification_institution_sso_linked'
-
-        if (
-          samlSession.userCreatedViaDomainCapture &&
-          samlSession.managedUsersEnabled
-        ) {
-          templateKey =
-            'notification_account_created_via_group_domain_capture_and_managed_users_enabled'
-        } else if (samlSession.domainCaptureEnabled) {
-          templateKey = 'notification_group_sso_linked'
-        }
         notificationsInstitution.push({
           email: samlSession.institutionEmail,
           institutionName:
             samlSession.linked.universityName ||
             samlSession.linked.providerName,
-          templateKey,
+          templateKey: 'notification_institution_sso_linked',
         })
       }
 
       // Notification group SSO: After SSO Linked
       if (samlSession.linkedGroup) {
         groupSsoSetupSuccess = true
-        viaDomainCapture = samlSession.domainCaptureJoin
-        joinedGroupName = samlSession.universityName
       }
 
       // Notification institution SSO: After SSO Linked or Logging in
@@ -446,7 +323,7 @@ async function projectListPage(req, res, next) {
   if (Settings.overleaf != null && req.ip !== user.lastLoginIp) {
     try {
       await NotificationsBuilder.promises
-        .ipMatcherAffiliation(user._id.toString())
+        .ipMatcherAffiliation(user._id)
         .create(req.ip)
     } catch (err) {
       logger.error(
@@ -477,123 +354,59 @@ async function projectListPage(req, res, next) {
 
   const { showUSGovBanner, usGovBannerVariant } = usGovBanner
 
-  const isUser30DaysOld = moment.utc().diff(user.signUpDate, 'days') > 30
-
   const showGroupsAndEnterpriseBanner =
     Features.hasFeature('saas') &&
     !showUSGovBanner &&
     !userIsMemberOfGroupSubscription &&
-    !hasPaidAffiliation &&
-    !inactiveTutorials.includes('groups-enterprise-banner-repeat') &&
-    isUser30DaysOld
+    !hasPaidAffiliation
 
   const groupsAndEnterpriseBannerVariant =
     showGroupsAndEnterpriseBanner &&
     _.sample(['on-premise', 'FOMO', 'FOMO', 'FOMO'])
 
   let showInrGeoBanner = false
+  let showBrlGeoBanner = false
   let showLATAMBanner = false
   let recommendedCurrency
-  const { countryCode, currencyCode } =
-    await GeoIpLookup.promises.getCurrencyCode(req.ip)
 
   if (
     usersBestSubscription?.type === 'free' ||
     usersBestSubscription?.type === 'standalone-ai-add-on'
   ) {
+    const { countryCode, currencyCode } =
+      await GeoIpLookup.promises.getCurrencyCode(req.ip)
+
     if (countryCode === 'IN') {
       showInrGeoBanner = true
     }
+    showBrlGeoBanner = countryCode === 'BR'
 
-    showLATAMBanner =
-      !!countryCode && ['MX', 'CO', 'CL', 'PE'].includes(countryCode)
+    showLATAMBanner = ['MX', 'CO', 'CL', 'PE'].includes(countryCode)
     // LATAM Banner needs to know which currency to display
     if (showLATAMBanner) {
       recommendedCurrency = currencyCode
     }
   }
 
-  let hasIndividualPaidSubscription = false
+  let hasIndividualRecurlySubscription = false
 
   try {
-    hasIndividualPaidSubscription =
-      SubscriptionHelper.isIndividualActivePaidSubscription(
-        usersIndividualSubscription
-      )
+    hasIndividualRecurlySubscription =
+      usersIndividualSubscription?.groupPlan === false &&
+      usersIndividualSubscription?.recurlyStatus?.state !== 'canceled' &&
+      usersIndividualSubscription?.recurlySubscription_id !== ''
   } catch (error) {
     logger.error({ err: error }, 'Failed to get individual subscription')
   }
 
-  const aiBlocked =
-    Features.hasFeature('saas') && !(await _canUseAIAssist(user))
-  const hasAiAssist =
-    Features.hasFeature('saas') && (await _userHasAIAssist(user))
-
-  const splitTests = [
-    // Split tests that will be made available to the frontend
-    'import-docx',
-    'overleaf-library',
-    'import-markdown',
-  ].filter(Boolean)
-
-  await Promise.all(
-    splitTests.map(splitTestName =>
-      SplitTestHandler.promises.getAssignment(req, res, splitTestName)
-    )
-  )
-
-  const userSettings = await UserSettingsHelper.buildUserSettings(
+  // Get the user's assignment for the papers notification banner split test,
+  // which populates splitTestVariants with a value for the split test name and
+  // allows Pug to send it to the browser
+  await SplitTestHandler.promises.getAssignment(
     req,
     res,
-    user
+    'papers-notification-banner'
   )
-
-  let groupRole
-  if (userIsMemberOfGroupSubscription) {
-    const userIdStr = userId.toString()
-    const isGroupAdmin = usersManagedGroupSubscriptions?.some(
-      sub => sub.admin_id?._id?.toString() === userIdStr
-    )
-    const isGroupManager =
-      usersManagedGroupSubscriptions?.length > 0 ||
-      usersGroupSubscriptions?.some(sub => sub.userIsGroupManager)
-    if (isGroupAdmin) {
-      groupRole = 'admin'
-    } else if (isGroupManager) {
-      groupRole = 'manager'
-    } else {
-      groupRole = 'member'
-    }
-  }
-
-  Modules.promises.hooks
-    .fire('setUserProperties', userId, {
-      overleaf_id: userId,
-      last_active: user.lastActive
-        ? Math.floor(user.lastActive.getTime() / 1000)
-        : null,
-      sign_up_date: user.signUpDate
-        ? Math.floor(user.signUpDate.getTime() / 1000)
-        : null,
-      ...(usersBestSubscription?.type && {
-        best_subscription_type: usersBestSubscription.type,
-      }),
-      ai_blocked: aiBlocked,
-      has_ai_assist: hasAiAssist,
-      ...(subjectArea && { subject_area: subjectArea }),
-      ...(role && { role }),
-      ...(primaryOccupation && { primary_occupation: primaryOccupation }),
-      ...(usedLatex && { used_latex: usedLatex }),
-      ...(countryCode && { country: countryCode }),
-      ...(commonsInstitution && { commons_institution: commonsInstitution }),
-      ...CustomerIoPlanHelpers.getAffiliationProperties(userEmails),
-      ...(groupRole && { group_role: groupRole }),
-      is_managed_user: Boolean(user.enrollment?.managedBy),
-      ...(user.email && { email: user.email }),
-    })
-    .catch(err => {
-      logger.error({ err }, 'Failed to set user properties for customer.io')
-    })
 
   res.render('project/list-react', {
     title: 'your_projects',
@@ -603,7 +416,6 @@ async function projectListPage(req, res, next) {
     user,
     userAffiliations,
     userEmails,
-    userSettings,
     reconfirmedViaSAML,
     allInReconfirmNotificationPeriods,
     survey,
@@ -617,19 +429,16 @@ async function projectListPage(req, res, next) {
     showLATAMBanner,
     recommendedCurrency,
     showInrGeoBanner,
+    showBrlGeoBanner,
     projectDashboardReact: true, // used in navbar
     groupSsoSetupSuccess,
-    joinedGroupName,
-    viaDomainCapture,
     groupSubscriptionsPendingEnrollment:
       groupSubscriptionsPendingEnrollment.map(subscription => ({
         groupId: subscription._id,
         groupName: subscription.teamName,
       })),
-    hasIndividualPaidSubscription,
+    hasIndividualRecurlySubscription,
     userRestrictions: Array.from(req.userRestrictions || []),
-    customerIoEnabled,
-    inactiveTutorials,
   })
 }
 
@@ -649,26 +458,10 @@ async function getProjectsJson(req, res) {
 
 /**
  * @param {string} userId
- * @private
- */
-async function _checkForOldDebugProjects(userId) {
-  const exists = await ProjectGetter.promises.existUsersDebugProjectsOlderThan(
-    userId,
-    7
-  )
-  if (exists) {
-    await NotificationsBuilder.promises.oldDebugProjects(userId).create()
-  } else {
-    await NotificationsBuilder.promises.oldDebugProjects(userId).read()
-  }
-}
-
-/**
- * @param {string} userId
  * @param {Filters} filters
  * @param {Sort} sort
  * @param {Page} page
- * @returns {Promise<{totalSize: number, projects: Project[]}>}
+ * @returns {Promise<{totalSize: number, projects: ProjectApi[]}>}
  * @private
  */
 async function _getProjects(
@@ -677,15 +470,16 @@ async function _getProjects(
   sort = { by: 'lastUpdated', order: 'desc' },
   page = { size: 20 }
 ) {
-  /** @type {[AllUsersProjects, MongoTag[]]} */
-  const results = await Promise.all([
+  const [
+    /** @type {AllUsersProjects} **/ allProjects,
+    /** @type {Tag[]} **/ tags,
+  ] = await Promise.all([
     ProjectGetter.promises.findAllUsersProjects(
       userId,
       'name lastUpdated lastUpdatedBy publicAccesLevel archived trashed owner_ref tokens'
     ),
     TagsHandler.promises.getAllTags(userId),
   ])
-  const [allProjects, tags] = results
   const formattedProjects = _formatProjects(allProjects, userId)
   const filteredProjects = _applyFilters(
     formattedProjects,
@@ -695,18 +489,18 @@ async function _getProjects(
   )
   const pagedProjects = _sortAndPaginate(filteredProjects, sort, page)
 
-  const projects = await _injectProjectUsers(pagedProjects)
+  await _injectProjectUsers(pagedProjects)
 
   return {
     totalSize: filteredProjects.length,
-    projects,
+    projects: pagedProjects,
   }
 }
 
 /**
  * @param {AllUsersProjects} projects
  * @param {string} userId
- * @returns {FormattedProject[]}
+ * @returns {Project[]}
  * @private
  */
 function _formatProjects(projects, userId) {
@@ -719,7 +513,7 @@ function _formatProjects(projects, userId) {
     tokenReadOnly,
   } = projects
 
-  const formattedProjects = /** @type {FormattedProject[]} **/ []
+  const formattedProjects = /** @type {Project[]} **/ []
   for (const project of owned) {
     formattedProjects.push(
       _formatProjectInfo(project, 'owner', Sources.OWNER, userId)
@@ -763,11 +557,11 @@ function _formatProjects(projects, userId) {
 }
 
 /**
- * @param {FormattedProject[]} projects
- * @param {MongoTag[]} tags
+ * @param {Project[]} projects
+ * @param {Tag[]} tags
  * @param {Filters} filters
  * @param {string} userId
- * @returns {FormattedProject[]}
+ * @returns {Project[]}
  * @private
  */
 function _applyFilters(projects, tags, filters, userId) {
@@ -778,10 +572,10 @@ function _applyFilters(projects, tags, filters, userId) {
 }
 
 /**
- * @param {FormattedProject[]} projects
+ * @param {Project[]} projects
  * @param {Sort} sort
  * @param {Page} page
- * @returns {FormattedProject[]}
+ * @returns {Project[]}
  * @private
  */
 function _sortAndPaginate(projects, sort, page) {
@@ -802,35 +596,38 @@ function _sortAndPaginate(projects, sort, page) {
 
 /**
  * @param {MongoProject} project
- * @param {ProjectAccessLevel} accessLevel
- * @param {Source} source
+ * @param {string} accessLevel
+ * @param {'owner' | 'invite' | 'token'} source
  * @param {string} userId
- * @returns {FormattedProject}
+ * @returns {object}
  * @private
  */
 function _formatProjectInfo(project, accessLevel, source, userId) {
   const archived = ProjectHelper.isArchived(project, userId)
   // If a project is simultaneously trashed and archived, we will consider it archived but not trashed.
   const trashed = ProjectHelper.isTrashed(project, userId) && !archived
-  const readOnlyTokenAccess =
-    accessLevel === PrivilegeLevels.READ_ONLY && source === Sources.TOKEN
 
-  return {
+  const model = {
     id: project._id.toString(),
     name: project.name,
-    owner_ref: readOnlyTokenAccess ? null : project.owner_ref,
+    owner_ref: project.owner_ref,
     lastUpdated: project.lastUpdated,
-    lastUpdatedBy: readOnlyTokenAccess ? null : project.lastUpdatedBy,
+    lastUpdatedBy: project.lastUpdatedBy,
     accessLevel,
     source,
     archived,
     trashed,
   }
+  if (accessLevel === PrivilegeLevels.READ_ONLY && source === Sources.TOKEN) {
+    model.owner_ref = null
+    model.lastUpdatedBy = null
+  }
+  return model
 }
 
 /**
- * @param {FormattedProject[]} projects
- * @returns {Promise<Project[]>}
+ * @param {Project[]} projects
+ * @returns {Promise<void>}
  * @private
  */
 async function _injectProjectUsers(projects) {
@@ -849,7 +646,6 @@ async function _injectProjectUsers(projects) {
     last_name: 1,
     email: 1,
   }
-  /** @type {Record<string, UserRef>} */
   const users = {}
   for (const user of await UserGetter.promises.getUsers(userIds, projection)) {
     const userId = user._id.toString()
@@ -860,30 +656,21 @@ async function _injectProjectUsers(projects) {
       lastName: user.last_name,
     }
   }
+  for (const project of projects) {
+    if (project.owner_ref != null) {
+      project.owner = users[project.owner_ref.toString()]
+    }
+    if (project.lastUpdatedBy != null) {
+      project.lastUpdatedBy = users[project.lastUpdatedBy.toString()] || null
+    }
 
-  return projects.map(project => ({
-    id: project.id,
-    name: project.name,
-    archived: project.archived,
-    trashed: project.trashed,
-    accessLevel: project.accessLevel,
-    source: project.source,
-    lastUpdated: project.lastUpdated.toISOString(),
-    lastUpdatedBy:
-      project.lastUpdatedBy == null
-        ? null
-        : users[project.lastUpdatedBy.toString()] || null,
-    owner:
-      project.owner_ref == null
-        ? undefined
-        : users[project.owner_ref.toString()],
-    owner_ref: undefined,
-  }))
+    delete project.owner_ref
+  }
 }
 
 /**
  * @param {any} project
- * @param {MongoTag[]} tags
+ * @param {Tag[]} tags
  * @param {Filters} filters
  * @private
  */
@@ -925,7 +712,7 @@ function _matchesFilters(project, tags, filters) {
  * @private
  */
 function _hasActiveFilter(filters) {
-  return Boolean(
+  return (
     filters.ownedByUser ||
     filters.sharedWithUser ||
     filters.archived ||
@@ -934,56 +721,6 @@ function _hasActiveFilter(filters) {
     filters.tag?.length ||
     filters.search?.length
   )
-}
-
-/**
- * @param {any} user
- */
-// todo: quota clean-up: rename function and vars
-async function _userHasAIAssist(user) {
-  let hasPremiumAiFeatures
-  const inQuotaSplitTest =
-    await SplitTestHandler.promises.featureFlagEnabledForUser(
-      user._id,
-      'plans-2026-phase-1'
-    )
-  if (inQuotaSplitTest) {
-    hasPremiumAiFeatures =
-      user.features?.aiUsageQuota === Settings.aiFeatures.unlimitedQuota
-  } else {
-    hasPremiumAiFeatures = user.features?.aiErrorAssistant === true
-  }
-  // Check if the user has a non free trial version of our AI features
-  if (hasPremiumAiFeatures) {
-    return true
-  }
-
-  // Check if the user has AI Assist enabled via Writefull
-  const { isPremium: hasAiAssistViaWritefull } =
-    await UserGetter.promises.getWritefullData(user._id)
-  if (hasAiAssistViaWritefull) {
-    return true
-  }
-  return false
-}
-
-// Determines if user is able to enable AI assist
-// based on their permissions and settings
-// It does NOT determine if the user has AI Assist enabled
-/**
- * @param {any} user
- */
-async function _canUseAIAssist(user) {
-  // Check if the assistant has been manually disabled by the user
-  // post https://github.com/overleaf/internal/pull/31273 we can rely on user.aiFeatures being populated
-  if (user.aiFeatures?.enabled === false) {
-    return false
-  }
-
-  // Check if the user can use AI features (policy check)
-  return await PermissionsManager.promises.checkUserPermissions(user, [
-    'use-ai',
-  ])
 }
 
 export default {

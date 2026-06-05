@@ -1,7 +1,4 @@
-import {
-  db,
-  getCollectionInternal,
-} from '../../app/src/infrastructure/mongodb.mjs'
+import { db } from '../../app/src/infrastructure/mongodb.js'
 import { ensureMongoTimeout } from '../helpers/env_variable_helper.mjs'
 import { scriptRunner } from '../lib/ScriptRunner.mjs'
 // Ensure default mongo query timeout has been increased 1h
@@ -48,14 +45,9 @@ async function setAllowDowngradeToFalse() {
 }
 
 async function deleteHistoryCollections() {
-  const docHistory = await getCollectionInternal('docHistory')
-  const docHistoryIndex = await getCollectionInternal('docHistoryIndex')
-  await gracefullyDropCollection(docHistory)
-  await gracefullyDropCollection(docHistoryIndex)
-  const projectHistoryMetaData = await getCollectionInternal(
-    'projectHistoryMetaData'
-  )
-  await gracefullyDropCollection(projectHistoryMetaData)
+  await gracefullyDropCollection(db.docHistory)
+  await gracefullyDropCollection(db.docHistoryIndex)
+  await gracefullyDropCollection(db.projectHistoryMetaData)
 }
 
 async function gracefullyDropCollection(collection) {

@@ -2,8 +2,8 @@ import { expect } from 'chai'
 import UserHelper from './helpers/User.mjs'
 import logger from '@overleaf/logger'
 import sinon from 'sinon'
-import { db } from '../../../app/src/infrastructure/mongodb.mjs'
-import Features from '../../../app/src/infrastructure/Features.mjs'
+import { db } from '../../../app/src/infrastructure/mongodb.js'
+import Features from '../../../app/src/infrastructure/Features.js'
 
 const User = UserHelper.promises
 
@@ -125,9 +125,7 @@ describe('Add secondary email address confirmation code email', function () {
       })
 
       expect(res.response.statusCode).to.equal(409)
-      expect(res.body.message.text).to.equal(
-        'This email address is already associated with a different Overleaf account.'
-      )
+      expect(res.body.message.text).to.equal('This email is already registered')
     })
   })
 

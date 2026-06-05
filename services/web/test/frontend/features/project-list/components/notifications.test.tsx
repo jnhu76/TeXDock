@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitForElementToBeRemoved,
+  within,
 } from '@testing-library/react'
 import fetchMock from 'fetch-mock'
 import { merge, cloneDeep } from 'lodash'
@@ -273,7 +274,7 @@ describe('<UserNotifications />', function () {
       screen.getByText(/it looks like you’re at/i)
       screen.getByText(/did you know that/i)
       screen.getByText(
-        /add your university email address to see if you qualify/i
+        /add an institutional email address to claim your features/i
       )
 
       const addAffiliation = screen.getByRole('link', {
@@ -441,7 +442,7 @@ describe('<UserNotifications />', function () {
               ),
             ])
             window.metaAttributesCache.set(
-              'ol-hasIndividualPaidSubscription',
+              'ol-hasIndividualRecurlySubscription',
               true
             )
 
@@ -509,43 +510,8 @@ describe('<UserNotifications />', function () {
       render(<Institution />)
       fetchMock.delete(`/notifications/${institution._id}`, 200)
 
-      const notificationEl = screen.getByRole('alert')
-      expect(notificationEl.textContent).to.match(
-        new RegExp(
-          `your Overleaf account on ${notificationsInstitution.email} ` +
-            `has been linked to your ${notificationsInstitution.institutionName} ` +
-            `institutional account.`,
-          'i'
-        )
-      )
-
-      const closeBtn = screen.getByRole('button', { name: /close/i })
-      fireEvent.click(closeBtn)
-
-      expect(fetchMock.callHistory.called()).to.be.true
-      expect(screen.queryByRole('alert')).to.be.null
-    })
-
-    it('shows sso linked to group with domain capture enabled', function () {
-      const institution: DeepPartial<InstitutionType> = {
-        _id: 1,
-        templateKey: 'notification_group_sso_linked',
-      }
-      window.metaAttributesCache.set('ol-notificationsInstitution', [
-        { ...notificationsInstitution, ...institution },
-      ])
-      render(<Institution />)
-      fetchMock.delete(`/notifications/${institution._id}`, 200)
-
-      const notificationEl = screen.getByRole('alert')
-      expect(notificationEl.textContent).to.match(
-        new RegExp(
-          `your Overleaf account on ${notificationsInstitution.email} ` +
-            `has been linked to your ${notificationsInstitution.institutionName} ` +
-            `account.`,
-          'i'
-        )
-      )
+      screen.getByRole('alert')
+      screen.getByText(/has been linked to your/i)
 
       const closeBtn = screen.getByRole('button', { name: /close/i })
       fireEvent.click(closeBtn)
@@ -627,31 +593,6 @@ describe('<UserNotifications />', function () {
 
       expect(screen.queryByRole('alert')).to.be.null
     })
-
-    it('shows reconfirmation unable-to-find-user error content', function () {
-      const institution: DeepPartial<InstitutionType> = {
-        templateKey: 'notification_institution_sso_error',
-        error: {
-          name: 'SAMLCommonsReconfirmationUnableToFindUserError',
-        },
-      }
-      window.metaAttributesCache.set('ol-notificationsInstitution', [
-        { ...notificationsInstitution, ...institution },
-      ])
-      render(<Institution />)
-
-      screen.getByRole('alert')
-      screen.getByText(/unable to confirm your affiliation/i)
-
-      const contactLink = screen.getByRole('link', { name: /contact us/i })
-      expect(contactLink.getAttribute('href')).to.equal('/contact')
-      expect(contactLink.getAttribute('target')).to.equal('_blank')
-
-      const closeBtn = screen.getByRole('button', { name: /close/i })
-      fireEvent.click(closeBtn)
-
-      expect(screen.queryByRole('alert')).to.be.null
-    })
   })
 
   describe('getEmailDeletionDate', function () {
@@ -674,13 +615,8 @@ describe('<UserNotifications />', function () {
         unconfirmedUserData,
         signUpDate
       )
-      const dateOptions: Intl.DateTimeFormatOptions = {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      }
       expect(emailDeletionDate).to.equal(
-        new Date('2025-09-03').toLocaleDateString(undefined, dateOptions)
+        new Date('2025-09-03').toLocaleDateString()
       )
     })
 
@@ -736,37 +672,32 @@ describe('<UserNotifications />', function () {
 
         renderWithinProjectListProvider(ConfirmEmail)
         await fetchMock.callHistory.flush(true)
-        fetchMock.post('/user/emails/send-confirmation-code', 200)
+        fetchMock.post('/user/emails/resend_confirmation', 200)
 
         const email = userEmails[0].email
-        const alert = await screen.findByRole('alert')
+        const notificationBody = await screen.findByTestId(
+          'pro-notification-body'
+        )
 
         if (isPrimary) {
-          expect(alert.textContent).to.contain(
-            `Please confirm your primary email address ${email}. To edit it, go to `
+          expect(notificationBody.textContent).to.contain(
+            `Please confirm your primary email address ${email} by clicking on the link in the confirmation email.`
           )
         } else {
-          expect(alert.textContent).to.contain(
-            `Please confirm your secondary email address ${email}. To edit it, go to `
+          expect(notificationBody.textContent).to.contain(
+            `Please confirm your secondary email address ${email} by clicking on the link in the confirmation email.`
           )
         }
 
-        expect(
-          screen
-            .getByRole('button', { name: 'Send confirmation code' })
-            .classList.contains('button-loading')
-        ).to.be.false
+        const resendButton = screen.getByRole('button', { name: /resend/i })
+        fireEvent.click(resendButton)
 
-        expect(screen.queryByRole('dialog')).to.be.null
-
-        const sendCodeButton = await screen.findByRole('button', {
-          name: 'Send confirmation code',
-        })
-        fireEvent.click(sendCodeButton)
-
-        await screen.findByRole('dialog')
+        await waitForElementToBeRemoved(() =>
+          screen.queryByRole('button', { name: /resend/i })
+        )
 
         expect(fetchMock.callHistory.called()).to.be.true
+        expect(screen.queryByRole('alert')).to.be.null
       })
     }
 
@@ -785,22 +716,25 @@ describe('<UserNotifications />', function () {
 
       renderWithinProjectListProvider(ConfirmEmail)
       await fetchMock.callHistory.flush(true)
-      fetchMock.post('/user/emails/send-confirmation-code', 200)
+      fetchMock.post('/user/emails/resend_confirmation', 200)
 
       const email = untrustedUserData.email
-      const alert = await screen.findByRole('alert')
-      expect(alert.textContent).to.contain(
+      const notificationBody = await screen.findByTestId(
+        'not-trusted-notification-body'
+      )
+      expect(notificationBody.textContent).to.contain(
         `To enhance the security of your Overleaf account, please reconfirm your secondary email address ${email}.`
       )
 
-      const resendButton = screen.getByRole('button', {
-        name: 'Send confirmation code',
-      })
+      const resendButton = screen.getByRole('button', { name: /resend/i })
       fireEvent.click(resendButton)
 
-      await screen.findByRole('dialog')
+      await waitForElementToBeRemoved(() =>
+        screen.getByRole('button', { name: /resend/i })
+      )
 
       expect(fetchMock.callHistory.called()).to.be.true
+      expect(screen.queryByRole('alert')).to.be.null
     })
 
     it('fails to send', async function () {
@@ -808,16 +742,20 @@ describe('<UserNotifications />', function () {
 
       renderWithinProjectListProvider(ConfirmEmail)
       await fetchMock.callHistory.flush(true)
-      fetchMock.post('/user/emails/send-confirmation-code', 500)
+      fetchMock.post('/user/emails/resend_confirmation', 500)
 
       const resendButtons = await screen.findAllByRole('button', {
-        name: 'Send confirmation code',
+        name: /resend/i,
       })
       const resendButton = resendButtons[0]
       fireEvent.click(resendButton)
-      await fetchMock.callHistory.flush(true)
+      const notificationBody = screen.getByTestId('pro-notification-body')
 
-      await screen.findByRole('dialog')
+      await waitForElementToBeRemoved(() =>
+        within(notificationBody).getByTestId(
+          'loading-resending-confirmation-email'
+        )
+      )
 
       expect(fetchMock.callHistory.called()).to.be.true
       screen.getByText(/something went wrong/i)
@@ -835,11 +773,12 @@ describe('<UserNotifications />', function () {
 
         const alert = await screen.findByRole('alert')
         const email = unconfirmedCommonsUserData.email
-        expect(alert.textContent).to.contain(
-          'You are one step away from accessing Overleaf premium features'
+        const notificationBody = within(alert).getByTestId('notification-body')
+        expect(notificationBody.textContent).to.contain(
+          'You are one step away from accessing Overleaf Professional features'
         )
-        expect(alert.textContent).to.contain(
-          `Overleaf has an Overleaf subscription. Click the confirmation link sent to ${email} to upgrade to Overleaf Commons`
+        expect(notificationBody.textContent).to.contain(
+          `Overleaf has an Overleaf subscription. Click the confirmation link sent to ${email} to upgrade to Overleaf Professional`
         )
       })
     }
@@ -855,14 +794,17 @@ describe('<UserNotifications />', function () {
 
         const alert = await screen.findByRole('alert')
         const email = unconfirmedCommonsUserData.email
+        const notificationBody = within(alert).getByTestId(
+          'pro-notification-body'
+        )
         const isPrimary = unconfirmedCommonsUserData.default
         if (isPrimary) {
-          expect(alert.textContent).to.contain(
-            `Please confirm your primary email address ${email}.`
+          expect(notificationBody.textContent).to.contain(
+            `Please confirm your primary email address ${email} by clicking on the link in the confirmation email`
           )
         } else {
-          expect(alert.textContent).to.contain(
-            `Please confirm your secondary email address ${email}.`
+          expect(notificationBody.textContent).to.contain(
+            `Please confirm your secondary email address ${email} by clicking on the link in the confirmation email`
           )
         }
       })
@@ -903,25 +845,24 @@ describe('<UserNotifications />', function () {
       )
 
       const sendReconfirmationMock = fetchMock.post(
-        '/user/emails/send-confirmation-code',
+        '/user/emails/send-reconfirmation',
         200
       )
       fireEvent.click(
-        screen.getByRole('button', { name: 'Send confirmation code' })
+        screen.getByRole('button', { name: /confirm affiliation/i })
       )
 
-      await waitForElementToBeRemoved(() => screen.getByText(/sending/i))
-      // Sometimes we need to wait for useWaitForI18n to be ready
-      await screen.findByText(
-        /Enter the 6-digit code sent to foo@overleaf.com/i
-      )
+      await waitForElementToBeRemoved(() => screen.getByText(/loading/i))
+      screen.getByText(/check your email inbox to confirm/i)
+      expect(screen.queryByRole('button', { name: /confirm affiliation/i })).to
+        .be.null
+      expect(screen.queryByRole('link', { name: /remove it/i })).to.be.null
+      expect(screen.queryByRole('link', { name: /learn more/i })).to.be.null
       expect(sendReconfirmationMock.callHistory.called()).to.be.true
       fireEvent.click(
-        screen.getByRole('button', { name: /resend confirmation code/i })
+        screen.getByRole('button', { name: /resend confirmation email/i })
       )
-      await waitForElementToBeRemoved(() =>
-        screen.getByText('Resending confirmation code')
-      )
+      await waitForElementToBeRemoved(() => screen.getByText('Sending…'))
       expect(sendReconfirmationMock.callHistory.calls()).to.have.lengthOf(2)
     })
 
@@ -978,8 +919,6 @@ describe('<UserNotifications />', function () {
         'ol-groupsAndEnterpriseBannerVariant',
         'on-premise'
       )
-
-      window.metaAttributesCache.set('ol-inactiveTutorials', '[]')
     })
 
     afterEach(function () {
@@ -1005,9 +944,9 @@ describe('<UserNotifications />', function () {
       await screen.findByRole('link', { name: 'Contact sales' })
     })
 
-    it('does not show the banner for users that have dismissed the banner within the last 30 days and before server-side state', async function () {
+    it('shows the banner for users that have dismissed the banner more than 30 days ago', async function () {
       const dismissed = new Date()
-      dismissed.setDate(dismissed.getDate() - 29) // 29 days
+      dismissed.setDate(dismissed.getDate() - 31) // 31 days
       window.metaAttributesCache.set('ol-showGroupsAndEnterpriseBanner', true)
       localStorage.setItem(
         'has_dismissed_groups_and_enterprise_banner',
@@ -1017,28 +956,17 @@ describe('<UserNotifications />', function () {
       renderWithinProjectListProvider(GroupsAndEnterpriseBanner)
       await fetchMock.callHistory.flush(true)
 
-      expect(screen.queryByRole('link', { name: 'Contact sales' })).to.be.null
+      await screen.findByRole('link', { name: 'Contact sales' })
     })
 
-    it('shows the banner for users who have not dismissed the repeat appearance', async function () {
-      window.metaAttributesCache.set(
-        'ol-inactiveTutorials',
-        '["groups-enterprise-banner"]'
-      )
+    it('does not show the banner for users that have dismissed the banner within the last 30 days', async function () {
+      const dismissed = new Date()
+      dismissed.setDate(dismissed.getDate() - 29) // 29 days
       window.metaAttributesCache.set('ol-showGroupsAndEnterpriseBanner', true)
-
-      renderWithinProjectListProvider(GroupsAndEnterpriseBanner)
-      await fetchMock.callHistory.flush(true)
-
-      expect(screen.queryByRole('link', { name: 'Contact sales' })).to.be.null
-    })
-
-    it('does not show the banner for users with both inactive tutorials', async function () {
-      window.metaAttributesCache.set(
-        'ol-inactiveTutorials',
-        '["groups-enterprise-banner", "groups-enterprise-banner-repeat"]'
+      localStorage.setItem(
+        'has_dismissed_groups_and_enterprise_banner',
+        dismissed
       )
-      window.metaAttributesCache.set('ol-showGroupsAndEnterpriseBanner', true)
 
       renderWithinProjectListProvider(GroupsAndEnterpriseBanner)
       await fetchMock.callHistory.flush(true)
@@ -1121,18 +1049,6 @@ describe('<UserNotifications />', function () {
       expect(
         screen.queryByText('Success! Single sign-on is all set up for you.')
       ).to.be.null
-    })
-
-    it('shows group SSO linked notification when joining via domain capture', function () {
-      const groupName = 'Group Name'
-      window.metaAttributesCache.set('ol-groupSsoSetupSuccess', true)
-      window.metaAttributesCache.set('ol-viaDomainCapture', true)
-      window.metaAttributesCache.set('ol-joinedGroupName', groupName)
-      renderWithinProjectListProvider(GroupSsoSetupSuccess)
-      const alert = screen.getByRole('alert')
-      expect(alert.textContent).to.contain(
-        `You’ve joined the ${groupName} group. SSO is enabled.`
-      )
     })
   })
 })

@@ -1,5 +1,5 @@
 import classNames from 'classnames'
-import overleafLogo from '@/shared/svgs/overleaf-green.svg'
+import overleafLogo from '@/shared/svgs/overleaf.svg'
 
 type InterstitialProps = {
   className?: string

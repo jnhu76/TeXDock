@@ -18,7 +18,10 @@ describe('group invite', function () {
 
   describe('when user has personal subscription', function () {
     beforeEach(function () {
-      window.metaAttributesCache.set('ol-hasIndividualPaidSubscription', true)
+      window.metaAttributesCache.set(
+        'ol-hasIndividualRecurlySubscription',
+        true
+      )
     })
 
     it('renders cancel personal subscription view', async function () {
@@ -52,7 +55,10 @@ describe('group invite', function () {
 
   describe('when user does not have a personal subscription', function () {
     beforeEach(function () {
-      window.metaAttributesCache.set('ol-hasIndividualPaidSubscription', false)
+      window.metaAttributesCache.set(
+        'ol-hasIndividualRecurlySubscription',
+        false
+      )
       window.metaAttributesCache.set('ol-inviteToken', 'token123')
     })
 

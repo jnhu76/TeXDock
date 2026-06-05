@@ -3,14 +3,13 @@ extends ../layout-react
 block vars
 	- var suppressNavbar = true
 	- var suppressSkipToContent = true
-	- isWebsiteRedesign = true
 
 block entrypointVar
 	- entrypoint = 'pages/user/confirm-secondary-email'
 
 block append meta
-	meta(name='ol-email' content=email)
+	meta(name="ol-email" content=email)
 
 block content
-	main.content
+	main.content.content-alt
 		#confirm-secondary-email

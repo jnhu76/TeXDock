@@ -155,8 +155,7 @@ const storeScrollPosition = (
 ) => {
   const key = buildStorageKey(docId)
   const data = customLocalStorage.getItem(key)
-  const pos = Math.min(lineInfo.first.from, view.state.doc.length)
-  const firstVisibleLine = view.state.doc.lineAt(pos).number
+  const firstVisibleLine = view.state.doc.lineAt(lineInfo.first.from).number
 
   customLocalStorage.setItem(key, { ...data, firstVisibleLine })
 }

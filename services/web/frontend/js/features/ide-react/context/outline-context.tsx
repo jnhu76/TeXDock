@@ -10,12 +10,11 @@ import {
 } from 'react'
 import useScopeEventEmitter from '@/shared/hooks/use-scope-event-emitter'
 import useEventListener from '@/shared/hooks/use-event-listener'
+import * as eventTracking from '@/infrastructure/event-tracking'
 import { isValidTeXFile } from '@/main/is-valid-tex-file'
 import localStorage from '@/infrastructure/local-storage'
 import { useProjectContext } from '@/shared/context/project-context'
-import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
-import { useFileTreeOpenContext } from './file-tree-open-context'
-import { useEditorAnalytics } from '@/shared/hooks/use-editor-analytics'
+import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
 
 export type PartialFlatOutline = {
   level: number
@@ -39,8 +38,6 @@ const OutlineContext = createContext<
       canShowOutline: boolean
       outlineExpanded: boolean
       toggleOutlineExpanded: () => void
-      expandOutline: () => void
-      collapseOutline: () => void
     }
   | undefined
 >(undefined)
@@ -53,7 +50,6 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
   const [ignoreNextCursorUpdate, setIgnoreNextCursorUpdate] =
     useState<boolean>(false)
   const [ignoreNextScroll, setIgnoreNextScroll] = useState<boolean>(false)
-  const { sendEvent } = useEditorAnalytics()
 
   const goToLineEmitter = useScopeEventEmitter('editor:gotoLine', true)
 
@@ -111,9 +107,9 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
         gotoColumn: 0,
         syncToPdf,
       })
-      sendEvent('outline-jump-to-line')
+      eventTracking.sendMB('outline-jump-to-line')
     },
-    [goToLineEmitter, sendEvent]
+    [goToLineEmitter]
   )
 
   const highlightedLine = useMemo(
@@ -122,47 +118,30 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
     [flatOutline, currentlyHighlightedLine]
   )
 
-  const { openDocName } = useEditorOpenDocContext()
+  const { openDocName } = useEditorManagerContext()
   const isTexFile = useMemo(
     () => (openDocName ? isValidTeXFile(openDocName) : false),
     [openDocName]
   )
 
-  const { selectedEntityCount } = useFileTreeOpenContext()
-  const hasSingleEntityOpen = selectedEntityCount === 1
-
-  const { projectId } = useProjectContext()
+  const { _id: projectId } = useProjectContext()
   const storageKey = `file_outline.expanded.${projectId}`
 
   const [outlineExpanded, setOutlineExpanded] = useState(
     () => localStorage.getItem(storageKey) !== false
   )
 
-  const canShowOutline = hasSingleEntityOpen && isTexFile && !binaryFileOpened
-
-  const expandOutline = useCallback(() => {
-    if (canShowOutline) {
-      localStorage.setItem(storageKey, true)
-      sendEvent('outline-expand')
-      setOutlineExpanded(true)
-    }
-  }, [canShowOutline, storageKey, sendEvent])
-
-  const collapseOutline = useCallback(() => {
-    if (canShowOutline) {
-      localStorage.setItem(storageKey, false)
-      sendEvent('outline-collapse')
-      setOutlineExpanded(false)
-    }
-  }, [canShowOutline, storageKey, sendEvent])
+  const canShowOutline = isTexFile && !binaryFileOpened
 
   const toggleOutlineExpanded = useCallback(() => {
-    if (outlineExpanded) {
-      collapseOutline()
-    } else {
-      expandOutline()
+    if (canShowOutline) {
+      localStorage.setItem(storageKey, !outlineExpanded)
+      eventTracking.sendMB(
+        outlineExpanded ? 'outline-collapse' : 'outline-expand'
+      )
+      setOutlineExpanded(!outlineExpanded)
     }
-  }, [collapseOutline, expandOutline, outlineExpanded])
+  }, [canShowOutline, outlineExpanded, storageKey])
 
   const value = useMemo(
     () => ({
@@ -173,8 +152,6 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
       canShowOutline,
       outlineExpanded,
       toggleOutlineExpanded,
-      expandOutline,
-      collapseOutline,
     }),
     [
       flatOutline,
@@ -183,8 +160,6 @@ export const OutlineProvider: FC<React.PropsWithChildren> = ({ children }) => {
       canShowOutline,
       outlineExpanded,
       toggleOutlineExpanded,
-      expandOutline,
-      collapseOutline,
     ]
   )
 

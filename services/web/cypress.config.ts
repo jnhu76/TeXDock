@@ -1,22 +1,11 @@
 import { defineConfig } from 'cypress'
 import { webpackConfig } from './cypress/support/webpack.cypress'
 
-let reporterOptions = {}
-if (process.env.CI) {
-  reporterOptions = {
-    reporter: 'cypress-multi-reporters',
-    reporterOptions: {
-      configFile: 'cypress/cypress-multi-reporters.json',
-    },
-  }
-}
-
 export default defineConfig({
   fixturesFolder: 'cypress/fixtures',
   video: process.env.CYPRESS_VIDEO === 'true',
-  downloadsFolder: process.env.CYPRESS_DOWNLOADS || 'cypress/downloads',
-  screenshotsFolder: process.env.CYPRESS_RESULTS || 'cypress/results',
-  videosFolder: process.env.CYPRESS_RESULTS || 'cypress/results',
+  screenshotsFolder: 'cypress/results',
+  videosFolder: 'cypress/results',
   viewportHeight: 800,
   viewportWidth: 800,
   component: {
@@ -34,7 +23,6 @@ export default defineConfig({
     excludeSpecPattern: process.env.CYPRESS_EXCLUDE_SPEC_PATTERN,
   },
   retries: {
-    runMode: parseInt(process.env.CYPRESS_RETRIES || '3', 10) || 3,
+    runMode: 3,
   },
-  ...reporterOptions,
 })

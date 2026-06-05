@@ -4,7 +4,7 @@ import {
   DropdownDivider,
   DropdownHeader,
   DropdownItem,
-} from '@/shared/components/dropdown/dropdown-menu'
+} from '@/features/ui/components/bootstrap-5/dropdown-menu'
 import { PdfFileData, PdfFileDataList } from '../util/types'
 
 function PdfFileList({ fileList }: { fileList: PdfFileDataList }) {

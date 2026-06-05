@@ -127,18 +127,6 @@ class FileMap {
   }
 
   /**
-   * @returns {Map<string, Record<string, number>>}
-   */
-  toStats() {
-    const sizes = new Map()
-    for (const [path, file] of Object.entries(this.files)) {
-      if (!file) continue
-      sizes.set(path, file.toStats())
-    }
-    return sizes
-  }
-
-  /**
    * Create the given file.
    *
    * @param {string} pathname

@@ -7,8 +7,10 @@
  * Alternatively, use an adhoc file: --logs=<(echo '{"projectId":"...","path":"..."}')
  */
 import mongodb from 'mongodb-legacy'
-import { db } from '../app/src/infrastructure/mongodb.mjs'
-import ProjectLocator from '../app/src/Features/Project/ProjectLocator.mjs'
+import { db } from '../app/src/infrastructure/mongodb.js'
+import ProjectLocator, {
+  findDeep,
+} from '../app/src/Features/Project/ProjectLocator.js'
 import minimist from 'minimist'
 import readline from 'node:readline'
 import fs from 'node:fs'
@@ -16,7 +18,6 @@ import logger from '@overleaf/logger'
 import { scriptRunner } from './lib/ScriptRunner.mjs'
 
 const { ObjectId } = mongodb
-const { findDeep } = ProjectLocator
 const lastUpdated = new Date()
 
 const argv = minimist(process.argv.slice(2), {

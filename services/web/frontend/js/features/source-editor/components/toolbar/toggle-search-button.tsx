@@ -12,7 +12,7 @@ export const ToggleSearchButton: FC<{ state: EditorState }> = ({ state }) => {
   return (
     <ToolbarButton
       id="toolbar-toggle-search"
-      label={t('toolbar_search_file')}
+      label={t('search_this_file')}
       command={commands.toggleSearch}
       active={searchPanelOpen(state)}
       icon="search"

@@ -9,12 +9,13 @@
  * DS102: Remove unnecessary code created because of implicit returns
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { expect } from 'chai'
+const { expect } = require('chai')
 
-import RealTimeClient from './helpers/RealTimeClient.js'
-import MockDocUpdaterServer from './helpers/MockDocUpdaterServer.js'
-import FixturesManager from './helpers/FixturesManager.js'
-import async from 'async'
+const RealTimeClient = require('./helpers/RealTimeClient')
+const MockDocUpdaterServer = require('./helpers/MockDocUpdaterServer')
+const FixturesManager = require('./helpers/FixturesManager')
+
+const async = require('async')
 
 describe('joinDoc', function () {
   before(function () {
@@ -327,7 +328,7 @@ describe('joinDoc', function () {
     })
 
     it('should return an invalid id error', function () {
-      this.error.message.should.equal('invalid Mongo ObjectId')
+      this.error.message.should.equal('invalid id')
     })
 
     return it('should not have joined the doc room', function (done) {

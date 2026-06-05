@@ -1,16 +1,15 @@
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
-import OLForm from '@/shared/components/ol/ol-form'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
+import OLForm from '@/features/ui/components/ol/ol-form'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
 import ModalError from './modal-error'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+} from '@/features/ui/components/ol/ol-modal'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import useAsync from '../../../../shared/hooks/use-async'
 import useAbortController from '../../../../shared/hooks/use-abort-controller'
 import useAddOrRemoveLabels from '../../hooks/use-add-or-remove-labels'
@@ -19,8 +18,7 @@ import { addLabel } from '../../services/api'
 import { Label } from '../../services/types/label'
 import { useRefWithAutoFocus } from '../../../../shared/hooks/use-ref-with-auto-focus'
 import { debugConsole } from '@/utils/debugging'
-import OLFormControl from '@/shared/components/ol/ol-form-control'
-import OLFormLabel from '@/shared/components/ol/ol-form-label'
+import OLFormControl from '@/features/ui/components/ol/ol-form-control'
 
 type AddLabelModalProps = {
   show: boolean
@@ -93,11 +91,11 @@ function AddLabelModal({ show, setShow, version }: AddLabelModalProps) {
       <OLForm onSubmit={handleSubmit}>
         <OLModalBody>
           {isError && <ModalError error={responseError} />}
-          <OLFormGroup controlId="add-label-modal">
-            <OLFormLabel>{t('history_new_label_name')}</OLFormLabel>
+          <OLFormGroup>
             <OLFormControl
               ref={autoFocusedRef}
               type="text"
+              placeholder={t('history_new_label_name')}
               required
               value={comment}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -119,7 +117,6 @@ function AddLabelModal({ show, setShow, version }: AddLabelModalProps) {
             variant="primary"
             disabled={isLoading || !comment.length}
             isLoading={isLoading}
-            loadingLabel={t('adding')}
           >
             {t('history_add_label')}
           </OLButton>

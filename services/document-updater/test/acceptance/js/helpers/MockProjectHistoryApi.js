@@ -1,23 +1,33 @@
+// TODO: This file was created by bulk-decaffeinate.
+// Fix any style issues and re-enable lint.
+/*
+ * decaffeinate suggestions:
+ * DS102: Remove unnecessary code created because of implicit returns
+ * DS207: Consider shorter variations of null checks
+ * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
+ */
 let MockProjectHistoryApi
-const { expressify } = require('@overleaf/promise-utils')
 const express = require('express')
 const app = express()
 
 module.exports = MockProjectHistoryApi = {
-  async flushProject(docId) {},
+  flushProject(docId, callback) {
+    if (callback == null) {
+      callback = function () {}
+    }
+    return callback()
+  },
 
   run() {
-    app.post(
-      '/project/:project_id/flush',
-      expressify(async (req, res, next) => {
-        try {
-          await this.flushProject(req.params.project_id)
-          return res.sendStatus(204)
-        } catch (error) {
+    app.post('/project/:project_id/flush', (req, res, next) => {
+      return this.flushProject(req.params.project_id, error => {
+        if (error != null) {
           return res.sendStatus(500)
+        } else {
+          return res.sendStatus(204)
         }
       })
-    )
+    })
 
     return app.listen(3054, error => {
       if (error != null) {

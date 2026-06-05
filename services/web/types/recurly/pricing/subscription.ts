@@ -55,7 +55,8 @@ interface AddOn {
 
 // Extending the default interface as it lacks the `items` prop
 export interface SubscriptionPricingInstanceCustom
-  extends SubscriptionPricingInstance, SubscriptionPricingState {
+  extends SubscriptionPricingInstance,
+    SubscriptionPricingState {
   id: string
   items: {
     addons: AddOn[]

@@ -1,34 +1,50 @@
 import { expect } from 'chai'
+import async from 'async'
 import metrics from './helpers/metrics.mjs'
 import User from './helpers/User.mjs'
 import redis from './helpers/redis.mjs'
-import Features from '../../../app/src/infrastructure/Features.mjs'
+import Features from '../../../app/src/infrastructure/Features.js'
 
 const UserPromises = User.promises
 
 // Expectations
-async function expectProjectAccess(user, projectId) {
+const expectProjectAccess = function (user, projectId, callback) {
   // should have access to project
-  await user.openProject(projectId)
+  user.openProject(projectId, err => {
+    expect(err).to.be.oneOf([null, undefined])
+    return callback()
+  })
 }
 
-async function expectNoProjectAccess(user, projectId) {
+const expectNoProjectAccess = function (user, projectId, callback) {
   // should not have access to project page
-  let error = null
-  try {
-    await user.openProject(projectId)
-  } catch (err) {
-    error = err
-  }
-  expect(error).to.be.instanceof(Error)
+  user.openProject(projectId, err => {
+    expect(err).to.be.instanceof(Error)
+    return callback()
+  })
 }
 
 // Actions
-async function tryLoginThroughRegistrationForm(user, email, password) {
-  await user.getCsrfToken()
-  return await user.doRequest('POST', {
-    url: '/register',
-    json: { email, password },
+const tryLoginThroughRegistrationForm = function (
+  user,
+  email,
+  password,
+  callback
+) {
+  user.getCsrfToken(err => {
+    if (err != null) {
+      return callback(err)
+    }
+    user.request.post(
+      {
+        url: '/register',
+        json: {
+          email,
+          password,
+        },
+      },
+      callback
+    )
   })
 }
 
@@ -101,7 +117,7 @@ describe('Registration', function () {
           expect(results).to.deep.equal(
             Array(10)
               .fill('invalid-password-retry-or-reset')
-              .concat(Array(5).fill('too-many-login-requests-2-mins'))
+              .concat(Array(5).fill('to-many-login-requests-2-mins'))
           )
         })
 
@@ -188,63 +204,95 @@ describe('Registration', function () {
     })
 
     beforeEach(function () {
-      this.user = new UserPromises()
+      this.user = new User()
       this.email = `test+${Math.random()}@example.com`
       this.password = 'password11'
     })
 
-    afterEach(async function () {
-      await this.user.fullDeleteUser(this.email)
+    afterEach(function (done) {
+      this.user.fullDeleteUser(this.email, done)
     })
 
-    it('should register with the csrf token', async function () {
-      await this.user.request.get('/login')
-      await this.user.getCsrfToken()
-      const { response } = await this.user.doRequest('POST', {
-        url: '/register',
-        json: {
-          email: this.email,
-          password: this.password,
-        },
-        headers: {
-          'x-csrf-token': this.user.csrfToken,
-        },
+    it('should register with the csrf token', function (done) {
+      this.user.request.get('/login', (err, res, body) => {
+        expect(err).to.not.exist
+        this.user.getCsrfToken(error => {
+          expect(error).to.not.exist
+          this.user.request.post(
+            {
+              url: '/register',
+              json: {
+                email: this.email,
+                password: this.password,
+              },
+              headers: {
+                'x-csrf-token': this.user.csrfToken,
+              },
+            },
+            (error, response, body) => {
+              expect(error).to.not.exist
+              expect(response.statusCode).to.equal(200)
+              return done()
+            }
+          )
+        })
       })
-      expect(response.statusCode).to.equal(200)
     })
 
-    it('should fail with no csrf token', async function () {
-      await this.user.request.get('/login')
-      await this.user.getCsrfToken()
-      const { response } = await this.user.doRequest('POST', {
-        url: '/register',
-        json: {
-          email: this.email,
-          password: this.password,
-        },
-        headers: {
-          'x-csrf-token': '',
-        },
+    it('should fail with no csrf token', function (done) {
+      this.user.request.get('/login', (err, res, body) => {
+        expect(err).to.not.exist
+        this.user.getCsrfToken(error => {
+          expect(error).to.not.exist
+          this.user.request.post(
+            {
+              url: '/register',
+              json: {
+                email: this.email,
+                password: this.password,
+              },
+              headers: {
+                'x-csrf-token': '',
+              },
+            },
+            (error, response, body) => {
+              expect(error).to.not.exist
+              expect(response.statusCode).to.equal(403)
+              return done()
+            }
+          )
+        })
       })
-      expect(response.statusCode).to.equal(403)
     })
 
-    it('should fail with a stale csrf token', async function () {
-      await this.user.request.get('/login')
-      await this.user.getCsrfToken()
-      const oldCsrfToken = this.user.csrfToken
-      await this.user.logout()
-      const { response } = await this.user.doRequest('POST', {
-        url: '/register',
-        json: {
-          email: this.email,
-          password: this.password,
-        },
-        headers: {
-          'x-csrf-token': oldCsrfToken,
-        },
+    it('should fail with a stale csrf token', function (done) {
+      this.user.request.get('/login', (err, res, body) => {
+        expect(err).to.not.exist
+        this.user.getCsrfToken(error => {
+          expect(error).to.not.exist
+          const oldCsrfToken = this.user.csrfToken
+          this.user.logout(err => {
+            expect(err).to.not.exist
+            this.user.request.post(
+              {
+                url: '/register',
+                json: {
+                  email: this.email,
+                  password: this.password,
+                },
+                headers: {
+                  'x-csrf-token': oldCsrfToken,
+                },
+              },
+              (error, response, body) => {
+                expect(error).to.not.exist
+                expect(response.statusCode).to.equal(403)
+                return done()
+              }
+            )
+          })
+        })
       })
-      expect(response.statusCode).to.equal(403)
     })
   })
 
@@ -256,32 +304,38 @@ describe('Registration', function () {
     })
 
     beforeEach(function () {
-      this.user = new UserPromises()
+      this.user = new User()
     })
 
-    it('Set emails attribute', async function () {
-      const user = await this.user.register()
-      expect(user.email).to.equal(this.user.email)
-      expect(user.emails).to.exist
-      expect(user.emails).to.be.a('array')
-      expect(user.emails.length).to.equal(1)
-      expect(user.emails[0].email).to.equal(this.user.email)
+    it('Set emails attribute', function (done) {
+      this.user.register((error, user) => {
+        expect(error).to.not.exist
+        user.email.should.equal(this.user.email)
+        user.emails.should.exist
+        user.emails.should.be.a('array')
+        user.emails.length.should.equal(1)
+        user.emails[0].email.should.equal(this.user.email)
+        return done()
+      })
     })
   })
 
   describe('LoginViaRegistration', function () {
-    beforeEach(async function () {
+    beforeEach(function (done) {
       this.timeout(60000)
-      this.user1 = new UserPromises()
-      this.user2 = new UserPromises()
-
-      await this.user1.login()
-      await this.user1.logout()
-      await redis.clearUserSessions(this.user1)
-      await this.user2.login()
-      await this.user2.logout()
-      await redis.clearUserSessions(this.user2)
-
+      this.user1 = new User()
+      this.user2 = new User()
+      async.series(
+        [
+          cb => this.user1.login(cb),
+          cb => this.user1.logout(cb),
+          cb => redis.clearUserSessions(this.user1, cb),
+          cb => this.user2.login(cb),
+          cb => this.user2.logout(cb),
+          cb => redis.clearUserSessions(this.user2, cb),
+        ],
+        done
+      )
       this.project_id = null
     })
 
@@ -292,46 +346,68 @@ describe('Registration', function () {
         }
       })
 
-      it('should not allow sign in with secondary email', async function () {
+      it('should not allow sign in with secondary email', function (done) {
         const secondaryEmail = 'acceptance-test-secondary@example.com'
-        await this.user1.addEmail(secondaryEmail)
-        let error = null
-        try {
-          await this.user1.loginWith(secondaryEmail)
-        } catch (err) {
-          error = err
-        }
-        expect(error).to.be.instanceOf(Error)
-        expect(error.message).to.match(/login failed: status=401/)
-        expect(error.info.body).to.deep.equal({
-          message: {
-            type: 'error',
-            key: 'invalid-password-retry-or-reset',
-          },
+        this.user1.addEmail(secondaryEmail, err => {
+          expect(err).to.not.exist
+          this.user1.loginWith(secondaryEmail, err => {
+            expect(err).to.match(/login failed: status=401/)
+            expect(err.info.body).to.deep.equal({
+              message: {
+                type: 'error',
+                key: 'invalid-password-retry-or-reset',
+              },
+            })
+            this.user1.isLoggedIn((err, isLoggedIn) => {
+              expect(err).to.not.exist
+              expect(isLoggedIn).to.equal(false)
+              return done()
+            })
+          })
         })
-
-        const isLoggedIn = await this.user1.isLoggedIn()
-        expect(isLoggedIn).to.equal(false)
       })
 
-      it('should have user1 login and create a project, which user2 cannot access', async function () {
-        // user1 logs in and creates a project which only they can access
-        await this.user1.login()
-        const projectId = await this.user1.createProject('Private Project')
-        await expectProjectAccess(this.user1, projectId)
-        await expectNoProjectAccess(this.user2, projectId)
-        // should prevent user2 from login/register with user1 email address
-        const { body } = await tryLoginThroughRegistrationForm(
-          this.user2,
-          this.user1.email,
-          'totally_not_the_right_password'
+      it('should have user1 login and create a project, which user2 cannot access', function (done) {
+        let projectId
+        async.series(
+          [
+            // user1 logs in and creates a project which only they can access
+            cb => {
+              this.user1.login(err => {
+                expect(err).not.to.exist
+                cb()
+              })
+            },
+            cb => {
+              this.user1.createProject('Private Project', (err, id) => {
+                expect(err).not.to.exist
+                projectId = id
+                cb()
+              })
+            },
+            cb => expectProjectAccess(this.user1, projectId, cb),
+            cb => expectNoProjectAccess(this.user2, projectId, cb),
+            // should prevent user2 from login/register with user1 email address
+            cb => {
+              tryLoginThroughRegistrationForm(
+                this.user2,
+                this.user1.email,
+                'totally_not_the_right_password',
+                (err, response, body) => {
+                  expect(err).to.not.exist
+                  expect(body.redir != null).to.equal(false)
+                  expect(body.message != null).to.equal(true)
+                  expect(body.message).to.have.all.keys('type', 'text')
+                  expect(body.message.type).to.equal('error')
+                  cb()
+                }
+              )
+            },
+            // check user still can't access the project
+            cb => expectNoProjectAccess(this.user2, projectId, done),
+          ],
+          done
         )
-        expect(body.redir != null).to.equal(false)
-        expect(body.message != null).to.equal(true)
-        expect(body.message).to.have.all.keys('type', 'text')
-        expect(body.message.type).to.equal('error')
-        // check user still can't access the project
-        await expectNoProjectAccess(this.user2, projectId)
       })
     })
   })

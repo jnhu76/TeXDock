@@ -9,14 +9,16 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { expect } from 'chai'
+const { expect } = require('chai')
 
-import RealTimeClient from './helpers/RealTimeClient.js'
-import MockWebServer from './helpers/MockWebServer.js'
-import FixturesManager from './helpers/FixturesManager.js'
-import async from 'async'
-import settings from '@overleaf/settings'
-import redis from '@overleaf/redis-wrapper'
+const RealTimeClient = require('./helpers/RealTimeClient')
+const MockWebServer = require('./helpers/MockWebServer')
+const FixturesManager = require('./helpers/FixturesManager')
+
+const async = require('async')
+
+const settings = require('@overleaf/settings')
+const redis = require('@overleaf/redis-wrapper')
 const rclient = redis.createClient(settings.redis.pubsub)
 
 describe('receiveUpdate', function () {

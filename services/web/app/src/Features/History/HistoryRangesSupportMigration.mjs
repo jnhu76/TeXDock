@@ -3,11 +3,11 @@
 import { callbackify } from 'node:util'
 import OError from '@overleaf/o-error'
 import logger from '@overleaf/logger'
-import HistoryManager from '../History/HistoryManager.mjs'
-import DocumentUpdaterHandler from '../DocumentUpdater/DocumentUpdaterHandler.mjs'
-import DocstoreManager from '../Docstore/DocstoreManager.mjs'
-import ProjectOptionsHandler from '../Project/ProjectOptionsHandler.mjs'
-import mongodb from '../../infrastructure/mongodb.mjs'
+import HistoryManager from '../History/HistoryManager.js'
+import DocumentUpdaterHandler from '../DocumentUpdater/DocumentUpdaterHandler.js'
+import DocstoreManager from '../Docstore/DocstoreManager.js'
+import ProjectOptionsHandler from '../Project/ProjectOptionsHandler.js'
+import mongodb from '../../infrastructure/mongodb.js'
 
 const { db, ObjectId, READ_PREFERENCE_SECONDARY } = mongodb
 
@@ -71,9 +71,6 @@ async function migrateProjects(opts = {}) {
     .sort({ _id: -1 })
 
   let terminating = false
-  /**
-   * @param {any} signal
-   */
   const handleSignal = signal => {
     logger.info({ signal }, 'History ranges support migration received signal')
     terminating = true
@@ -81,7 +78,6 @@ async function migrateProjects(opts = {}) {
   process.on('SIGINT', handleSignal)
   process.on('SIGTERM', handleSignal)
 
-  /** @type {{ quick: number; skipped: number; resync: number; total: number; [key: string]: number }} */
   const projectsProcessed = {
     quick: 0,
     skipped: 0,
@@ -124,39 +120,35 @@ async function migrateProjects(opts = {}) {
     }
 
     const job = processProject(projectId, direction, quickOnly)
-      .then(
-        /** @param {any} info */ info => {
-          jobsByProjectId.delete(projectId)
-          projectsProcessed[info.migrationType] += 1
-          projectsProcessed.total += 1
-          logger.debug(
-            {
-              projectId,
-              direction,
-              projectsProcessed,
-              errors,
-              ...info,
-            },
-            'History ranges support migration'
-          )
-          if (projectsProcessed.total % 10000 === 0) {
-            logger.info(
-              { projectsProcessed, errors, lastProjectId: projectId },
-              'History ranges support migration progress'
-            )
-          }
-        }
-      )
-      .catch(
-        /** @param {any} err */ err => {
-          jobsByProjectId.delete(projectId)
-          errors += 1
-          logger.error(
-            { err, projectId, direction, projectsProcessed, errors },
-            'Failed to migrate history ranges support'
+      .then(info => {
+        jobsByProjectId.delete(projectId)
+        projectsProcessed[info.migrationType] += 1
+        projectsProcessed.total += 1
+        logger.debug(
+          {
+            projectId,
+            direction,
+            projectsProcessed,
+            errors,
+            ...info,
+          },
+          'History ranges support migration'
+        )
+        if (projectsProcessed.total % 10000 === 0) {
+          logger.info(
+            { projectsProcessed, errors, lastProjectId: projectId },
+            'History ranges support migration progress'
           )
         }
-      )
+      })
+      .catch(err => {
+        jobsByProjectId.delete(projectId)
+        errors += 1
+        logger.error(
+          { err, projectId, direction, projectsProcessed, errors },
+          'Failed to migrate history ranges support'
+        )
+      })
 
     jobsByProjectId.set(projectId, job)
   }
@@ -206,7 +198,7 @@ async function quickMigration(projectId, direction = 'forwards') {
   try {
     projectHasRanges =
       await DocstoreManager.promises.projectHasRanges(projectId)
-  } catch (/** @type {any} */ err) {
+  } catch (err) {
     // Docstore request probably timed out. Assume the project has ranges
     logger.warn(
       { err, projectId },
@@ -224,7 +216,7 @@ async function quickMigration(projectId, direction = 'forwards') {
       projectId,
       direction === 'forwards'
     )
-  } catch (/** @type {any} */ err) {
+  } catch (err) {
     await DocumentUpdaterHandler.promises.unblockProject(projectId)
     await hardResyncProject(projectId)
     throw err
@@ -233,7 +225,7 @@ async function quickMigration(projectId, direction = 'forwards') {
   let wasBlocked
   try {
     wasBlocked = await DocumentUpdaterHandler.promises.unblockProject(projectId)
-  } catch (/** @type {any} */ err) {
+  } catch (err) {
     await hardResyncProject(projectId)
     throw err
   }

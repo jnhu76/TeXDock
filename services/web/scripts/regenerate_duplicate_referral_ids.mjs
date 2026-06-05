@@ -1,9 +1,9 @@
 import {
   db,
   READ_PREFERENCE_SECONDARY,
-} from '../app/src/infrastructure/mongodb.mjs'
+} from '../app/src/infrastructure/mongodb.js'
 import { promiseMapWithLimit } from '@overleaf/promise-utils'
-import TokenGenerator from '../app/src/Features/TokenGenerator/TokenGenerator.mjs'
+import TokenGenerator from '../app/src/Features/TokenGenerator/TokenGenerator.js'
 import { batchedUpdate } from '@overleaf/mongo-utils/batchedUpdate.js'
 
 const VERBOSE_LOGGING = process.env.VERBOSE_LOGGING === 'true'

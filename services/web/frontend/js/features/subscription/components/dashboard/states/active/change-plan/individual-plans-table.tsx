@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plan } from '../../../../../../../../../types/subscription/plan'
-import MaterialIcon from '@/shared/components/material-icon'
+import Icon from '../../../../../../../shared/components/icon'
 import { useSubscriptionDashboardContext } from '../../../../../context/subscription-dashboard-context'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
 
 function ChangeToPlanButton({ planCode }: { planCode: string }) {
   const { t } = useTranslation()
@@ -20,7 +20,7 @@ function ChangeToPlanButton({ planCode }: { planCode: string }) {
   )
 }
 
-function KeepCurrentPlanButton() {
+function KeepCurrentPlanButton({ plan }: { plan: Plan }) {
   const { t } = useTranslation()
   const { handleOpenModal } = useSubscriptionDashboardContext()
 
@@ -38,28 +38,24 @@ function KeepCurrentPlanButton() {
 function ChangePlanButton({ plan }: { plan: Plan }) {
   const { t } = useTranslation()
   const { personalSubscription } = useSubscriptionDashboardContext()
-  const currentPlanCode = personalSubscription?.planCode?.split('_')[0]
-  const pendingPlanCode =
-    personalSubscription?.pendingPlan?.planCode?.split('_')[0]
   const isCurrentPlanForUser =
-    currentPlanCode && plan.planCode === currentPlanCode
+    personalSubscription?.planCode &&
+    plan.planCode === personalSubscription.planCode.split('_')[0]
 
-  if (isCurrentPlanForUser) {
-    if (pendingPlanCode && pendingPlanCode !== currentPlanCode) {
-      return <KeepCurrentPlanButton />
-    }
-
+  if (isCurrentPlanForUser && personalSubscription.pendingPlan) {
+    return <KeepCurrentPlanButton plan={plan} />
+  } else if (isCurrentPlanForUser && !personalSubscription.pendingPlan) {
     return (
-      <b className="d-inline-flex align-items-center">
-        <MaterialIcon type="check" />
-        &nbsp;{t('your_plan')}
+      <b>
+        <Icon type="check" /> {t('your_plan')}
       </b>
     )
-  } else if (pendingPlanCode === plan.planCode) {
+  } else if (
+    personalSubscription?.pendingPlan?.planCode?.split('_')[0] === plan.planCode
+  ) {
     return (
-      <b className="d-inline-flex align-items-center">
-        <MaterialIcon type="check" />
-        &nbsp;{t('your_new_plan')}
+      <b>
+        <Icon type="check" /> {t('your_new_plan')}
       </b>
     )
   } else {
@@ -104,11 +100,7 @@ export function IndividualPlansTable({ plans }: { plans: Array<Plan> }) {
     () =>
       plans?.filter(
         plan =>
-          ![
-            'paid-personal',
-            'paid-personal-annual',
-            'institutional_commons',
-          ].includes(plan.planCode)
+          !['paid-personal', 'paid-personal-annual'].includes(plan.planCode)
       ),
     [plans]
   )

@@ -3,13 +3,11 @@
 The history service uses knex to manage PostgreSQL migrations.
 
 To create a new migrations, run:
-
 ```
 npx knex migrate:make migration_name
 ```
 
 To apply migrations, run:
-
 ```
 npx knex migrate:latest
 ```

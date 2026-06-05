@@ -2,10 +2,9 @@
 import crypto from 'node:crypto'
 
 import SurveyCache from './SurveyCache.mjs'
-import SubscriptionLocator from '../Subscription/SubscriptionLocator.mjs'
-import PlansHelper from '../Subscription/PlansHelper.mjs'
+import SubscriptionLocator from '../Subscription/SubscriptionLocator.js'
 import { callbackify } from '@overleaf/promise-utils'
-import UserGetter from '../User/UserGetter.mjs'
+import UserGetter from '../User/UserGetter.js'
 
 /**
  * @import { Survey } from '../../../../types/project/dashboard/survey'
@@ -15,55 +14,29 @@ import UserGetter from '../User/UserGetter.mjs'
  * determines if there is a survey to show, given current surveys and rollout percentages
  * uses userId in computation, to ensure that rollout groups always contain same users
  * @param {string} userId
- * @returns {Promise<Pick<Survey, 'name' | 'title' | 'text' | 'cta' | 'url'> | undefined>}
+ * @returns {Promise<Survey | undefined>}
  */
 async function getSurvey(userId) {
   const survey = await SurveyCache.get(true)
   if (survey) {
-    const hasFilters =
-      survey.options.hasFreeSubscription ||
-      survey.options.hasIndividualStandardSubscription ||
-      survey.options.hasIndividualProfessionalSubscription ||
-      survey.options.hasGroupStandardSubscription ||
-      survey.options.hasGroupProfessionalSubscription ||
-      survey.options.hasEnterpriseSubscription
-
-    if (hasFilters) {
-      const subscriptions =
-        await SubscriptionLocator.promises.getAllAssociatedSubscriptions(
-          userId,
-          {
-            groupPlan: 1,
-            planCode: 1,
-          }
-        )
-      const isFreeSubscription = Boolean(!subscriptions?.length)
-
-      if (isFreeSubscription) {
-        if (!survey.options?.hasFreeSubscription) {
-          return
-        }
-      } else if (
-        !subscriptions.some(sub => _canDisplaySurvey(sub, survey.options))
-      ) {
+    if (survey.options?.hasRecurlyGroupSubscription) {
+      const hasRecurlyGroupSubscription =
+        await SubscriptionLocator.promises.hasRecurlyGroupSubscription(userId)
+      if (!hasRecurlyGroupSubscription) {
         return
       }
     }
 
-    const { name, title, text, cta, url, options } = survey?.toObject() || {}
+    const { name, preText, linkText, url, options } = survey?.toObject() || {}
     // default to full rollout for backwards compatibility
     const rolloutPercentage = options?.rolloutPercentage || 100
     if (!_userInRolloutPercentile(userId, name, rolloutPercentage)) {
       return
     }
 
-    const { earliestSignupDate, latestSignupDate, excludeLabsUsers } =
-      survey.options || {}
-    if (earliestSignupDate || latestSignupDate || excludeLabsUsers) {
-      const user = await UserGetter.promises.getUser(userId, {
-        signUpDate: 1,
-        labsProgram: 1,
-      })
+    const { earliestSignupDate, latestSignupDate } = survey.options || {}
+    if (earliestSignupDate || latestSignupDate) {
+      const user = await UserGetter.promises.getUser(userId, { signUpDate: 1 })
       if (!user) {
         return
       }
@@ -78,35 +51,10 @@ async function getSurvey(userId) {
       if (earliestSignupDate && signUpDate < earliestSignupDate) {
         return
       }
-      if (excludeLabsUsers && user.labsProgram) {
-        return
-      }
     }
 
-    return { name, title, text, cta, url }
+    return { name, preText, linkText, url }
   }
-}
-
-function _canDisplaySurvey(subscription, options = {}) {
-  const {
-    hasIndividualStandardSubscription,
-    hasIndividualProfessionalSubscription,
-    hasGroupStandardSubscription,
-    hasGroupProfessionalSubscription,
-    hasEnterpriseSubscription,
-  } = options
-  const isGroupPlan = subscription.groupPlan
-  const isProfessional = PlansHelper.isProfessionalPlan(subscription.planCode)
-  const isEnterprise =
-    isGroupPlan && subscription.planCode?.includes('enterprise')
-
-  return (
-    (hasIndividualStandardSubscription && !isGroupPlan && !isProfessional) ||
-    (hasIndividualProfessionalSubscription && !isGroupPlan && isProfessional) ||
-    (hasGroupStandardSubscription && isGroupPlan && !isProfessional) ||
-    (hasGroupProfessionalSubscription && isGroupPlan && isProfessional) ||
-    (hasEnterpriseSubscription && isEnterprise)
-  )
 }
 
 function _userRolloutPercentile(userId, surveyName) {

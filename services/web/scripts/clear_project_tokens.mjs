@@ -1,4 +1,4 @@
-import ProjectDetailsHandler from '../app/src/Features/Project/ProjectDetailsHandler.mjs'
+import ProjectDetailsHandler from '../app/src/Features/Project/ProjectDetailsHandler.js'
 import { scriptRunner } from './lib/ScriptRunner.mjs'
 const projectId = process.argv[2]
 

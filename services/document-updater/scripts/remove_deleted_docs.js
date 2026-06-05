@@ -7,6 +7,11 @@ const keys = Settings.redis.documentupdater.key_schema
 const ProjectFlusher = require('../app/js/ProjectFlusher')
 const RedisManager = require('../app/js/RedisManager')
 const { mongoClient, db, ObjectId } = require('../app/js/mongodb')
+const util = require('node:util')
+const getDoc = util.promisify((projectId, docId, cb) =>
+  RedisManager.getDoc(projectId, docId, (err, ...args) => cb(err, args))
+)
+const removeDocFromMemory = util.promisify(RedisManager.removeDocFromMemory)
 
 const summary = { totalDocs: 0, deletedDocs: 0, skippedDocs: 0 }
 
@@ -28,8 +33,8 @@ async function removeDeletedDocs(dockeys, options) {
 async function removeDeletedDoc(docId, options) {
   const projectId = await rclient.get(keys.projectKey({ doc_id: docId }))
 
-  const {
-    lines: docLines,
+  const [
+    docLines,
     version,
     ranges,
     pathname,
@@ -37,9 +42,7 @@ async function removeDeletedDoc(docId, options) {
     unflushedTime,
     lastUpdatedAt,
     lastUpdatedBy,
-    historyRangesSupport,
-    resolvedCommentIds,
-  } = await RedisManager.promises.getDoc(projectId, docId)
+  ] = await getDoc(projectId, docId)
 
   const project = await db.projects.findOne({ _id: new ObjectId(projectId) })
 
@@ -61,8 +64,6 @@ async function removeDeletedDoc(docId, options) {
           unflushedTime,
           lastUpdatedAt,
           lastUpdatedBy,
-          historyRangesSupport,
-          resolvedCommentIds,
         },
         'refusing to delete doc, project contains docId'
       )
@@ -81,8 +82,6 @@ async function removeDeletedDoc(docId, options) {
           unflushedTime,
           lastUpdatedAt,
           lastUpdatedBy,
-          historyRangesSupport,
-          resolvedCommentIds,
         },
         'refusing to delete doc, project still exists'
       )
@@ -106,8 +105,6 @@ async function removeDeletedDoc(docId, options) {
         unflushedTime,
         lastUpdatedAt,
         lastUpdatedBy,
-        historyRangesSupport,
-        resolvedCommentIds,
         status,
         summary,
       },
@@ -115,6 +112,7 @@ async function removeDeletedDoc(docId, options) {
     )
     return
   }
+  removeDocFromMemory(projectId, docId)
   logger.info(
     {
       projectId,
@@ -127,14 +125,11 @@ async function removeDeletedDoc(docId, options) {
       unflushedTime,
       lastUpdatedAt,
       lastUpdatedBy,
-      historyRangesSupport,
-      resolvedCommentIds,
       status,
       summary,
     },
-    'removing doc from redis'
+    'removed doc from redis'
   )
-  await RedisManager.promises.removeDocFromMemory(projectId, docId)
 }
 
 async function findAndProcessDocs(options) {
@@ -153,26 +148,8 @@ async function findAndProcessDocs(options) {
   } while (cursor !== '0')
 }
 
-async function main() {
-  const options = {
-    limit: 1000,
-    dryRun: process.env.DRY_RUN !== 'false',
-  }
-  if (process.argv.length > 2) {
-    const docId = process.argv[process.argv.length - 1]
-    if (!ObjectId.isValid(docId)) {
-      throw new Error(
-        'bad docId: usage: $ node scripts/remove_deleted_docs.js [DOC_ID]'
-      )
-    }
-    await removeDeletedDoc(docId, options)
-  } else {
-    await findAndProcessDocs(options)
-  }
-}
-
-main()
-  .then(() => {
+findAndProcessDocs({ limit: 1000, dryRun: process.env.DRY_RUN !== 'false' })
+  .then(result => {
     rclient.quit()
     mongoClient.close()
     console.log('DONE')

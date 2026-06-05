@@ -45,7 +45,6 @@ function PdfLogsEntries({
       {logEntries.map((logEntry, index) => (
         <PdfLogEntry
           key={logEntry.key}
-          autoExpand={index === 0}
           index={index}
           id={logEntry.key}
           logEntry={logEntry}

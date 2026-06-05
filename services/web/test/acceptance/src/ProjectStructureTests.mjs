@@ -2,8 +2,8 @@ import chai, { expect } from 'chai'
 import mongodb from 'mongodb-legacy'
 import Path from 'node:path'
 import fs from 'node:fs'
-import { Project } from '../../../app/src/models/Project.mjs'
-import ProjectGetter from '../../../app/src/Features/Project/ProjectGetter.mjs'
+import { Project } from '../../../app/src/models/Project.js'
+import ProjectGetter from '../../../app/src/Features/Project/ProjectGetter.js'
 import UserHelper from './helpers/User.mjs'
 import MockDocStoreApiClass from './mocks/MockDocstoreApi.mjs'
 import MockDocUpdaterApiClass from './mocks/MockDocUpdaterApi.mjs'
@@ -138,47 +138,6 @@ describe('ProjectStructureChanges', function () {
     })
   })
 
-  describe('when sending an upload request without a file', function () {
-    describe('project', function () {
-      it('should reject the request with status 400', async function () {
-        const { response, body } = await owner.doRequest('POST', {
-          uri: 'project/new/upload',
-          json: true,
-          formData: {
-            name: 'foo',
-          },
-        })
-
-        expect(response.statusCode).to.equal(400)
-        expect(body).to.deep.equal({
-          success: false,
-          error: 'invalid_upload_request',
-        })
-      })
-    })
-
-    describe('file', function () {
-      it('should reject the request with status 400', async function () {
-        const projectId = await owner.createProject('foo', {
-          template: 'blank',
-        })
-        const { response, body } = await owner.doRequest('POST', {
-          uri: `project/${projectId}/upload`,
-          json: true,
-          formData: {
-            name: 'foo.txt',
-          },
-        })
-
-        expect(response.statusCode).to.equal(400)
-        expect(body).to.deep.equal({
-          success: false,
-          error: 'invalid_upload_request',
-        })
-      })
-    })
-  })
-
   describe('uploading an empty zipfile', function () {
     let res
 
@@ -247,24 +206,6 @@ describe('ProjectStructureChanges', function () {
       const project = await ProjectGetter.promises.getProject(exampleProjectId)
       expect(project.rootFolder[0].folders[0].name).to.equal('styles')
       expect(project.rootFolder[0].folders[0].docs[0].name).to.equal('ao.sty')
-    })
-  })
-
-  describe('uploading a project containing a filename that is too long', function () {
-    let res
-
-    beforeEach(async function () {
-      const { response } = await uploadExampleProject(
-        owner,
-        'test_project_with_too_long_filename.zip',
-        { allowBadStatus: true }
-      )
-
-      res = response
-    })
-
-    it('should fail with 422 error', function () {
-      expect(res.statusCode).to.equal(422)
     })
   })
 

@@ -78,10 +78,13 @@ const updatesInfoInitialState: HistoryContextValue['updatesInfo'] = {
 function useHistory() {
   const { view } = useLayoutContext()
   const user = useUserContext()
-  const { projectId, project, features } = useProjectContext()
+  const project = useProjectContext()
   const userId = user.id
-  const projectOwnerId = project?.owner?._id
-  const userHasFullFeature = Boolean(features.versioning || user.isAdmin)
+  const projectId = project._id
+  const projectOwnerId = project.owner?._id
+  const userHasFullFeature = Boolean(
+    project.features?.versioning || user.isAdmin
+  )
   const currentUserIsOwner = projectOwnerId === userId
 
   const [selection, setSelection] = useState<Selection>(selectionInitialState)

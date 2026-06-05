@@ -17,7 +17,6 @@ import { SpellingSuggestions } from '@/features/source-editor/extensions/spellin
 import { SplitTestProvider } from '@/shared/context/split-test-context'
 import { addLearnedWord } from '@/features/source-editor/extensions/spelling/learned-words'
 import { postJSON } from '@/infrastructure/fetch-json'
-import { closeAllContextMenusEffect } from '../../utils/close-all-context-menus-effect'
 
 /*
  * The time until which a click event will be ignored, so it doesn't immediately close the spelling menu.
@@ -45,11 +44,6 @@ const handleClickEvent = (event: MouseEvent, view: EditorView) => {
  * and show a menu of suggestions
  */
 const handleContextMenuEvent = (event: MouseEvent, view: EditorView) => {
-  if (event.shiftKey) {
-    view.dispatch({ effects: closeAllContextMenusEffect.of(null) })
-    return
-  }
-
   const position = view.posAtCoords(
     {
       x: event.pageX,
@@ -78,13 +72,10 @@ const handleContextMenuEvent = (event: MouseEvent, view: EditorView) => {
   openingUntil = Date.now() + 100
 
   view.dispatch({
-    effects: [
-      closeAllContextMenusEffect.of(null),
-      showSpellingMenu.of({
-        mark: targetMark,
-        word: targetWord,
-      }),
-    ],
+    effects: showSpellingMenu.of({
+      mark: targetMark,
+      word: targetWord,
+    }),
   })
 }
 
@@ -96,13 +87,10 @@ const handleShortcutEvent = (view: EditorView) => {
   }
 
   view.dispatch({
-    effects: [
-      closeAllContextMenusEffect.of(null),
-      showSpellingMenu.of({
-        mark: targetMark,
-        word: targetMark.value.spec.word,
-      }),
-    ],
+    effects: showSpellingMenu.of({
+      mark: targetMark,
+      word: targetMark.value.spec.word,
+    }),
   })
 
   return true
@@ -138,8 +126,6 @@ export const spellingMenuField = StateField.define<Tooltip | null>({
           strictSide: false,
           create: createSpellingSuggestionList(word),
         }
-      } else if (effect.is(closeAllContextMenusEffect)) {
-        value = null
       }
     }
     return value

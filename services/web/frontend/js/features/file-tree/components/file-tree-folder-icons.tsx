@@ -1,21 +1,49 @@
 import { useTranslation } from 'react-i18next'
 import MaterialIcon from '@/shared/components/material-icon'
+import { useIsNewEditorEnabled } from '@/features/ide-redesign/utils/new-editor-utils'
 
-function FileTreeFolderIcons({ expanded }: { expanded: boolean }) {
+function FileTreeFolderIcons({
+  expanded,
+  onExpandCollapseClick,
+}: {
+  expanded: boolean
+  onExpandCollapseClick: () => void
+}) {
   const { t } = useTranslation()
+  const newEditor = useIsNewEditorEnabled()
+
+  if (newEditor) {
+    return (
+      <>
+        <button
+          className="folder-expand-collapse-button"
+          onClick={onExpandCollapseClick}
+          aria-label={expanded ? t('collapse') : t('expand')}
+        >
+          <MaterialIcon
+            type={expanded ? 'expand_more' : 'chevron_right'}
+            className="file-tree-expand-icon"
+          />
+        </button>
+      </>
+    )
+  }
 
   return (
     <>
-      <div
-        // TODO ide-redesign-cleanup: rename the class now its no longer a button
-        className="folder-expand-collapse-button"
+      <button
+        onClick={onExpandCollapseClick}
         aria-label={expanded ? t('collapse') : t('expand')}
       >
         <MaterialIcon
           type={expanded ? 'expand_more' : 'chevron_right'}
           className="file-tree-expand-icon"
         />
-      </div>
+      </button>
+      <MaterialIcon
+        type={expanded ? 'folder_open' : 'folder'}
+        className="file-tree-folder-icon"
+      />
     </>
   )
 }

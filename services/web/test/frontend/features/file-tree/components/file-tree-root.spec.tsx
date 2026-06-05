@@ -1,7 +1,6 @@
 import FileTreeRoot from '../../../../../frontend/js/features/file-tree/components/file-tree-root'
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { SocketIOMock } from '@/ide/connection/SocketIoShim'
-import type { Socket } from '@/features/ide-react/connection/types/socket'
 
 describe('<FileTreeRoot/>', function () {
   beforeEach(function () {
@@ -246,9 +245,9 @@ describe('<FileTreeRoot/>', function () {
   })
 
   describe('when deselecting files', function () {
-    let socket: SocketIOMock & Socket
+    let socket: SocketIOMock
     beforeEach(function () {
-      socket = new SocketIOMock() as any
+      socket = new SocketIOMock()
       const rootFolder = [
         {
           _id: 'root-folder-id',

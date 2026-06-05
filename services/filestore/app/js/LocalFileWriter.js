@@ -1,15 +1,13 @@
-import fs from 'node:fs'
-import crypto from 'node:crypto'
-import path from 'node:path'
-import Stream from 'node:stream'
-import { callbackify, promisify } from 'node:util'
-import metrics from '@overleaf/metrics'
-import Settings from '@overleaf/settings'
-import Errors from './Errors.js'
+const fs = require('node:fs')
+const crypto = require('node:crypto')
+const path = require('node:path')
+const Stream = require('node:stream')
+const { callbackify, promisify } = require('node:util')
+const metrics = require('@overleaf/metrics')
+const Settings = require('@overleaf/settings')
+const { WriteError } = require('./Errors')
 
-const { WriteError } = Errors
-
-export default {
+module.exports = {
   promises: {
     writeStream,
     deleteFile,
@@ -41,7 +39,7 @@ async function deleteFile(fsPath) {
     return
   }
   try {
-    await fs.promises.unlink(fsPath)
+    await promisify(fs.unlink)(fsPath)
   } catch (err) {
     if (err.code !== 'ENOENT') {
       throw new WriteError('failed to delete file', { fsPath }, err)

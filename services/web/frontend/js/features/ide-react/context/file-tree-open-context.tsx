@@ -11,8 +11,8 @@ import {
 import { useProjectContext } from '@/shared/context/project-context'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
-import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
-import { useEditorPropertiesContext } from '@/features/ide-react/context/editor-properties-context'
+import useScopeValueSetterOnly from '@/shared/hooks/use-scope-value-setter-only'
+import { BinaryFile } from '@/features/file-view/types/binary-file'
 import {
   FileTreeDocumentFindResult,
   FileTreeFileRefFindResult,
@@ -22,8 +22,6 @@ import { debugConsole } from '@/utils/debugging'
 import { convertFileRefToBinaryFile } from '@/features/ide-react/util/file-view'
 import { sendMB } from '@/infrastructure/event-tracking'
 import { FileRef } from '../../../../../types/file-ref'
-import { useLayoutContext } from '@/shared/context/layout-context'
-import { isVisualEditorAvailable } from '@/features/source-editor/utils/visual-editor'
 
 const FileTreeOpenContext = createContext<
   | {
@@ -34,8 +32,6 @@ const FileTreeOpenContext = createContext<
       handleFileTreeDelete: (entity: FileTreeFindResult) => void
       fileTreeExpanded: boolean
       toggleFileTreeExpanded: () => void
-      expandFileTree: () => void
-      collapseFileTree: () => void
     }
   | undefined
 >(undefined)
@@ -43,14 +39,11 @@ const FileTreeOpenContext = createContext<
 export const FileTreeOpenProvider: FC<React.PropsWithChildren> = ({
   children,
 }) => {
-  const { project } = useProjectContext()
-  const rootDocId = project?.rootDocId
-  const projectOwner = project?.owner?._id
+  const { rootDocId, owner } = useProjectContext()
   const { eventEmitter, projectJoined } = useIdeReactContext()
-  const { openDocWithId, openInitialDoc } = useEditorManagerContext()
-  const { currentDocumentId } = useEditorOpenDocContext()
-  const { showVisualForFile } = useEditorPropertiesContext()
-  const { setOpenFile } = useLayoutContext()
+  const { openDocWithId, currentDocumentId, openInitialDoc } =
+    useEditorManagerContext()
+  const [, setOpenFile] = useScopeValueSetterOnly<BinaryFile | null>('openFile')
   const [openEntity, setOpenEntity] = useState<
     FileTreeDocumentFindResult | FileTreeFileRefFindResult | null
   >(null)
@@ -62,14 +55,6 @@ export const FileTreeOpenProvider: FC<React.PropsWithChildren> = ({
 
   const toggleFileTreeExpanded = useCallback(() => {
     setFileTreeExpanded(prev => !prev)
-  }, [])
-
-  const expandFileTree = useCallback(() => {
-    setFileTreeExpanded(true)
-  }, [])
-
-  const collapseFileTree = useCallback(() => {
-    setFileTreeExpanded(false)
   }, [])
 
   const handleFileTreeInit = useCallback(() => {
@@ -92,20 +77,13 @@ export const FileTreeOpenProvider: FC<React.PropsWithChildren> = ({
       }
 
       setOpenEntity(selected)
-      const editorMode =
-        isVisualEditorAvailable(selected.entity.name) &&
-        showVisualForFile(selected.entity.name)
-          ? 'visual'
-          : 'code'
-
       if (selected.type === 'doc' && fileTreeReady) {
         openDocWithId(selected.entity._id, { keepCurrentView: true })
         if (selected.entity.name.endsWith('.bib')) {
           sendMB('open-bib-file', {
-            projectOwner,
+            projectOwner: owner._id,
             isSampleFile: selected.entity.name === 'sample.bib',
             linkedFileProvider: null,
-            editorMode,
           })
         }
       }
@@ -118,24 +96,23 @@ export const FileTreeOpenProvider: FC<React.PropsWithChildren> = ({
       if (openFile) {
         if (selected?.entity?.name?.endsWith('.bib')) {
           sendMB('open-bib-file', {
-            projectOwner,
+            projectOwner: owner._id,
             isSampleFile: false,
             linkedFileProvider: (selected.entity as FileRef).linkedFileData
               ?.provider,
-            editorMode,
           })
         }
         window.dispatchEvent(new CustomEvent('file-view:file-opened'))
       }
     },
-    [fileTreeReady, openDocWithId, projectOwner, setOpenFile, showVisualForFile]
+    [fileTreeReady, setOpenFile, openDocWithId, owner]
   )
 
   const handleFileTreeDelete = useCallback(
-    (entity: FileTreeFindResult, isFileRestore?: boolean) => {
+    (entity: FileTreeFindResult) => {
       eventEmitter.emit('entity:deleted', entity)
-      // Select the root document if the current document was deleted and delete is not part of a file restore
-      if (!isFileRestore && entity.entity._id === currentDocumentId) {
+      // Select the root document if the current document was deleted
+      if (entity.entity._id === currentDocumentId) {
         openDocWithId(rootDocId!)
       }
     },
@@ -145,7 +122,12 @@ export const FileTreeOpenProvider: FC<React.PropsWithChildren> = ({
   // Open a document once the file tree and project are ready
   const initialOpenDoneRef = useRef(false)
   useEffect(() => {
-    if (fileTreeReady && projectJoined && !initialOpenDoneRef.current) {
+    if (
+      rootDocId &&
+      fileTreeReady &&
+      projectJoined &&
+      !initialOpenDoneRef.current
+    ) {
       initialOpenDoneRef.current = true
       openInitialDoc(rootDocId)
     }
@@ -160,8 +142,6 @@ export const FileTreeOpenProvider: FC<React.PropsWithChildren> = ({
       handleFileTreeDelete,
       fileTreeExpanded,
       toggleFileTreeExpanded,
-      expandFileTree,
-      collapseFileTree,
     }
   }, [
     handleFileTreeDelete,
@@ -171,8 +151,6 @@ export const FileTreeOpenProvider: FC<React.PropsWithChildren> = ({
     selectedEntityCount,
     fileTreeExpanded,
     toggleFileTreeExpanded,
-    expandFileTree,
-    collapseFileTree,
   ])
 
   return (

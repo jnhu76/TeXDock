@@ -9,64 +9,55 @@ import {
   useMemo,
   useState,
 } from 'react'
+import useScopeValue from '../hooks/use-scope-value'
 import useBrowserWindow from '../hooks/use-browser-window'
+import { useIdeContext } from './ide-context'
 import { useProjectContext } from './project-context'
 import { useDetachContext } from './detach-context'
 import getMeta from '../../utils/meta'
 import { useUserContext } from './user-context'
 import { saveProjectSettings } from '@/features/editor-left-menu/utils/api'
+import { PermissionsLevel } from '@/features/ide-react/types/permissions'
 import { useModalsContext } from '@/features/ide-react/context/modals-context'
 import { WritefullAPI } from './types/writefull-instance'
 import { Cobranding } from '../../../../types/cobranding'
 import { SymbolWithCharacter } from '../../../../modules/symbol-palette/frontend/js/data/symbols'
-
-type UpgradeTrackChangesModal = {
-  show: boolean
-  location?: string
-}
 
 export const EditorContext = createContext<
   | {
       cobranding?: Cobranding
       hasPremiumCompile?: boolean
       renameProject: (newName: string) => void
+      setPermissionsLevel: (permissionsLevel: PermissionsLevel) => void
+      showSymbolPalette?: boolean
+      toggleSymbolPalette?: () => void
       insertSymbol?: (symbol: SymbolWithCharacter) => void
       isProjectOwner: boolean
       isRestrictedTokenMember?: boolean
       isPendingEditor: boolean
-      hasSuggestionsLeft: boolean
-      suggestionsLeft: number
-      setSuggestionsLeft: (value: number) => void
-      premiumSuggestionResetDate: Date
+      permissionsLevel: PermissionsLevel
+      deactivateTutorial: (tutorial: string) => void
+      inactiveTutorials: string[]
+      currentPopup: string | null
+      setCurrentPopup: Dispatch<SetStateAction<string | null>>
+      setOutOfSync: (value: boolean) => void
+      hasPremiumSuggestion: boolean
+      setHasPremiumSuggestion: (value: boolean) => void
       setPremiumSuggestionResetDate: (date: Date) => void
-      hasTokensLeft: boolean
-      tokensLeft: number
-      setTokensLeft: (value: number) => void
-      tokenResetDate: Date
-      setTokenResetDate: (date: Date) => void
+      premiumSuggestionResetDate: Date
       writefullInstance: WritefullAPI | null
       setWritefullInstance: (instance: WritefullAPI) => void
-      upgradeTrackChangesModal: UpgradeTrackChangesModal
-      setUpgradeTrackChangesModal: Dispatch<
-        SetStateAction<UpgradeTrackChangesModal>
-      >
     }
   | undefined
 >(undefined)
 
 export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
+  const { socket } = useIdeContext()
   const { id: userId, featureUsage } = useUserContext()
   const { role } = useDetachContext()
   const { showGenericMessageModal } = useModalsContext()
 
-  const {
-    features,
-    projectId,
-    project,
-    name: projectName,
-    updateProject,
-  } = useProjectContext()
-  const { owner, members } = project || {}
+  const { owner, features, _id: projectId, members } = useProjectContext()
 
   const cobranding = useMemo(() => {
     const brandVariation = getMeta('ol-brandVariation')
@@ -81,73 +72,81 @@ export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
         partner: brandVariation.partner,
         brandedMenu: brandVariation.branded_menu,
         submitBtnHtml: brandVariation.submit_button_html,
-        submitBtnHtmlNoBreaks: brandVariation.submit_button_html_no_br,
       }
     )
   }, [])
 
-  const [suggestionsLeft, setSuggestionsLeft] = useState<number>(() => {
-    return featureUsage?.aiFeatureUsage?.remainingUsage || 0
-  })
+  const [projectName, setProjectName] = useScopeValue('project.name')
+  const [permissionsLevel, setPermissionsLevel] =
+    useScopeValue('permissionsLevel')
+  const [outOfSync, setOutOfSync] = useState(false)
+  const [showSymbolPalette] = useScopeValue('editor.showSymbolPalette')
+  const [toggleSymbolPalette] = useScopeValue('editor.toggleSymbolPalette')
 
-  const hasSuggestionsLeft = useMemo(
-    () => suggestionsLeft > 0,
-    [suggestionsLeft]
+  const [inactiveTutorials, setInactiveTutorials] = useState(
+    () => getMeta('ol-inactiveTutorials') || []
   )
 
+  const [currentPopup, setCurrentPopup] = useState<string | null>(null)
+  const [hasPremiumSuggestion, setHasPremiumSuggestion] = useState<boolean>(
+    () => {
+      return Boolean(
+        featureUsage?.aiErrorAssistant &&
+          featureUsage?.aiErrorAssistant.remainingUsage > 0
+      )
+    }
+  )
   const [premiumSuggestionResetDate, setPremiumSuggestionResetDate] =
     useState<Date>(() => {
-      return featureUsage?.aiFeatureUsage?.resetDate
-        ? new Date(featureUsage.aiFeatureUsage.resetDate)
+      return featureUsage?.aiErrorAssistant?.resetDate
+        ? new Date(featureUsage.aiErrorAssistant.resetDate)
         : new Date()
     })
 
-  const [tokensLeft, setTokensLeft] = useState<number>(() => {
-    return featureUsage?.aiWorkbench?.remainingTokens || 0
-  })
-
-  const hasTokensLeft = useMemo(() => tokensLeft > 0, [tokensLeft])
-
-  const [tokenResetDate, setTokenResetDate] = useState<Date>(() => {
-    return featureUsage?.aiWorkbench?.resetDate
-      ? new Date(featureUsage.aiWorkbench.resetDate)
-      : new Date()
-  })
-
-  const [showUpgradeModal, setShowUpgradeModal] =
-    useState<UpgradeTrackChangesModal>({ show: false })
-
   const isPendingEditor = useMemo(
     () =>
-      Boolean(
-        members?.some(
-          member =>
-            member._id === userId &&
-            (member.pendingEditor || member.pendingReviewer)
-        )
+      members?.some(
+        member =>
+          member._id === userId &&
+          (member.pendingEditor || member.pendingReviewer)
       ),
     [members, userId]
   )
 
+  const deactivateTutorial = useCallback(
+    (tutorialKey: string) => {
+      setInactiveTutorials([...inactiveTutorials, tutorialKey])
+    },
+    [inactiveTutorials]
+  )
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('projectNameUpdated', setProjectName)
+      return () => socket.removeListener('projectNameUpdated', setProjectName)
+    }
+  }, [socket, setProjectName])
+
   const renameProject = useCallback(
     (newName: string) => {
-      const oldName = projectName
-      if (newName !== oldName) {
-        updateProject({ name: newName })
-        saveProjectSettings(projectId, { name: newName }).catch(
-          (response: any) => {
-            updateProject({ name: oldName })
-            const { data, status } = response
+      setProjectName((oldName: string) => {
+        if (oldName !== newName) {
+          saveProjectSettings(projectId, { name: newName }).catch(
+            (response: any) => {
+              setProjectName(oldName)
+              const { data, status } = response
 
-            showGenericMessageModal(
-              'Error renaming project',
-              status === 400 ? data : 'Please try again in a moment'
-            )
-          }
-        )
-      }
+              showGenericMessageModal(
+                'Error renaming project',
+                status === 400 ? data : 'Please try again in a moment'
+              )
+            }
+          )
+        }
+        return newName
+      })
     },
-    [projectName, updateProject, projectId, showGenericMessageModal]
+    [setProjectName, projectId, showGenericMessageModal]
   )
 
   const { setTitle } = useBrowserWindow()
@@ -187,24 +186,25 @@ export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
       cobranding,
       hasPremiumCompile: features?.compileGroup === 'priority',
       renameProject,
+      permissionsLevel: outOfSync ? 'readOnly' : permissionsLevel,
+      setPermissionsLevel,
       isProjectOwner: owner?._id === userId,
       isRestrictedTokenMember: getMeta('ol-isRestrictedTokenMember'),
       isPendingEditor,
+      showSymbolPalette,
+      toggleSymbolPalette,
       insertSymbol,
-      hasSuggestionsLeft,
-      suggestionsLeft,
-      setSuggestionsLeft,
+      inactiveTutorials,
+      deactivateTutorial,
+      currentPopup,
+      setCurrentPopup,
+      setOutOfSync,
+      hasPremiumSuggestion,
+      setHasPremiumSuggestion,
       premiumSuggestionResetDate,
       setPremiumSuggestionResetDate,
-      hasTokensLeft,
-      tokensLeft,
-      setTokensLeft,
-      tokenResetDate,
-      setTokenResetDate,
       writefullInstance,
       setWritefullInstance,
-      upgradeTrackChangesModal: showUpgradeModal,
-      setUpgradeTrackChangesModal: setShowUpgradeModal,
     }),
     [
       cobranding,
@@ -212,22 +212,24 @@ export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
       owner,
       userId,
       renameProject,
+      permissionsLevel,
+      setPermissionsLevel,
       isPendingEditor,
+      showSymbolPalette,
+      toggleSymbolPalette,
       insertSymbol,
-      hasSuggestionsLeft,
-      suggestionsLeft,
-      setSuggestionsLeft,
+      inactiveTutorials,
+      deactivateTutorial,
+      currentPopup,
+      setCurrentPopup,
+      outOfSync,
+      setOutOfSync,
+      hasPremiumSuggestion,
+      setHasPremiumSuggestion,
       premiumSuggestionResetDate,
       setPremiumSuggestionResetDate,
-      hasTokensLeft,
-      tokensLeft,
-      setTokensLeft,
-      tokenResetDate,
-      setTokenResetDate,
       writefullInstance,
       setWritefullInstance,
-      showUpgradeModal,
-      setShowUpgradeModal,
     ]
   )
 
@@ -235,7 +237,6 @@ export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
     <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
   )
 }
-
 export function useEditorContext() {
   const context = useContext(EditorContext)
 

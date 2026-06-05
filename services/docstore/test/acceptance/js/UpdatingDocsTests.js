@@ -1,20 +1,31 @@
-import mongodb from 'mongodb-legacy'
-import DocstoreApp from './helpers/DocstoreApp.js'
-import DocstoreClient from './helpers/DocstoreClient.js'
+/* eslint-disable
+    no-unused-vars,
+*/
+// TODO: This file was created by bulk-decaffeinate.
+// Fix any style issues and re-enable lint.
+/*
+ * decaffeinate suggestions:
+ * DS102: Remove unnecessary code created because of implicit returns
+ * DS207: Consider shorter variations of null checks
+ * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
+ */
+const sinon = require('sinon')
+const { ObjectId } = require('mongodb-legacy')
+const DocstoreApp = require('./helpers/DocstoreApp')
 
-const { ObjectId } = mongodb
+const DocstoreClient = require('./helpers/DocstoreClient')
 
 describe('Applying updates to a doc', function () {
-  beforeEach(async function () {
+  beforeEach(function (done) {
     this.project_id = new ObjectId()
     this.doc_id = new ObjectId()
-    this.originalLines = ['original', 'lines', '$1.00', '$foo']
-    this.newLines = ['new', 'lines', '$2.00', '$bar']
+    this.originalLines = ['original', 'lines']
+    this.newLines = ['new', 'lines']
     this.originalRanges = {
       changes: [
         {
           id: new ObjectId().toString(),
-          op: { i: '$foo', p: 3 },
+          op: { i: 'foo', p: 3 },
           meta: {
             user_id: new ObjectId().toString(),
             ts: new Date().toString(),
@@ -26,7 +37,7 @@ describe('Applying updates to a doc', function () {
       changes: [
         {
           id: new ObjectId().toString(),
-          op: { i: '$bar', p: 6 },
+          op: { i: 'bar', p: 6 },
           meta: {
             user_id: new ObjectId().toString(),
             ts: new Date().toString(),
@@ -34,362 +45,513 @@ describe('Applying updates to a doc', function () {
         },
       ],
     }
-
     this.version = 42
-    await DocstoreApp.ensureRunning()
-    await DocstoreClient.createDoc(
-      this.project_id,
-      this.doc_id,
-      this.originalLines,
-      this.version,
-      this.originalRanges
-    )
-  })
-
-  describe('when nothing has been updated', function () {
-    beforeEach(async function () {
-      this.body = await DocstoreClient.updateDoc(
+    return DocstoreApp.ensureRunning(() => {
+      return DocstoreClient.createDoc(
         this.project_id,
         this.doc_id,
         this.originalLines,
         this.version,
-        this.originalRanges
+        this.originalRanges,
+        error => {
+          if (error != null) {
+            throw error
+          }
+          return done()
+        }
+      )
+    })
+  })
+
+  describe('when nothing has been updated', function () {
+    beforeEach(function (done) {
+      return DocstoreClient.updateDoc(
+        this.project_id,
+        this.doc_id,
+        this.originalLines,
+        this.version,
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.body = body
+          return done()
+        }
       )
     })
 
     it('should return modified = false', function () {
-      this.body.modified.should.equal(false)
+      return this.body.modified.should.equal(false)
     })
 
-    it('should not update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.originalLines)
-      doc.version.should.equal(this.version)
-      doc.ranges.should.deep.equal(this.originalRanges)
+    return it('should not update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.originalLines)
+          doc.version.should.equal(this.version)
+          doc.ranges.should.deep.equal(this.originalRanges)
+          return done()
+        }
+      )
     })
   })
 
   describe('when the lines have changed', function () {
-    beforeEach(async function () {
-      this.body = await DocstoreClient.updateDoc(
+    beforeEach(function (done) {
+      return DocstoreClient.updateDoc(
         this.project_id,
         this.doc_id,
         this.newLines,
         this.version,
-        this.originalRanges
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.body = body
+          return done()
+        }
       )
     })
 
     it('should return modified = true', function () {
-      this.body.modified.should.equal(true)
+      return this.body.modified.should.equal(true)
     })
 
     it('should return the rev', function () {
-      this.body.rev.should.equal(2)
+      return this.body.rev.should.equal(2)
     })
 
-    it('should update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.newLines)
-      doc.version.should.equal(this.version)
-      doc.ranges.should.deep.equal(this.originalRanges)
+    return it('should update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.newLines)
+          doc.version.should.equal(this.version)
+          doc.ranges.should.deep.equal(this.originalRanges)
+          return done()
+        }
+      )
     })
   })
 
   describe('when the version has changed', function () {
-    beforeEach(async function () {
-      this.body = await DocstoreClient.updateDoc(
+    beforeEach(function (done) {
+      return DocstoreClient.updateDoc(
         this.project_id,
         this.doc_id,
         this.originalLines,
         this.version + 1,
-        this.originalRanges
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.body = body
+          return done()
+        }
       )
     })
 
     it('should return modified = true', function () {
-      this.body.modified.should.equal(true)
+      return this.body.modified.should.equal(true)
     })
 
     it('should return the rev', function () {
-      this.body.rev.should.equal(1)
+      return this.body.rev.should.equal(1)
     })
 
-    it('should update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.originalLines)
-      doc.version.should.equal(this.version + 1)
-      doc.ranges.should.deep.equal(this.originalRanges)
+    return it('should update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.originalLines)
+          doc.version.should.equal(this.version + 1)
+          doc.ranges.should.deep.equal(this.originalRanges)
+          return done()
+        }
+      )
     })
   })
 
   describe('when the version was decremented', function () {
-    let statusCode
-    beforeEach(async function () {
-      try {
-        this.body = await DocstoreClient.updateDoc(
-          this.project_id,
-          this.doc_id,
-          this.newLines,
-          this.version - 1,
-          this.newRanges
-        )
-      } catch (error) {
-        statusCode = error.info.status
-      }
+    beforeEach(function (done) {
+      DocstoreClient.updateDoc(
+        this.project_id,
+        this.doc_id,
+        this.newLines,
+        this.version - 1,
+        this.newRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.res = res
+          this.body = body
+          done()
+        }
+      )
     })
 
     it('should return 409', function () {
-      statusCode.should.equal(409)
+      this.res.statusCode.should.equal(409)
     })
 
-    it('should not update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.originalLines)
-      doc.version.should.equal(this.version)
-      doc.ranges.should.deep.equal(this.originalRanges)
+    it('should not update the doc in the API', function (done) {
+      DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.originalLines)
+          doc.version.should.equal(this.version)
+          doc.ranges.should.deep.equal(this.originalRanges)
+          done()
+        }
+      )
     })
   })
 
   describe('when the ranges have changed', function () {
-    beforeEach(async function () {
-      this.body = await DocstoreClient.updateDoc(
+    beforeEach(function (done) {
+      return DocstoreClient.updateDoc(
         this.project_id,
         this.doc_id,
         this.originalLines,
         this.version,
-        this.newRanges
+        this.newRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.body = body
+          return done()
+        }
       )
     })
 
     it('should return modified = true', function () {
-      this.body.modified.should.equal(true)
+      return this.body.modified.should.equal(true)
     })
 
     it('should return the rev', function () {
-      this.body.rev.should.equal(2)
+      return this.body.rev.should.equal(2)
     })
 
-    it('should update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.originalLines)
-      doc.version.should.equal(this.version)
-      doc.ranges.should.deep.equal(this.newRanges)
+    return it('should update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.originalLines)
+          doc.version.should.equal(this.version)
+          doc.ranges.should.deep.equal(this.newRanges)
+          return done()
+        }
+      )
     })
   })
 
   describe('when the doc does not exist', function () {
-    beforeEach(async function () {
+    beforeEach(function (done) {
       this.missing_doc_id = new ObjectId()
-      this.body = await DocstoreClient.updateDoc(
+      return DocstoreClient.updateDoc(
         this.project_id,
         this.missing_doc_id,
         this.originalLines,
         0,
-        this.originalRanges
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.res = res
+          this.body = body
+          return done()
+        }
       )
     })
 
     it('should create the doc', function () {
-      this.body.rev.should.equal(1)
+      return this.body.rev.should.equal(1)
     })
 
-    it('should be retreivable', async function () {
-      const doc = await DocstoreClient.getDoc(
+    return it('should be retreivable', function (done) {
+      return DocstoreClient.getDoc(
         this.project_id,
-        this.missing_doc_id
+        this.missing_doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.originalLines)
+          doc.version.should.equal(0)
+          doc.ranges.should.deep.equal(this.originalRanges)
+          return done()
+        }
       )
-      doc.lines.should.deep.equal(this.originalLines)
-      doc.version.should.equal(0)
-      doc.ranges.should.deep.equal(this.originalRanges)
     })
   })
 
   describe('when malformed doc lines are provided', function () {
     describe('when the lines are not an array', function () {
-      let statusCode
-      beforeEach(async function () {
-        try {
-          this.body = await DocstoreClient.updateDoc(
-            this.project_id,
-            this.doc_id,
-            { foo: 'bar' },
-            this.version,
-            this.originalRanges
-          )
-        } catch (error) {
-          statusCode = error.info.status
-        }
+      beforeEach(function (done) {
+        return DocstoreClient.updateDoc(
+          this.project_id,
+          this.doc_id,
+          { foo: 'bar' },
+          this.version,
+          this.originalRanges,
+          (error, res, body) => {
+            if (error) return done(error)
+            this.res = res
+            this.body = body
+            return done()
+          }
+        )
       })
 
       it('should return 400', function () {
-        statusCode.should.equal(400)
+        return this.res.statusCode.should.equal(400)
       })
 
-      it('should not update the doc in the API', async function () {
-        const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-        doc.lines.should.deep.equal(this.originalLines)
+      return it('should not update the doc in the API', function (done) {
+        return DocstoreClient.getDoc(
+          this.project_id,
+          this.doc_id,
+          {},
+          (error, res, doc) => {
+            if (error) return done(error)
+            doc.lines.should.deep.equal(this.originalLines)
+            return done()
+          }
+        )
       })
     })
 
-    describe('when the lines are not present', function () {
-      let statusCode
-      beforeEach(async function () {
-        try {
-          this.body = await DocstoreClient.updateDoc(
-            this.project_id,
-            this.doc_id,
-            null,
-            this.version,
-            this.originalRanges
-          )
-        } catch (error) {
-          statusCode = error.info.status
-        }
+    return describe('when the lines are not present', function () {
+      beforeEach(function (done) {
+        return DocstoreClient.updateDoc(
+          this.project_id,
+          this.doc_id,
+          null,
+          this.version,
+          this.originalRanges,
+          (error, res, body) => {
+            if (error) return done(error)
+            this.res = res
+            this.body = body
+            return done()
+          }
+        )
       })
 
       it('should return 400', function () {
-        statusCode.should.equal(400)
+        return this.res.statusCode.should.equal(400)
       })
 
-      it('should not update the doc in the API', async function () {
-        const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-        doc.lines.should.deep.equal(this.originalLines)
+      return it('should not update the doc in the API', function (done) {
+        return DocstoreClient.getDoc(
+          this.project_id,
+          this.doc_id,
+          {},
+          (error, res, doc) => {
+            if (error) return done(error)
+            doc.lines.should.deep.equal(this.originalLines)
+            return done()
+          }
+        )
       })
     })
   })
 
   describe('when no version is provided', function () {
-    let statusCode
-    beforeEach(async function () {
-      try {
-        this.body = await DocstoreClient.updateDoc(
-          this.project_id,
-          this.doc_id,
-          this.originalLines,
-          null,
-          this.originalRanges
-        )
-      } catch (error) {
-        statusCode = error.info.status
-      }
+    beforeEach(function (done) {
+      return DocstoreClient.updateDoc(
+        this.project_id,
+        this.doc_id,
+        this.originalLines,
+        null,
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.res = res
+          this.body = body
+          return done()
+        }
+      )
     })
 
     it('should return 400', function () {
-      statusCode.should.equal(400)
+      return this.res.statusCode.should.equal(400)
     })
 
-    it('should not update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.originalLines)
-      doc.version.should.equal(this.version)
+    return it('should not update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.originalLines)
+          doc.version.should.equal(this.version)
+          return done()
+        }
+      )
     })
   })
 
   describe('when the content is large', function () {
-    beforeEach(async function () {
+    beforeEach(function (done) {
       const line = new Array(1025).join('x') // 1kb
       this.largeLines = Array.apply(null, Array(1024)).map(() => line) // 1mb
-      this.body = await DocstoreClient.updateDoc(
+      return DocstoreClient.updateDoc(
         this.project_id,
         this.doc_id,
         this.largeLines,
         this.version,
-        this.originalRanges
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.body = body
+          return done()
+        }
       )
     })
 
     it('should return modified = true', function () {
-      this.body.modified.should.equal(true)
+      return this.body.modified.should.equal(true)
     })
 
-    it('should update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.largeLines)
+    return it('should update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.largeLines)
+          return done()
+        }
+      )
     })
   })
 
   describe('when there is a large json payload', function () {
-    beforeEach(async function () {
+    beforeEach(function (done) {
       const line = new Array(1025).join('x') // 1kb
       this.largeLines = Array.apply(null, Array(1024)).map(() => line) // 1kb
       this.originalRanges.padding = Array.apply(null, Array(2049)).map(
         () => line
       ) // 2mb + 1kb
-      this.body = await DocstoreClient.updateDoc(
+      return DocstoreClient.updateDoc(
         this.project_id,
         this.doc_id,
         this.largeLines,
         this.version,
-        this.originalRanges
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.res = res
+          this.body = body
+          return done()
+        }
       )
     })
 
     it('should return modified = true', function () {
-      this.body.modified.should.equal(true)
+      return this.body.modified.should.equal(true)
     })
 
-    it('should update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.largeLines)
+    return it('should update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.largeLines)
+          return done()
+        }
+      )
     })
   })
 
   describe('when the document body is too large', function () {
-    let statusCode, body
-    beforeEach(async function () {
+    beforeEach(function (done) {
       const line = new Array(1025).join('x') // 1kb
       this.largeLines = Array.apply(null, Array(2049)).map(() => line) // 2mb + 1kb
-      try {
-        this.body = await DocstoreClient.updateDoc(
-          this.project_id,
-          this.doc_id,
-          this.largeLines,
-          this.version,
-          this.originalRanges
-        )
-      } catch (error) {
-        statusCode = error.info.status
-        body = error.body
-      }
+      return DocstoreClient.updateDoc(
+        this.project_id,
+        this.doc_id,
+        this.largeLines,
+        this.version,
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.res = res
+          this.body = body
+          return done()
+        }
+      )
     })
 
     it('should return 413', function () {
-      statusCode.should.equal(413)
+      return this.res.statusCode.should.equal(413)
     })
 
     it('should report body too large', function () {
-      body.should.equal('document body too large')
+      return this.res.body.should.equal('document body too large')
     })
 
-    it('should not update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.originalLines)
+    return it('should not update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.originalLines)
+          return done()
+        }
+      )
     })
   })
 
-  describe('when the json payload is too large', function () {
-    beforeEach(async function () {
-      const line = new Array(1024).join('x') // 1 KB
-      this.largeLines = new Array(8192).fill(line) // 8 MB
-      this.originalRanges.padding = new Array(6144).fill(line) // 6 MB
-
-      try {
-        this.body = await DocstoreClient.updateDoc(
-          this.project_id,
-          this.doc_id,
-          this.largeLines,
-          this.version,
-          this.originalRanges
-        )
-      } catch (error) {
-        // ignore error response
-      }
+  return describe('when the json payload is too large', function () {
+    beforeEach(function (done) {
+      const line = new Array(1025).join('x') // 1kb
+      this.largeLines = Array.apply(null, Array(1024)).map(() => line) // 1kb
+      this.originalRanges.padding = Array.apply(null, Array(6144)).map(
+        () => line
+      ) // 6mb
+      return DocstoreClient.updateDoc(
+        this.project_id,
+        this.doc_id,
+        this.largeLines,
+        this.version,
+        this.originalRanges,
+        (error, res, body) => {
+          if (error) return done(error)
+          this.res = res
+          this.body = body
+          return done()
+        }
+      )
     })
 
-    it('should not update the doc in the API', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.originalLines)
+    return it('should not update the doc in the API', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.originalLines)
+          return done()
+        }
+      )
     })
   })
 })

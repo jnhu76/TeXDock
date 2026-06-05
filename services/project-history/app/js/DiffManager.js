@@ -77,7 +77,7 @@ export function getFileTreeDiff(projectId, fromVersion, toVersion, callback) {
           if (error instanceof Errors.InconsistentChunkError) {
             return callback(error)
           } else {
-            return callback(OError.tag(error))
+            throw OError.tag(error)
           }
         }
         callback(null, diff)

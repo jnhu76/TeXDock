@@ -1,19 +1,16 @@
-import type { Meta } from '@storybook/react-webpack5'
+import type { Meta } from '@storybook/react'
 import _ from 'lodash'
-import { SplitTestContext } from '@/shared/context/split-test-context'
+import { SplitTestContext } from '../../frontend/js/shared/context/split-test-context'
 
-export const defaultSplitTestsArgTypes = {
+export const splitTestsArgTypes = {
   // to be able to use this utility, you need to add the argTypes for each split test in this object
   // Check the original implementation for an example: https://github.com/overleaf/internal/pull/17809
 }
 
-export const withSplitTests = <ArgTypes = typeof defaultSplitTestsArgTypes,>(
+export const withSplitTests = (
   story: Meta,
-  splitTests: (keyof ArgTypes)[] = [],
-  /** @deprecated For demo purposes only. Add actual split tests in defaultSplitTestsArgTypes */
-  _splitTestsArgTypes?: ArgTypes
+  splitTests: (keyof typeof splitTestsArgTypes)[] = []
 ): Meta => {
-  const splitTestsArgTypes = _splitTestsArgTypes ?? defaultSplitTestsArgTypes
   return {
     ...story,
     argTypes: { ...story.argTypes, ..._.pick(splitTestsArgTypes, splitTests) },

@@ -242,7 +242,20 @@ export const packageArgumentCompletionSource: CompletionSource =
 
 export const inputArgumentCompletionSource: CompletionSource =
   makeArgumentCompletionSource(
-    ['InputArgument', 'IncludeArgument', 'SubfileArgument'],
+    ['InputArgument'],
+    ({ completions, context, from }) => {
+      buildIncludeCompletions(completions, context)
+
+      return {
+        from,
+        validFor: /^[^}]*/,
+        options: completions.includes,
+      }
+    }
+  )
+export const includeArgumentCompletionSource: CompletionSource =
+  makeArgumentCompletionSource(
+    ['IncludeArgument'],
     ({ completions, context, from }) => {
       buildIncludeCompletions(completions, context)
 
@@ -342,6 +355,7 @@ export const argumentCompletionSources: CompletionSource[] = [
   refArgumentCompletionSource,
   packageArgumentCompletionSource,
   inputArgumentCompletionSource,
+  includeArgumentCompletionSource,
   includeGraphicsArgumentCompletionSource,
   environmentNameCompletionSource,
   documentClassArgumentCompletionSource,

@@ -288,49 +288,28 @@ module.exports = class GcsPersistor extends AbstractPersistor {
     } while (query)
   }
 
-  async #listDirectory(bucketName, prefix) {
+  async directorySize(bucketName, key) {
+    let files
+    const prefix = ensurePrefixIsDirectory(key)
+
     try {
       const [response] = await this.storage
         .bucket(bucketName)
         .getFiles({ prefix })
-      return response
+      files = response
     } catch (err) {
       throw PersistorHelper.wrapError(
         err,
         'failed to list objects in GCS',
-        { bucketName, prefix },
+        { bucketName, key },
         ReadError
       )
     }
-  }
-
-  async directorySize(bucketName, key) {
-    const prefix = ensurePrefixIsDirectory(key)
-    const files = await this.#listDirectory(bucketName, prefix)
 
     return files.reduce(
       (acc, file) => parseInt(file.metadata.size, 10) + acc,
       0
     )
-  }
-
-  async listDirectoryKeys(bucketName, prefix) {
-    const files = await this.#listDirectory(
-      bucketName,
-      ensurePrefixIsDirectory(prefix)
-    )
-    return files.map(file => file.name)
-  }
-
-  async listDirectoryStats(bucketName, prefix) {
-    const files = await this.#listDirectory(
-      bucketName,
-      ensurePrefixIsDirectory(prefix)
-    )
-    return files.map(file => ({
-      key: file.name,
-      size: parseInt(file.metadata.size, 10),
-    }))
   }
 
   async checkIfObjectExists(bucketName, key) {

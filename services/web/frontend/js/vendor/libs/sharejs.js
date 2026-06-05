@@ -680,7 +680,6 @@ export const { Doc } = (() => {
   // Text document API for text
 
   text.api = {
-    otType: "sharejs-text-ot",
     provides: { text: true },
 
     // The number of characters in the string
@@ -1009,8 +1008,8 @@ export const { Doc } = (() => {
 
         this.type = type;
         if (type.api) {
-          for (var k in type.api) {
-            var v = type.api[k];this[k] = v;
+          for (const k of ['insert', 'del', 'getText', 'getLength', '_register']) {
+            this[k] = type.api[k]
           }
           return typeof this._register === 'function' ? this._register() : undefined;
         } else {
@@ -1096,7 +1095,14 @@ export const { Doc } = (() => {
           if (!msg.error) {
             if (msg.op === undefined && msg.v !== undefined) {
               if (msg.v < this.version) {
-                debugConsole.warn('Received an ack for an op with an outdated version.')
+                postJSON('/error/client', {
+                  body: {
+                    error: {
+                      message: 'out-of-order-ack-ignored'
+                    },
+                    meta: { msg, version: this.version }
+                  }
+                })
                 return
               }
             } else {

@@ -1,16 +1,15 @@
 import { useCallback, useState, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import OLBadge from '@/shared/components/ol/ol-badge'
+import OLBadge from '@/features/ui/components/ol/ol-badge'
 import getMeta from '../../../../utils/meta'
 import { sendMB } from '../../../../infrastructure/event-tracking'
-import OLButton from '@/shared/components/ol/ol-button'
-import {
-  OLModal,
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
+} from '@/features/ui/components/ol/ol-modal'
 
 function trackUpgradeClick(integration: string) {
   sendMB('settings-upgrade-click', { integration })
@@ -122,9 +121,7 @@ function ActionButton({
   titleId,
 }: ActionButtonProps) {
   const { t } = useTranslation()
-  const upgradeTextId = `${titleId}-upgrade`
   const linkTextId = `${titleId}-link`
-  const unlinkTextId = `${titleId}-unlink`
 
   if (!hasFeature) {
     return (
@@ -132,19 +129,17 @@ function ActionButton({
         variant="primary"
         href="/user/subscription/plans"
         onClick={() => trackUpgradeClick(integration)}
-        aria-labelledby={`${titleId} ${upgradeTextId}`}
+        aria-labelledby={`${titleId} ${linkTextId}`}
       >
-        <span id={upgradeTextId}>{t('upgrade')}</span>
+        <span id={linkTextId}>{t('upgrade')}</span>
       </OLButton>
     )
   } else if (linked) {
     return (
       <OLButton
         variant="danger-ghost"
-        aria-labelledby={`${unlinkTextId} ${titleId}`}
         onClick={handleUnlinkClick}
         disabled={disabled}
-        id={unlinkTextId}
       >
         {t('unlink')}
       </OLButton>
@@ -153,12 +148,7 @@ function ActionButton({
     return (
       <>
         {disabled ? (
-          <OLButton
-            disabled
-            variant="secondary"
-            aria-labelledby={`${linkTextId} ${titleId}`}
-            id={linkTextId}
-          >
+          <OLButton disabled variant="secondary">
             {t('link')}
           </OLButton>
         ) : (
@@ -166,8 +156,6 @@ function ActionButton({
             variant="secondary"
             href={linkPath}
             onClick={() => trackLinkingClick(integration)}
-            aria-labelledby={`${linkTextId} ${titleId}`}
-            id={linkTextId}
           >
             {t('link')}
           </OLButton>
@@ -209,7 +197,7 @@ function UnlinkConfirmationModal({
 
   return (
     <OLModal show={show} onHide={handleHide}>
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{title}</OLModalTitle>
       </OLModalHeader>
 

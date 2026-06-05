@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import classNames from 'classnames'
 import HistoryFileTreeItem from './history-file-tree-item'
-import { newEditorIconTypeFromName } from '../../../file-tree/util/icon-type-from-name'
+import iconTypeFromName from '../../../file-tree/util/icon-type-from-name'
 import type { FileDiff } from '../../services/types/file'
 import MaterialIcon from '@/shared/components/material-icon'
 
@@ -29,15 +29,13 @@ function HistoryFileTreeDoc({
       aria-selected={selected}
       aria-label={name}
       tabIndex={0}
-      translate="no"
     >
       <HistoryFileTreeItem
         name={name}
         operation={'operation' in file ? file.operation : undefined}
         icons={
           <MaterialIcon
-            unfilled
-            type={newEditorIconTypeFromName(name)}
+            type={iconTypeFromName(name)}
             className="file-tree-icon"
           />
         }

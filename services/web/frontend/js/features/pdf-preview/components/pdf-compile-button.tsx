@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { memo, useCallback } from 'react'
+import { memo } from 'react'
 import classNames from 'classnames'
 import { useDetachCompileContext as useCompileContext } from '../../../shared/context/detach-compile-context'
 import { useStopOnFirstError } from '../../../shared/hooks/use-stop-on-first-error'
 import * as eventTracking from '../../../infrastructure/event-tracking'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
 import {
   DropdownToggleCustom,
   Dropdown,
@@ -13,11 +13,10 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
-} from '@/shared/components/dropdown/dropdown-menu'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLButtonGroup from '@/shared/components/ol/ol-button-group'
+} from '@/features/ui/components/bootstrap-5/dropdown-menu'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLButtonGroup from '@/features/ui/components/ol/ol-button-group'
 import { useLayoutContext } from '@/shared/context/layout-context'
-import { useCommandProvider } from '@/features/ide-react/hooks/use-command-provider'
 
 const modifierKey = /Mac/i.test(navigator.platform) ? 'Cmd' : 'Ctrl'
 
@@ -56,12 +55,12 @@ function PdfCompileButton() {
 
   const { detachRole } = useLayoutContext()
 
-  const fromScratchWithEvent = useCallback(() => {
+  const fromScratchWithEvent = () => {
     eventTracking.sendMB('recompile-setting-changed', {
       setting: 'from-scratch',
     })
     recompileFromScratch()
-  }, [recompileFromScratch])
+  }
 
   const tooltipElement = (
     <>
@@ -76,40 +75,14 @@ function PdfCompileButton() {
       'btn-striped-animated': hasChanges,
     },
     'no-left-border',
-    'dropdown-button-toggle',
-    'compile-dropdown-toggle'
+    'dropdown-button-toggle'
   )
 
   const buttonClassName = classNames(
     'align-items-center py-0 no-left-radius px-3',
-    'compile-button',
     {
       'btn-striped-animated': hasChanges,
     }
-  )
-
-  useCommandProvider(
-    () => [
-      {
-        id: 'compile',
-        handler: () => startCompile(),
-        label: t('recompile'),
-        disabled: compiling,
-      },
-      {
-        id: 'stop-compile',
-        handler: () => stopCompile(),
-        label: t('stop_compile'),
-        disabled: !compiling,
-      },
-      {
-        id: 'recompile-from-scratch',
-        handler: fromScratchWithEvent,
-        label: t('recompile_from_scratch'),
-        disabled: compiling,
-      },
-    ],
-    [startCompile, t, compiling, stopCompile, fromScratchWithEvent]
   )
 
   return (
@@ -190,7 +163,7 @@ function PdfCompileButton() {
           </DropdownItem>
         </li>
         <DropdownDivider />
-        <DropdownHeader>{t('syntax_checks')}</DropdownHeader>
+        <DropdownHeader>Syntax Checks</DropdownHeader>
         <li role="none">
           <DropdownItem
             as="button"

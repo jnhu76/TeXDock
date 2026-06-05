@@ -1,5 +1,5 @@
 import { Trans, useTranslation } from 'react-i18next'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
 import MaterialIcon from '@/shared/components/material-icon'
 
 type PausedPlanProps = {
@@ -13,7 +13,7 @@ function PausedPlan({ subscriptionPageUrl }: PausedPlanProps) {
       i18nKey="your_premium_plan_is_paused"
       components={[
         // eslint-disable-next-line react/jsx-key
-        <strong translate="no" />,
+        <strong />,
       ]}
     />
   )

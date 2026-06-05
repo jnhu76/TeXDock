@@ -1,5 +1,5 @@
-import NotificationsHandler from './NotificationsHandler.mjs'
-import SessionManager from '../Authentication/SessionManager.mjs'
+import NotificationsHandler from './NotificationsHandler.js'
+import SessionManager from '../Authentication/SessionManager.js'
 import _ from 'lodash'
 
 export default {
@@ -31,28 +31,6 @@ export default {
     const { notificationId } = req.params
     NotificationsHandler.markAsRead(userId, notificationId, () =>
       res.sendStatus(200)
-    )
-  },
-
-  getNotification(req, res, next) {
-    const userId = SessionManager.getLoggedInUserId(req.session)
-    const { notificationId } = req.params
-    NotificationsHandler.getUserNotifications(
-      userId,
-      function (err, unreadNotifications) {
-        if (err) {
-          return next(err)
-        }
-        const notification = unreadNotifications.find(
-          n => n._id === notificationId
-        )
-
-        if (!notification) {
-          return res.status(404).end()
-        }
-
-        res.json(notification)
-      }
     )
   },
 }

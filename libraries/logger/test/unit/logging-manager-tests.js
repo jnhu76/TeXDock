@@ -43,13 +43,9 @@ describe('LoggingManager', function () {
         .stub()
         .returns(this.GCEMetadataLogLevelChecker),
     }
-    this.fetchUtils = {
-      setLogger: sinon.stub(),
-    }
     this.LoggingManager = SandboxedModule.require(MODULE_PATH, {
       requires: {
         bunyan: this.Bunyan,
-        '@overleaf/fetch-utils': this.fetchUtils,
         './log-level-checker': this.LogLevelChecker,
       },
     })

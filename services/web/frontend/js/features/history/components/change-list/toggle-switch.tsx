@@ -61,9 +61,7 @@ function ToggleSwitch({ labelsOnly, setLabelsOnly }: ToggleSwitchProps) {
 
   return (
     <fieldset className="toggle-switch">
-      <legend className="visually-hidden">
-        {t('history_view_a11y_description')}
-      </legend>
+      <legend className="sr-only">{t('history_view_a11y_description')}</legend>
       <input
         type="radio"
         name="labels-only-toggle-switch"

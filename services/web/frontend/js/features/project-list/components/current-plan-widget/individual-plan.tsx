@@ -1,6 +1,6 @@
 import { useTranslation, Trans } from 'react-i18next'
 import { IndividualPlanSubscription } from '../../../../../../types/project/dashboard/subscription'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
 import MaterialIcon from '@/shared/components/material-icon'
 
 type IndividualPlanProps = Pick<
@@ -14,25 +14,21 @@ function IndividualPlan({
   remainingTrialDays,
 }: IndividualPlanProps) {
   const { t } = useTranslation()
-  const planNameComponent = <strong translate="no" />
   const currentPlanLabel =
     remainingTrialDays >= 0 ? (
       remainingTrialDays === 1 ? (
-        <Trans i18nKey="trial_last_day" components={{ b: planNameComponent }} />
+        <Trans i18nKey="trial_last_day" components={{ b: <strong /> }} />
       ) : (
         <Trans
           i18nKey="trial_remaining_days"
-          components={{ b: planNameComponent }}
+          components={{ b: <strong /> }}
           values={{ days: remainingTrialDays }}
           shouldUnescape
           tOptions={{ interpolation: { escapeValue: true } }}
         />
       )
     ) : (
-      <Trans
-        i18nKey="premium_plan_label"
-        components={{ b: planNameComponent }}
-      />
+      <Trans i18nKey="premium_plan_label" components={{ b: <strong /> }} />
     )
 
   return (

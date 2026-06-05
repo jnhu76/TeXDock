@@ -1,12 +1,11 @@
 import { syntaxTree } from '@codemirror/language'
 import { Diagnostic, LintSource } from '@codemirror/lint'
 import {
-  Entry,
-  EntryCommand,
-  EntryBody,
-  EntryType,
+  Declaration,
+  EntryName,
+  EntryTypeName,
   FieldName,
-  Comment,
+  Other,
 } from '../../lezer-bibtex/bibtex.terms.mjs'
 import { SyntaxNodeRef } from '@lezer/common'
 import { EditorState } from '@codemirror/state'
@@ -37,7 +36,7 @@ export const bibtexLintSource: LintSource = view => {
       if (fileLintingDisabled) {
         return false
       }
-      if (node.type.is(Comment)) {
+      if (node.type.is(Other)) {
         // Content between declaration. Can be linter directive
         const content = view.state.sliceDoc(node.from, node.to).trim()
         if (content === '%%novalidate') {
@@ -51,7 +50,7 @@ export const bibtexLintSource: LintSource = view => {
       if (lintingCurrentlyDisabled) {
         return false
       }
-      if (node.type.is(Entry)) {
+      if (node.type.is(Declaration)) {
         diagnostics.push(...checkRequiredFields(node, view.state))
         return false
       }
@@ -183,7 +182,7 @@ const bibEntryValidationRules = new Map<string, BibEntryValidationRule>([
   ],
 ])
 
-export const checkRequiredFields = (
+const checkRequiredFields = (
   nodeRef: SyntaxNodeRef,
   state: EditorState
 ): Diagnostic[] => {
@@ -191,29 +190,25 @@ export const checkRequiredFields = (
   // syntax tree
   const node = nodeRef.node
 
-  const entryCommandNode = node.getChild(EntryCommand)
-  if (!entryCommandNode) {
+  const entryNameNode = node.getChild(EntryName)
+  if (!entryNameNode) {
     return []
   }
 
-  const entryTypeNode = entryCommandNode.getChild(EntryType)
-  if (!entryTypeNode) {
+  const entryTypeNameNode = entryNameNode.getChild(EntryTypeName)
+  if (!entryTypeNameNode) {
     return []
   }
-  const entryType = state
-    .sliceDoc(entryTypeNode.from, entryTypeNode.to)
+  const entryTypeName = state
+    .sliceDoc(entryTypeNameNode.from, entryTypeNameNode.to)
     .toLowerCase()
-  const environment = bibEntryValidationRules.get(entryType)
+  const environment = bibEntryValidationRules.get(entryTypeName)
   if (!environment) {
     return []
   }
   const requiredFields = environment.requiredAttributes
 
-  const entryBodyNode = node.getChild(EntryBody)
-  if (!entryBodyNode) {
-    return []
-  }
-  const actualFieldNodes = entryBodyNode.getChildren('Field')
+  const actualFieldNodes = node.getChildren('Field')
   const actualFieldNames = new Set(
     actualFieldNodes
       .map(fieldNode => fieldNode.getChild(FieldName))
@@ -254,9 +249,9 @@ export const checkRequiredFields = (
 
   return [
     {
-      from: entryCommandNode.from,
-      to: entryCommandNode.to,
-      message: createErrorMessage(missingFields, entryType, state),
+      from: entryNameNode.from,
+      to: entryNameNode.to,
+      message: createErrorMessage(missingFields, entryTypeName, state),
       severity: 'warning',
     },
   ]

@@ -18,9 +18,9 @@ import {
   isDeleteOperation,
   isInsertOperation,
 } from '@/utils/operations'
-import { Ranges } from '@/features/review-panel/context/ranges-context'
-import { Threads } from '@/features/review-panel/context/threads-context'
-import { isSelectionWithinOp } from '@/features/review-panel/utils/is-selection-within-op'
+import { Ranges } from '@/features/review-panel-new/context/ranges-context'
+import { Threads } from '@/features/review-panel-new/context/threads-context'
+import { isSelectionWithinOp } from '@/features/review-panel-new/utils/is-selection-within-op'
 
 type RangesData = {
   ranges: Ranges
@@ -68,7 +68,7 @@ export const rangesDataField = StateField.define<RangesData | null>({
 export const ranges = () => [
   rangesDataField,
   // handle viewportChanged updates
-  ViewPlugin.define(() => {
+  ViewPlugin.define(view => {
     let timer: number
 
     return {
@@ -199,7 +199,6 @@ export const ranges = () => [
                 tr.effects.some(effect => effect.is(updateRangesEffect))
             )
           ) {
-            this.decorations = this.decorations.map(update.changes)
             return
           }
 
@@ -398,9 +397,6 @@ const trackChangesTheme = EditorView.baseTheme({
     {
       backgroundColor: 'rgba(194, 93, 11, 0.15)',
     },
-  '.ol-cm-change-focus .ol-cm-change': {
-    backgroundColor: 'transparent',
-  },
   '.ol-cm-change': {
     padding: 'var(--half-leading, 0) 0',
   },
@@ -424,6 +420,14 @@ const trackChangesTheme = EditorView.baseTheme({
   },
   '&dark .ol-cm-change-d-highlight': {
     borderLeft: '3px solid #c5060b',
+    marginLeft: '-2px',
+  },
+  '&light .ol-cm-change-d-focus': {
+    borderLeft: '3px solid #B83A33',
+    marginLeft: '-2px',
+  },
+  '&dark .ol-cm-change-d-focus': {
+    borderLeft: '3px solid #B83A33',
     marginLeft: '-2px',
   },
 })

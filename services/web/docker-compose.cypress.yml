@@ -1,17 +1,13 @@
 services:
   cypress:
-    build:
-      context: ../../dockerfiles/cypress
-      args:
-        - USER_UID
-        - USER_GID
+    image: cypress/included:13.13.2
     volumes:
       - ../../:/overleaf
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ${XAUTHORITY:-/dev/null}:/home/node/.Xauthority
     working_dir: /overleaf/services/web
-    entrypoint: yarn
+    entrypoint: npm
     command: run cypress:open-ct
+    user: "${DOCKER_USER:-1000:1000}"
     environment:
       VERBOSE_LOGGING:
       DISPLAY: ${DISPLAY:-:0}

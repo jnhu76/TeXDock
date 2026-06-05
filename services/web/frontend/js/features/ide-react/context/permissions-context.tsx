@@ -1,11 +1,12 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
-import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
+import { useEditorContext } from '@/shared/context/editor-context'
 import getMeta from '@/utils/meta'
 import {
   Permissions,
   PermissionsLevel,
 } from '@/features/ide-react/types/permissions'
+import useScopeValue from '@/shared/hooks/use-scope-value'
 import { DeepReadonly } from '../../../../../types/utils'
 import useViewerPermissions from '@/shared/hooks/use-viewer-permissions'
 import { useProjectContext } from '@/shared/context/project-context'
@@ -78,27 +79,18 @@ const noTrackChangesPermissionsMap: typeof permissionsMap = {
   owner: permissionsMap.owner,
 }
 
-const defaultPermissions: Permissions = {
-  read: true,
-  write: true,
-  admin: false,
-  comment: true,
-  resolveOwnComments: false,
-  resolveAllComments: false,
-  trackedWrite: true,
-  labelVersion: false,
-}
-
 export const PermissionsProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
   const [permissions, setPermissions] =
-    useState<Permissions>(defaultPermissions)
+    useScopeValue<Readonly<Permissions>>('permissions')
   const { connectionState } = useConnectionContext()
-  const { permissionsLevel } = useIdeReactContext()
+  const { permissionsLevel } = useEditorContext() as {
+    permissionsLevel: PermissionsLevel
+  }
   const hasViewerPermissions = useViewerPermissions()
   const anonymous = getMeta('ol-anonymous')
-  const { features } = useProjectContext()
+  const project = useProjectContext()
 
   useEffect(() => {
     let activePermissionsMap
@@ -106,7 +98,7 @@ export const PermissionsProvider: React.FC<React.PropsWithChildren> = ({
       activePermissionsMap = linkSharingWarningPermissionsMap
     } else if (anonymous) {
       activePermissionsMap = anonymousPermissionsMap
-    } else if (!features.trackChanges) {
+    } else if (!project.features.trackChanges) {
       activePermissionsMap = noTrackChangesPermissionsMap
     } else {
       activePermissionsMap = permissionsMap
@@ -117,7 +109,7 @@ export const PermissionsProvider: React.FC<React.PropsWithChildren> = ({
     permissionsLevel,
     setPermissions,
     hasViewerPermissions,
-    features.trackChanges,
+    project.features.trackChanges,
   ])
 
   useEffect(() => {

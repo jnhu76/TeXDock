@@ -8,14 +8,12 @@ import Actions from './actions'
 import { institutionAlreadyLinked } from '../../utils/selectors'
 import { useUserEmailsContext } from '../../context/user-email-context'
 import getMeta from '../../../../utils/meta'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
 import { ssoAvailableForInstitution } from '../../utils/sso'
 import ReconfirmationInfo from './reconfirmation-info'
 import { useLocation } from '../../../../shared/hooks/use-location'
-import OLRow from '@/shared/components/ol/ol-row'
-import OLCol from '@/shared/components/ol/ol-col'
-import OLButton from '@/shared/components/ol/ol-button'
-import UnlinkCommonsSSOModal from './unlink-commons-sso-modal'
+import OLRow from '@/features/ui/components/ol/ol-row'
+import OLCol from '@/features/ui/components/ol/ol-col'
+import OLButton from '@/features/ui/components/ol/ol-button'
 
 type EmailsRowProps = {
   userEmailData: UserEmailData
@@ -25,7 +23,7 @@ type EmailsRowProps = {
 function EmailsRow({ userEmailData, primary }: EmailsRowProps) {
   const hasSSOAffiliation = Boolean(
     userEmailData.affiliation &&
-    ssoAvailableForInstitution(userEmailData.affiliation.institution)
+      ssoAvailableForInstitution(userEmailData.affiliation.institution)
   )
 
   return (
@@ -67,14 +65,9 @@ function SSOAffiliationInfo({ userEmailData }: SSOAffiliationInfoProps) {
   const { t } = useTranslation()
   const { state } = useUserEmailsContext()
   const location = useLocation()
-  const [showUnlinkSSOModal, setShowUnlinkSSOModal] = useState(false)
 
   const [linkAccountsButtonDisabled, setLinkAccountsButtonDisabled] =
     useState(false)
-
-  const domainCapturedByGroupRolloutFlagEnabled = useFeatureFlag(
-    'domain-captured-by-group'
-  )
 
   function handleLinkAccountsButtonClick() {
     setLinkAccountsButtonDisabled(true)
@@ -96,64 +89,25 @@ function SSOAffiliationInfo({ userEmailData }: SSOAffiliationInfoProps) {
     return (
       <OLRow>
         <OLCol lg={{ span: 8, offset: 4 }}>
-          <div className="horizontal-divider" />
-          <OLRow>
-            <OLCol lg={9}>
-              <EmailCell>
-                <p>
-                  <Trans
-                    i18nKey="acct_linked_to_institution_acct_2"
-                    components={
-                      /* eslint-disable-next-line jsx-a11y/anchor-has-content, react/jsx-key */
-                      [<strong />]
-                    }
-                    values={{
-                      institutionName:
-                        userEmailData.affiliation?.institution.name,
-                    }}
-                    shouldUnescape
-                    tOptions={{ interpolation: { escapeValue: true } }}
-                  />
-                </p>
-              </EmailCell>
-            </OLCol>
-            <OLCol lg={3} className="text-lg-end">
-              <EmailCell>
-                <OLButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowUnlinkSSOModal(true)}
-                >
-                  {t('unlink_sso')}
-                </OLButton>
-
-                <UnlinkCommonsSSOModal
-                  show={showUnlinkSSOModal}
-                  onClose={() => setShowUnlinkSSOModal(false)}
-                  institutionName={
-                    userEmailData.affiliation?.institution.name || ''
-                  }
-                  institutionEmail={userEmailData.email}
-                  hasLicence={userEmailData.emailHasInstitutionLicence || false}
-                />
-              </EmailCell>
-            </OLCol>
-          </OLRow>
+          <EmailCell>
+            <p>
+              <Trans
+                i18nKey="acct_linked_to_institution_acct_2"
+                components={
+                  /* eslint-disable-next-line jsx-a11y/anchor-has-content, react/jsx-key */
+                  [<strong />]
+                }
+                values={{
+                  institutionName: userEmailData.affiliation?.institution.name,
+                }}
+                shouldUnescape
+                tOptions={{ interpolation: { escapeValue: true } }}
+              />
+            </p>
+          </EmailCell>
         </OLCol>
       </OLRow>
     )
-  }
-
-  const domainAlsoForGroupWithDomainCapture =
-    domainCapturedByGroupRolloutFlagEnabled
-      ? userEmailData?.affiliation?.domainCapturedByGroup &&
-        userEmailData?.affiliation?.group?.domainCaptureEnabled
-      : userEmailData?.affiliation?.group?.domainCaptureEnabled
-
-  if (domainAlsoForGroupWithDomainCapture) {
-    // user is not linked via Commons and should link via groups
-    // do not show UI to link to Commons
-    return null
   }
 
   return (

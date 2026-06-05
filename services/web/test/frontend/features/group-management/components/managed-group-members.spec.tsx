@@ -77,7 +77,6 @@ describe('group members, with managed users', function () {
       win.metaAttributesCache.set('ol-groupName', 'My Awesome Team')
       win.metaAttributesCache.set('ol-groupSize', 10)
       win.metaAttributesCache.set('ol-managedUsersActive', true)
-      win.metaAttributesCache.set('ol-hasWriteAccess', true)
     })
     mountGroupMembersProvider()
   })
@@ -131,8 +130,8 @@ describe('group members, with managed users', function () {
       },
     })
 
-    cy.findByLabelText('Invite more members').type('someone.else@test.com')
-    cy.findByRole('button', { name: /invite/i }).click()
+    cy.get('.form-control').type('someone.else@test.com')
+    cy.get('.add-more-members-form button').click()
 
     cy.findByTestId('managed-entities-table')
       .find('tbody')
@@ -160,8 +159,8 @@ describe('group members, with managed users', function () {
       },
     })
 
-    cy.findByLabelText('Invite more members').type('someone.else@test.com')
-    cy.findByRole('button', { name: /invite/i }).click()
+    cy.get('.form-control').type('someone.else@test.com')
+    cy.get('.add-more-members-form button').click()
     cy.findByRole('alert').contains('Error: User already added')
   })
 

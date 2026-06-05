@@ -5,16 +5,16 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import Settings from '@overleaf/settings'
-import logger from '@overleaf/logger'
 let commandRunnerPath
+const Settings = require('@overleaf/settings')
+const logger = require('@overleaf/logger')
 
 if ((Settings.clsi != null ? Settings.clsi.dockerRunner : undefined) === true) {
-  commandRunnerPath = './DockerRunner.js'
+  commandRunnerPath = './DockerRunner'
 } else {
-  commandRunnerPath = './LocalCommandRunner.js'
+  commandRunnerPath = './LocalCommandRunner'
 }
 logger.debug({ commandRunnerPath }, 'selecting command runner for clsi')
-const CommandRunner = (await import(commandRunnerPath)).default
+const CommandRunner = require(commandRunnerPath)
 
-export default CommandRunner
+module.exports = CommandRunner

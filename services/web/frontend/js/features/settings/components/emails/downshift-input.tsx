@@ -2,12 +2,9 @@ import { useState, useEffect, forwardRef } from 'react'
 import { useCombobox } from 'downshift'
 import classnames from 'classnames'
 import { escapeRegExp } from 'lodash'
-import OLFormControl from '@/shared/components/ol/ol-form-control'
-import { DropdownItem } from '@/shared/components/dropdown/dropdown-menu'
-import OLFormLabel from '@/shared/components/ol/ol-form-label'
-import DSFormLabel from '@/shared/components/ds/ds-form-label'
-import DSFormControl from '@/shared/components/ds/ds-form-control'
-import { Check } from '@phosphor-icons/react'
+import OLFormControl from '@/features/ui/components/ol/ol-form-control'
+import { DropdownItem } from '@/features/ui/components/bootstrap-5/dropdown-menu'
+import OLFormLabel from '@/features/ui/components/ol/ol-form-label'
 
 type DownshiftInputProps = {
   highlightMatches?: boolean
@@ -19,7 +16,6 @@ type DownshiftInputProps = {
   inputRef?: React.ForwardedRef<HTMLInputElement>
   showLabel?: boolean
   showSuggestedText?: boolean
-  isCiam?: boolean
 } & React.InputHTMLAttributes<HTMLInputElement>
 
 const filterItemsByInputValue = (
@@ -39,7 +35,6 @@ function Downshift({
   inputRef,
   showLabel = false,
   showSuggestedText = false,
-  isCiam = false,
 }: DownshiftInputProps) {
   const [inputItems, setInputItems] = useState(items)
 
@@ -81,73 +76,7 @@ function Downshift({
     )
   }
 
-  const tickIcon = function () {
-    return isCiam ? <Check /> : 'check'
-  }
-
-  const shouldOpen = isOpen && inputItems.length > 0
-
-  const dropdown = (
-    <ul
-      {...getMenuProps()}
-      className={classnames('dropdown-menu', 'select-dropdown-menu', {
-        show: shouldOpen,
-        'ciam-dropdown-menu': isCiam,
-      })}
-    >
-      {showSuggestedText && inputItems.length > 0 && (
-        <li>
-          <DropdownItem as="span" role={undefined} disabled>
-            {itemsTitle}
-          </DropdownItem>
-        </li>
-      )}
-      {inputItems.map((item, index) => (
-        // eslint-disable-next-line jsx-a11y/role-supports-aria-props
-        <li
-          key={`${item}${index}`}
-          {...getItemProps({ item, index })}
-          aria-selected={selectedItem === item}
-        >
-          <DropdownItem
-            as="span"
-            role={undefined}
-            className={classnames({
-              active: selectedItem === item,
-              'dropdown-item-highlighted': highlightedIndex === index,
-            })}
-            trailingIcon={selectedItem === item ? tickIcon() : undefined}
-          >
-            {highlightMatchedCharacters(item, inputValue)}
-          </DropdownItem>
-        </li>
-      ))}
-    </ul>
-  )
-
-  if (isCiam) {
-    return (
-      <div className="dropdown d-block">
-        <DSFormLabel
-          {...getLabelProps()}
-          className={showLabel ? '' : 'visually-hidden'}
-        >
-          {label}
-        </DSFormLabel>
-        <DSFormControl
-          {...getInputProps({
-            onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-              setValue(event.target.value)
-            },
-            ref: inputRef,
-          })}
-          placeholder={placeholder}
-          disabled={disabled}
-        />
-        {dropdown}
-      </div>
-    )
-  }
+  const shouldOpen = isOpen && inputItems.length
 
   return (
     <div className={classnames('dropdown', 'd-block')}>
@@ -169,7 +98,40 @@ function Downshift({
           disabled={disabled}
         />
       </div>
-      {dropdown}
+      <ul
+        {...getMenuProps()}
+        className={classnames('dropdown-menu', 'select-dropdown-menu', {
+          show: shouldOpen,
+        })}
+      >
+        {showSuggestedText && inputItems.length && (
+          <li>
+            <DropdownItem as="span" role={undefined} disabled>
+              {itemsTitle}
+            </DropdownItem>
+          </li>
+        )}
+        {inputItems.map((item, index) => (
+          // eslint-disable-next-line jsx-a11y/role-supports-aria-props
+          <li
+            key={`${item}${index}`}
+            {...getItemProps({ item, index })}
+            aria-selected={selectedItem === item}
+          >
+            <DropdownItem
+              as="span"
+              role={undefined}
+              className={classnames({
+                active: selectedItem === item,
+                'dropdown-item-highlighted': highlightedIndex === index,
+              })}
+              trailingIcon={selectedItem === item ? 'check' : undefined}
+            >
+              {highlightMatchedCharacters(item, inputValue)}
+            </DropdownItem>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

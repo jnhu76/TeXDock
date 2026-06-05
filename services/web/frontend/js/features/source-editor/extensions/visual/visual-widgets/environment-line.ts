@@ -1,4 +1,4 @@
-import { WidgetType } from '@codemirror/view'
+import { EditorView, WidgetType } from '@codemirror/view'
 
 export class EnvironmentLineWidget extends WidgetType {
   constructor(
@@ -8,7 +8,7 @@ export class EnvironmentLineWidget extends WidgetType {
     super()
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const element = document.createElement('div')
     element.classList.add(`ol-cm-environment-${this.environment}`)
     element.classList.add('ol-cm-environment-edge')

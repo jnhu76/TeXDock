@@ -12,7 +12,6 @@ export abstract class ProjectionItem {
   readonly from: number = 0
   readonly to: number = 0
   readonly line: number = 0
-  readonly toLine: number = 0
 }
 
 /* eslint-disable no-unused-vars */
@@ -49,15 +48,9 @@ export function updatePosition<T extends ProjectionItem>(
   const { from, to } = item
   const newFrom = transaction.changes.mapPos(from)
   const newTo = transaction.changes.mapPos(to)
-  const newLine = transaction.state.doc.lineAt(newFrom).number
-  const newToLine = transaction.state.doc.lineAt(newTo).number
+  const lineNumber = transaction.state.doc.lineAt(newFrom).number
 
-  if (
-    newFrom === from &&
-    newTo === to &&
-    newLine === item.line &&
-    newToLine === item.toLine
-  ) {
+  if (newFrom === from && newTo === to && lineNumber === item.line) {
     // Optimisation - if the item hasn't moved, don't create a new object
     // If items are not immutable this can introduce problems
     return item
@@ -67,8 +60,7 @@ export function updatePosition<T extends ProjectionItem>(
     ...item,
     from: newFrom,
     to: newTo,
-    line: newLine,
-    toLine: newToLine,
+    line: lineNumber,
   }
 }
 

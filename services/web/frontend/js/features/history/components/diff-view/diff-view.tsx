@@ -10,15 +10,11 @@ import useAsync from '../../../../shared/hooks/use-async'
 import { useTranslation } from 'react-i18next'
 
 function DiffView() {
-  const { selection, projectId, loadingFileDiffs, updatesInfo } =
-    useHistoryContext()
+  const { selection, projectId, loadingFileDiffs } = useHistoryContext()
   const { isLoading, data, runAsync } = useAsync<DocDiffResponse>()
   const { t } = useTranslation()
   const { updateRange, selectedFile } = selection
   const { showBoundary } = useErrorBoundary()
-
-  const isCurrentVersion =
-    !!updateRange && updatesInfo.updates[0].toV === updateRange.toV
 
   useEffect(() => {
     if (!updateRange || !selectedFile?.pathname || loadingFileDiffs) {
@@ -77,11 +73,7 @@ function DiffView() {
   return (
     <div className="doc-panel">
       <div className="history-header toolbar-container">
-        <Toolbar
-          diff={diff}
-          selection={selection}
-          isCurrentVersion={isCurrentVersion}
-        />
+        <Toolbar diff={diff} selection={selection} />
       </div>
       <div className="doc-container">
         <Main diff={diff} isLoading={isLoading || loadingFileDiffs} />

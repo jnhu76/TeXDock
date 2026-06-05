@@ -9,18 +9,17 @@ import { createTag } from '../../util/api'
 import { MAX_TAG_LENGTH } from '../../util/tag'
 import { ColorPicker } from '../color-picker/color-picker'
 import { debugConsole } from '@/utils/debugging'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
-import OLFormLabel from '@/shared/components/ol/ol-form-label'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLFormControl from '@/shared/components/ol/ol-form-control'
-import OLForm from '@/shared/components/ol/ol-form'
+} from '@/features/ui/components/ol/ol-modal'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
+import OLFormLabel from '@/features/ui/components/ol/ol-form-label'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLFormControl from '@/features/ui/components/ol/ol-form-control'
+import OLForm from '@/features/ui/components/ol/ol-form'
 import Notification from '@/shared/components/notification'
 
 type CreateTagModalProps = {
@@ -81,12 +80,12 @@ export default function CreateTagModal({
 
   return (
     <OLModal show animation onHide={onClose} id={id} backdrop="static">
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{t('create_new_tag')}</OLModalTitle>
       </OLModalHeader>
 
       <OLModalBody>
-        <OLForm onSubmit={handleSubmit}>
+        <OLForm id="create-tag-modal-form" onSubmit={handleSubmit}>
           <OLFormGroup controlId="create-tag-modal-form">
             <OLFormLabel>{t('new_tag_name')}</OLFormLabel>
             <OLFormControl
@@ -130,7 +129,6 @@ export default function CreateTagModal({
             status === 'pending' || !tagName?.length || !!validationError
           }
           isLoading={isLoading}
-          loadingLabel={t('creating')}
         >
           {t('create')}
         </OLButton>

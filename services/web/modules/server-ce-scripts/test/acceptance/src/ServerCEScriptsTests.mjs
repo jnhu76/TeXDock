@@ -1,51 +1,39 @@
-import { exec } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import Settings from '@overleaf/settings'
 import { expect } from 'chai'
-import { db } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { db } from '../../../../../app/src/infrastructure/mongodb.js'
 import UserHelper from '../../../../../test/acceptance/src/helpers/User.mjs'
 
 const { promises: User } = UserHelper
 
 /**
  * @param {string} cmd
- * @return {Promise<string>}
+ * @return {string}
  */
-async function run(cmd) {
+function run(cmd) {
   // https://nodejs.org/docs/latest-v12.x/api/child_process.html#child_process_child_process_execsync_command_options
   // > stderr by default will be output to the parent process' stderr
   // > unless stdio is specified.
   // https://nodejs.org/docs/latest-v12.x/api/child_process.html#child_process_options_stdio
   // Pipe stdin from /dev/null, store stdout, pipe stderr to /dev/null.
-  return new Promise((resolve, reject) => {
-    exec(
-      cmd,
-      {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          LOG_LEVEL: 'warn',
-        },
-      },
-      (error, stdout) => {
-        if (error) {
-          reject(error)
-        } else {
-          resolve(stdout)
-        }
-      }
-    )
-  })
+  return execSync(cmd, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      LOG_LEVEL: 'warn',
+    },
+  }).toString()
 }
 
-async function runAndExpectError(cmd, errorMessages, exitCode = 1) {
+function runAndExpectError(cmd, errorMessages) {
   try {
-    await run(cmd)
+    run(cmd)
   } catch (error) {
-    expect(error.code).to.equal(exitCode)
+    expect(error.status).to.equal(1)
     if (errorMessages) {
       errorMessages.forEach(errorMessage =>
-        expect(error.message).to.include(errorMessage)
+        expect(error.stderr.toString()).to.include(errorMessage)
       )
     }
     return
@@ -59,65 +47,73 @@ async function getUser(email) {
 
 describe('ServerCEScripts', function () {
   describe('check-mongodb', function () {
-    it('should exit with code 0 on success', async function () {
-      await run('node modules/server-ce-scripts/scripts/check-mongodb.mjs')
+    it('should exit with code 0 on success', function () {
+      run('node modules/server-ce-scripts/scripts/check-mongodb.mjs')
     })
 
-    it('should exit with code 1 on error', async function () {
-      await runAndExpectError(
-        'MONGO_SERVER_SELECTION_TIMEOUT=1 ' +
-          'MONGO_CONNECTION_STRING=mongodb://127.0.0.1:4242 ' +
-          'node modules/server-ce-scripts/scripts/check-mongodb.mjs'
-      )
+    it('should exit with code 1 on error', function () {
+      try {
+        run(
+          'MONGO_SERVER_SELECTION_TIMEOUT=1' +
+            'MONGO_CONNECTION_STRING=mongodb://127.0.0.1:4242 ' +
+            'node modules/server-ce-scripts/scripts/check-mongodb.mjs'
+        )
+      } catch (e) {
+        expect(e.status).to.equal(1)
+        return
+      }
+      expect.fail('command should have failed')
     })
   })
 
   describe('check-redis', function () {
-    it('should exit with code 0 on success', async function () {
-      await run('node modules/server-ce-scripts/scripts/check-redis.mjs')
+    it('should exit with code 0 on success', function () {
+      run('node modules/server-ce-scripts/scripts/check-redis.mjs')
     })
 
-    it('should exit with code 1 on error', async function () {
-      await runAndExpectError(
-        'REDIS_PORT=42 node modules/server-ce-scripts/scripts/check-redis.mjs'
-      )
+    it('should exit with code 1 on error', function () {
+      try {
+        run(
+          'REDIS_PORT=42 node modules/server-ce-scripts/scripts/check-redis.mjs'
+        )
+      } catch (e) {
+        expect(e.status).to.equal(1)
+        return
+      }
+      expect.fail('command should have failed')
     })
   })
 
   describe('create-user', function () {
-    it('should exit with code 0 on success', async function () {
-      const out = await run(
+    it('should exit with code 0 on success', function () {
+      const out = run(
         'node modules/server-ce-scripts/scripts/create-user.js --email=foo@bar.com'
       )
       expect(out).to.include('/user/activate?token=')
     })
 
     it('should create a regular user by default', async function () {
-      await run(
+      run(
         'node modules/server-ce-scripts/scripts/create-user.js --email=foo@bar.com'
       )
       expect(await getUser('foo@bar.com')).to.deep.equal({ isAdmin: false })
     })
 
-    it('should also work with mjs version', async function () {
-      const out = await run(
-        'node modules/server-ce-scripts/scripts/create-user.mjs --email=foo@bar.com'
-      )
-      expect(out).to.include('/user/activate?token=')
-      expect(await getUser('foo@bar.com')).to.deep.equal({ isAdmin: false })
-    })
-
     it('should create an admin user with --admin flag', async function () {
-      await run(
+      run(
         'node modules/server-ce-scripts/scripts/create-user.js --admin --email=foo@bar.com'
       )
       expect(await getUser('foo@bar.com')).to.deep.equal({ isAdmin: true })
     })
 
-    it('should exit with code 1 on missing email', async function () {
-      await runAndExpectError(
-        'node modules/server-ce-scripts/scripts/create-user.js'
-      )
+    it('should exit with code 1 on missing email', function () {
+      try {
+        run('node modules/server-ce-scripts/scripts/create-user.js')
+      } catch (e) {
+        expect(e.status).to.equal(1)
+        return
+      }
+      expect.fail('command should have failed')
     })
   })
 
@@ -128,18 +124,18 @@ describe('ServerCEScripts', function () {
       await user.login()
     })
 
-    it('should log missing user', async function () {
+    it('should log missing user', function () {
       const email = 'does-not-exist@example.com'
-      const out = await run(
+      const out = run(
         'node modules/server-ce-scripts/scripts/delete-user.mjs --email=' +
           email
       )
       expect(out).to.include('not in database, potentially already deleted')
     })
 
-    it('should exit with code 0 on success', async function () {
+    it('should exit with code 0 on success', function () {
       const email = user.email
-      await run(
+      run(
         'node modules/server-ce-scripts/scripts/delete-user.mjs --email=' +
           email
       )
@@ -147,7 +143,7 @@ describe('ServerCEScripts', function () {
 
     it('should have deleted the user on success', async function () {
       const email = user.email
-      await run(
+      run(
         'node modules/server-ce-scripts/scripts/delete-user.mjs --email=' +
           email
       )
@@ -160,10 +156,14 @@ describe('ServerCEScripts', function () {
       expect(softDeletedEntry.deleterData.deleterIpAddress).to.equal('0.0.0.0')
     })
 
-    it('should exit with code 1 on missing email', async function () {
-      await runAndExpectError(
-        'node modules/server-ce-scripts/scripts/delete-user.mjs'
-      )
+    it('should exit with code 1 on missing email', function () {
+      try {
+        run('node modules/server-ce-scripts/scripts/delete-user.mjs')
+      } catch (e) {
+        expect(e.status).to.equal(1)
+        return
+      }
+      expect.fail('command should have failed')
     })
   })
 
@@ -213,7 +213,7 @@ describe('ServerCEScripts', function () {
     })
 
     it('should do a dry run by default', async function () {
-      await run(
+      run(
         `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs ${csv}`
       )
       for (const user of usersToMigrate) {
@@ -226,14 +226,14 @@ describe('ServerCEScripts', function () {
       }
     })
 
-    it('should exit with code 0 when successfully migrating user emails', async function () {
-      await run(
+    it('should exit with code 0 when successfully migrating user emails', function () {
+      run(
         `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit ${csv}`
       )
     })
 
     it('should migrate the user emails with the --commit option', async function () {
-      await run(
+      run(
         `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit ${csv}`
       )
       for (const user of usersToMigrate) {
@@ -247,7 +247,7 @@ describe('ServerCEScripts', function () {
     })
 
     it('should leave other user emails unchanged', async function () {
-      await run(
+      run(
         `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit ${csv}`
       )
       for (const user of otherUsers) {
@@ -256,27 +256,39 @@ describe('ServerCEScripts', function () {
       }
     })
 
-    it('should exit with code 1 when there are failures migrating user emails', async function () {
-      await runAndExpectError(
-        `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit ${csvfail}`
-      )
+    it('should exit with code 1 when there are failures migrating user emails', function () {
+      try {
+        run(
+          `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit ${csvfail}`
+        )
+      } catch (e) {
+        expect(e.status).to.equal(1)
+        return
+      }
+      expect.fail('command should have failed')
     })
 
     it('should migrate other users when there are failures with the --continue option', async function () {
-      await runAndExpectError(
-        `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit ${csvfail}`
-      )
-      await run(
-        `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit --continue ${csvfail}`
-      )
-      for (const user of usersToMigrate) {
-        const dbEntry = await user.get()
-        expect(dbEntry.email).to.equal(`new-${user.email}`)
-        expect(dbEntry.emails).to.have.lengthOf(1)
-        expect(dbEntry.emails[0].email).to.equal(`new-${user.email}`)
-        expect(dbEntry.emails[0].reversedHostname).to.equal('moc.elpmaxe')
-        expect(dbEntry.emails[0].createdAt).to.eql(user.emails[0].createdAt)
+      try {
+        run(
+          `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit ${csvfail}`
+        )
+      } catch (e) {
+        expect(e.status).to.equal(1)
+        run(
+          `node modules/server-ce-scripts/scripts/migrate-user-emails.mjs --commit --continue ${csvfail}`
+        )
+        for (const user of usersToMigrate) {
+          const dbEntry = await user.get()
+          expect(dbEntry.email).to.equal(`new-${user.email}`)
+          expect(dbEntry.emails).to.have.lengthOf(1)
+          expect(dbEntry.emails[0].email).to.equal(`new-${user.email}`)
+          expect(dbEntry.emails[0].reversedHostname).to.equal('moc.elpmaxe')
+          expect(dbEntry.emails[0].createdAt).to.eql(user.emails[0].createdAt)
+        }
+        return
       }
+      expect.fail('command should have failed')
     })
   })
 
@@ -303,7 +315,7 @@ describe('ServerCEScripts', function () {
 
       expect(await getTagNames()).to.deep.equal([oldName])
 
-      await run(
+      run(
         `node modules/server-ce-scripts/scripts/rename-tag.mjs --user-id=${user.id} --old-name=${oldName} --new-name=${newName}`
       )
 
@@ -334,9 +346,9 @@ describe('ServerCEScripts', function () {
 
     describe('happy path', function () {
       let newUserATimeout
-      beforeEach('run script on user a', async function () {
+      beforeEach('run script on user a', function () {
         newUserATimeout = userATimeout - 1
-        await run(
+        run(
           `node modules/server-ce-scripts/scripts/change-compile-timeout.mjs --user-id=${userA.id} --compile-timeout=${newUserATimeout}`
         )
       })
@@ -354,21 +366,27 @@ describe('ServerCEScripts', function () {
 
     describe('bad options', function () {
       it('should reject zero timeout', async function () {
-        await runAndExpectError(
-          `node modules/server-ce-scripts/scripts/change-compile-timeout.mjs --user-id=${userA.id} --compile-timeout=0`,
-          ['positive number of seconds'],
-          101
-        )
+        try {
+          run(
+            `node modules/server-ce-scripts/scripts/change-compile-timeout.mjs --user-id=${userA.id} --compile-timeout=0`
+          )
+          expect.fail('should error out')
+        } catch (err) {
+          expect(err.stderr.toString()).to.include('positive number of seconds')
+        }
         expect(await getCompileTimeout(userA)).to.equal(userATimeout)
         expect(await getCompileTimeout(userB)).to.equal(userBTimeout)
       })
 
       it('should reject a 20min timeout', async function () {
-        await runAndExpectError(
-          `node modules/server-ce-scripts/scripts/change-compile-timeout.mjs --user-id=${userA.id} --compile-timeout=1200`,
-          ['below 10 minutes'],
-          101
-        )
+        try {
+          run(
+            `node modules/server-ce-scripts/scripts/change-compile-timeout.mjs --user-id=${userA.id} --compile-timeout=1200`
+          )
+          expect.fail('should error out')
+        } catch (err) {
+          expect(err.stderr.toString()).to.include('below 10 minutes')
+        }
         expect(await getCompileTimeout(userA)).to.equal(userATimeout)
         expect(await getCompileTimeout(userB)).to.equal(userBTimeout)
       })
@@ -406,13 +424,13 @@ describe('ServerCEScripts', function () {
     })
 
     beforeEach('downgrade userCustomTimeoutLower', async function () {
-      await run(
+      run(
         `node modules/server-ce-scripts/scripts/change-compile-timeout.mjs --user-id=${userCustomTimeoutLower.id} --compile-timeout=42`
       )
     })
 
     beforeEach('upgrade userCustomTimeoutHigher', async function () {
-      await run(
+      run(
         `node modules/server-ce-scripts/scripts/change-compile-timeout.mjs --user-id=${userCustomTimeoutHigher.id} --compile-timeout=360`
       )
     })
@@ -446,8 +464,8 @@ describe('ServerCEScripts', function () {
 
     describe('dry-run', function () {
       let output
-      beforeEach('run script', async function () {
-        output = await run(
+      beforeEach('run script', function () {
+        output = run(
           `node modules/server-ce-scripts/scripts/upgrade-user-features.mjs`
         )
       })
@@ -475,8 +493,8 @@ describe('ServerCEScripts', function () {
 
     describe('live run', function () {
       let output
-      beforeEach('run script', async function () {
-        output = await run(
+      beforeEach('run script', function () {
+        output = run(
           `node modules/server-ce-scripts/scripts/upgrade-user-features.mjs --dry-run=false`
         )
       })
@@ -546,10 +564,8 @@ describe('ServerCEScripts', function () {
     })
 
     describe('when running in CE', function () {
-      beforeEach('run script', async function () {
-        output = await run(
-          buildCheckTexLiveCmd({ OVERLEAF_IS_SERVER_PRO: false })
-        )
+      beforeEach('run script', function () {
+        output = run(buildCheckTexLiveCmd({ OVERLEAF_IS_SERVER_PRO: false }))
       })
 
       it('should skip checks', function () {
@@ -560,8 +576,8 @@ describe('ServerCEScripts', function () {
     })
 
     describe('when sandboxed compiles are disabled', function () {
-      beforeEach('run script', async function () {
-        output = await run(buildCheckTexLiveCmd({ SANDBOXED_COMPILES: false }))
+      beforeEach('run script', function () {
+        output = run(buildCheckTexLiveCmd({ SANDBOXED_COMPILES: false }))
       })
 
       it('should skip checks', function () {
@@ -572,8 +588,8 @@ describe('ServerCEScripts', function () {
     })
 
     describe('when texlive configuration is incorrect', function () {
-      it('should fail when TEX_LIVE_DOCKER_IMAGE is not set', async function () {
-        await runAndExpectError(
+      it('should fail when TEX_LIVE_DOCKER_IMAGE is not set', function () {
+        runAndExpectError(
           buildCheckTexLiveCmd({
             SANDBOXED_COMPILES: true,
             ALL_TEX_LIVE_DOCKER_IMAGES: TEST_TL_IMAGE_LIST,
@@ -584,8 +600,8 @@ describe('ServerCEScripts', function () {
         )
       })
 
-      it('should fail when ALL_TEX_LIVE_DOCKER_IMAGES is not set', async function () {
-        await runAndExpectError(
+      it('should fail when ALL_TEX_LIVE_DOCKER_IMAGES is not set', function () {
+        runAndExpectError(
           buildCheckTexLiveCmd({
             SANDBOXED_COMPILES: true,
             TEX_LIVE_DOCKER_IMAGE: TEST_TL_IMAGE,
@@ -596,8 +612,8 @@ describe('ServerCEScripts', function () {
         )
       })
 
-      it('should fail when TEX_LIVE_DOCKER_IMAGE is not defined in ALL_TEX_LIVE_DOCKER_IMAGES', async function () {
-        await runAndExpectError(
+      it('should fail when TEX_LIVE_DOCKER_IMAGE is not defined in ALL_TEX_LIVE_DOCKER_IMAGES', function () {
+        runAndExpectError(
           buildCheckTexLiveCmd({
             SANDBOXED_COMPILES: true,
             TEX_LIVE_DOCKER_IMAGE: 'tl-1',
@@ -615,8 +631,8 @@ describe('ServerCEScripts', function () {
         await db.projects.updateMany({}, { $unset: { imageName: 1 } })
       })
 
-      it('should fail and suggest running backfilling scripts', async function () {
-        await runAndExpectError(
+      it('should fail and suggest running backfilling scripts', function () {
+        runAndExpectError(
           buildCheckTexLiveCmd({
             SANDBOXED_COMPILES: true,
             TEX_LIVE_DOCKER_IMAGE: TEST_TL_IMAGE,
@@ -635,8 +651,8 @@ describe('ServerCEScripts', function () {
         await db.projects.updateMany({}, { $set: { imageName: null } })
       })
 
-      it('should fail and suggest running backfilling scripts', async function () {
-        await runAndExpectError(
+      it('should fail and suggest running backfilling scripts', function () {
+        runAndExpectError(
           buildCheckTexLiveCmd({
             SANDBOXED_COMPILES: true,
             TEX_LIVE_DOCKER_IMAGE: TEST_TL_IMAGE,
@@ -653,7 +669,7 @@ describe('ServerCEScripts', function () {
     describe('when TexLive ALL_TEX_LIVE_DOCKER_IMAGES are upgraded and used images are no longer available', function () {
       it('should suggest running a fixing script', async function () {
         await db.projects.updateMany({}, { $set: { imageName: TEST_TL_IMAGE } })
-        await runAndExpectError(
+        runAndExpectError(
           buildCheckTexLiveCmd({
             SANDBOXED_COMPILES: true,
             TEX_LIVE_DOCKER_IMAGE: 'tl-1',
@@ -671,8 +687,8 @@ describe('ServerCEScripts', function () {
         await db.projects.updateMany({}, { $set: { imageName: TEST_TL_IMAGE } })
       })
 
-      it('should succeed when there are no changes to the TexLive images', async function () {
-        const output = await run(
+      it('should succeed when there are no changes to the TexLive images', function () {
+        const output = run(
           buildCheckTexLiveCmd({
             SANDBOXED_COMPILES: true,
             TEX_LIVE_DOCKER_IMAGE: TEST_TL_IMAGE,
@@ -682,8 +698,8 @@ describe('ServerCEScripts', function () {
         expect(output).to.include('Done.')
       })
 
-      it('should succeed when there are valid changes to the TexLive images', async function () {
-        const output = await run(
+      it('should succeed when there are valid changes to the TexLive images', function () {
+        const output = run(
           buildCheckTexLiveCmd({
             SANDBOXED_COMPILES: true,
             TEX_LIVE_DOCKER_IMAGE: 'new-image',
@@ -692,53 +708,6 @@ describe('ServerCEScripts', function () {
         )
         expect(output).to.include('Done.')
       })
-    })
-  })
-
-  describe('transfer-all-projects-to-user', function () {
-    let fromUser, projects
-    beforeEach(async function () {
-      fromUser = new User()
-      await fromUser.login()
-      projects = await Promise.all([
-        fromUser.createProject('a'),
-        fromUser.createProject('b'),
-        fromUser.createProject('c'),
-      ])
-    })
-    let toUser
-    beforeEach(async function () {
-      toUser = new User()
-      await toUser.login()
-    })
-
-    it('should log missing user', async function () {
-      const email = 'does-not-exist@example.com'
-      await runAndExpectError(
-        `node modules/server-ce-scripts/scripts/transfer-all-projects-to-user.mjs --from-user=${email}`,
-        [`user with email --from-user=${email} does not exist`]
-      )
-    })
-
-    it('should transfer projects by email', async function () {
-      await run(
-        `node modules/server-ce-scripts/scripts/transfer-all-projects-to-user.mjs --from-user=${fromUser.email} --to-user=${toUser.email}`
-      )
-      for (const projectId of projects) {
-        expect(
-          (await toUser.getProject(projectId)).owner_ref.toString()
-        ).to.equal(toUser._id.toString())
-      }
-    })
-    it('should transfer projects by id', async function () {
-      await run(
-        `node modules/server-ce-scripts/scripts/transfer-all-projects-to-user.mjs --from-user=${fromUser._id} --to-user=${toUser._id}`
-      )
-      for (const projectId of projects) {
-        expect(
-          (await toUser.getProject(projectId)).owner_ref.toString()
-        ).to.equal(toUser._id.toString())
-      }
     })
   })
 })

@@ -1,34 +1,30 @@
 // Metrics must be initialized before importing anything else
-import '@overleaf/metrics/initialize.js'
+require('@overleaf/metrics/initialize')
 
-import Metrics from '@overleaf/metrics'
-import Settings from '@overleaf/settings'
-import async from 'async'
-import logger from '@overleaf/logger'
-import express from 'express'
-import session from 'express-session'
-import redis from '@overleaf/redis-wrapper'
-import ConnectRedis from 'connect-redis'
-import SessionSockets from './app/js/SessionSockets.js'
-import CookieParser from 'cookie-parser'
-import DrainManager from './app/js/DrainManager.js'
-import HealthCheckManager from './app/js/HealthCheckManager.js'
-import DeploymentManager from './app/js/DeploymentManager.js'
-import Path from 'node:path'
-import socketIO from 'socket.io'
-import socketIOClient from 'socket.io-client'
-import http from 'node:http'
-import Router from './app/js/Router.js'
-import WebsocketLoadBalancer from './app/js/WebsocketLoadBalancer.js'
-import DocumentUpdaterController from './app/js/DocumentUpdaterController.js'
+const Metrics = require('@overleaf/metrics')
+const Settings = require('@overleaf/settings')
+const async = require('async')
 
+const logger = require('@overleaf/logger')
 logger.initialize('real-time')
 Metrics.event_loop.monitor(logger)
 Metrics.open_sockets.monitor()
 
+const express = require('express')
+const session = require('express-session')
+const redis = require('@overleaf/redis-wrapper')
+
 const sessionRedisClient = redis.createClient(Settings.redis.websessions)
 
-const RedisStore = ConnectRedis(session)
+const RedisStore = require('connect-redis')(session)
+const SessionSockets = require('./app/js/SessionSockets')
+const CookieParser = require('cookie-parser')
+
+const DrainManager = require('./app/js/DrainManager')
+const HealthCheckManager = require('./app/js/HealthCheckManager')
+const DeploymentManager = require('./app/js/DeploymentManager')
+
+const Path = require('node:path')
 
 // NOTE: debug is invoked for every blob that is put on the wire
 const socketIoLogger = {
@@ -49,9 +45,9 @@ DeploymentManager.initialise()
 // Set up socket.io server
 const app = express()
 
-const server = http.createServer(app)
+const server = require('node:http').createServer(app)
 server.keepAliveTimeout = Settings.keepAliveTimeoutMs
-const io = socketIO.listen(server, {
+const io = require('socket.io').listen(server, {
   logger: socketIoLogger,
 })
 
@@ -131,7 +127,7 @@ io.configure(function () {
 // The express sendFile method correctly handles conditional
 // requests using the last-modified time and etag (which is
 // a combination of mtime and size)
-const socketIOClientFolder = socketIOClient.dist
+const socketIOClientFolder = require('socket.io-client').dist
 app.get('/socket.io/socket.io.js', function (req, res) {
   res.sendFile(Path.join(socketIOClientFolder, 'socket.io.min.js'))
 })
@@ -160,7 +156,9 @@ app.get('/debug/events', function (req, res) {
   res.send(`debug mode will log next ${Settings.debugEvents} events`)
 })
 
-const rclient = redis.createClient(Settings.redis.realtime)
+const rclient = require('@overleaf/redis-wrapper').createClient(
+  Settings.redis.realtime
+)
 
 function healthCheck(req, res) {
   rclient.healthCheck(function (error) {
@@ -192,10 +190,13 @@ app.get('/health_check/redis', healthCheck)
 // log http requests for routes defined from this point onwards
 app.use(Metrics.http.monitor(logger))
 
+const Router = require('./app/js/Router')
 Router.configure(app, io, sessionSockets)
 
+const WebsocketLoadBalancer = require('./app/js/WebsocketLoadBalancer')
 WebsocketLoadBalancer.listenForEditorEvents(io)
 
+const DocumentUpdaterController = require('./app/js/DocumentUpdaterController')
 DocumentUpdaterController.listenForUpdatesFromDocumentUpdater(io)
 
 const { port } = Settings.internal.realTime
@@ -291,7 +292,6 @@ if (Settings.shutdownDrainTimeWindow) {
           'EPIPE',
           'ECONNRESET',
           'ERR_STREAM_WRITE_AFTER_END',
-          'ERR_STREAM_UNABLE_TO_PIPE',
         ].includes(error.code) ||
         // socket.io error handler sending on polling connection again.
         (error.code === 'ERR_HTTP_HEADERS_SENT' &&
@@ -352,5 +352,3 @@ if (Settings.continualPubsubTraffic) {
 
   runPubSubTraffic()
 }
-
-export default app

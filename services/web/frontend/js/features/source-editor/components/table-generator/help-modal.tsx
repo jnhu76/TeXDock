@@ -1,11 +1,10 @@
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+} from '@/features/ui/components/ol/ol-modal'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import { useTabularContext } from './contexts/tabular-context'
 import { Trans, useTranslation } from 'react-i18next'
 
@@ -20,14 +19,22 @@ export const TableGeneratorHelpModal = () => {
       onHide={hideHelp}
       className="table-generator-help-modal"
     >
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{t('help')}</OLModalTitle>
       </OLModalHeader>
       <OLModalBody>
         <p>
-          {t(
-            'this_tool_helps_you_insert_simple_tables_into_your_project_without_writing_latex_code'
-          )}
+          <Trans
+            i18nKey="this_tool_helps_you_insert_simple_tables_into_your_project_without_writing_latex_code_give_feedback"
+            components={[
+              // eslint-disable-next-line react/jsx-key, jsx-a11y/anchor-has-content
+              <a
+                href="https://forms.gle/ri3fzV1oQDAjmfmD7"
+                target="_blank"
+                rel="noopener noreferrer"
+              />,
+            ]}
+          />
         </p>
         <b>{t('how_it_works')}</b>
         <p>

@@ -16,15 +16,6 @@ import {
   unconfirmedUserData,
 } from '../../fixtures/test-user-email-data'
 import getMeta from '@/utils/meta'
-import { SplitTestProvider } from '@/shared/context/split-test-context'
-
-function renderEmailsSection() {
-  return render(<EmailsSection />, {
-    wrapper: ({ children }) => (
-      <SplitTestProvider>{children}</SplitTestProvider>
-    ),
-  })
-}
 
 describe('<EmailsSection />', function () {
   beforeEach(function () {
@@ -39,13 +30,13 @@ describe('<EmailsSection />', function () {
   })
 
   it('renders translated heading', function () {
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     screen.getByRole('heading', { name: /emails and affiliations/i })
   })
 
   it('renders translated description', function () {
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     screen.getByText(/add additional email addresses/i)
     screen.getByText(/to change your primary email/i)
@@ -55,14 +46,14 @@ describe('<EmailsSection />', function () {
   })
 
   it('renders a loading message when loading', async function () {
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     await screen.findByText(/loading/i)
   })
 
   it('renders an error message and hides loading message on error', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', 500)
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     await screen.findByText(
       /an error has occurred while performing your request/i
@@ -72,7 +63,7 @@ describe('<EmailsSection />', function () {
 
   it('renders user emails', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', fakeUsersData)
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     await waitFor(() => {
       fakeUsersData.forEach(userData => {
@@ -83,7 +74,7 @@ describe('<EmailsSection />', function () {
 
   it('renders primary status', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [professionalUserData])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     await screen.findByText(`${professionalUserData.email}`)
     screen.getByText('Primary')
@@ -91,14 +82,14 @@ describe('<EmailsSection />', function () {
 
   it('shows confirmation status for unconfirmed users', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [unconfirmedUserData])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     await screen.findByText(/unconfirmed/i)
   })
 
   it('hides confirmation status for confirmed users', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [confirmedUserData])
-    renderEmailsSection()
+    render(<EmailsSection />)
     await waitForElementToBeRemoved(() => screen.getByText(/loading/i))
 
     expect(screen.queryByText(/please check your inbox/i)).to.be.null
@@ -106,71 +97,71 @@ describe('<EmailsSection />', function () {
 
   it('renders resend link', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [unconfirmedUserData])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
-    await screen.findByRole('button', { name: 'Send confirmation code' })
+    await screen.findByRole('button', { name: /resend confirmation code/i })
   })
 
-  it('renders commons label', async function () {
+  it('renders professional label', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [professionalUserData])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const node = await screen.findByText(professionalUserData.email, {
       exact: false,
     })
-    expect(within(node).getByText(/commons/i)).to.exist
+    expect(within(node).getByText(/professional/i)).to.exist
   })
 
   it('shows loader when resending email', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [unconfirmedUserData])
 
-    renderEmailsSection()
+    render(<EmailsSection />)
     await waitForElementToBeRemoved(() => screen.getByText(/loading/i))
 
     fetchMock.post('/user/emails/send-confirmation-code', 200)
 
     const button = screen.getByRole('button', {
-      name: 'Send confirmation code',
+      name: /resend confirmation code/i,
     })
     fireEvent.click(button)
 
     expect(
       screen.queryByRole('button', {
-        name: 'Send confirmation code',
+        name: /resend confirmation code/i,
       })
     ).to.be.null
 
-    await screen.findByRole('dialog')
+    await waitForElementToBeRemoved(() => screen.getByText(/sending/i))
 
     expect(
       screen.queryByText(/an error has occurred while performing your request/i)
     ).to.be.null
 
     await screen.findAllByRole('button', {
-      name: 'Resend confirmation code',
+      name: /resend confirmation code/i,
     })
   })
 
   it('shows error when resending email fails', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [unconfirmedUserData])
 
-    renderEmailsSection()
+    render(<EmailsSection />)
     await waitForElementToBeRemoved(() => screen.getByText(/loading/i))
 
     fetchMock.post('/user/emails/send-confirmation-code', 503)
 
     const button = screen.getByRole('button', {
-      name: 'Send confirmation code',
+      name: /resend confirmation code/i,
     })
     fireEvent.click(button)
 
-    expect(screen.queryByRole('button', { name: 'Send confirmation code' })).to
-      .be.null
+    expect(screen.queryByRole('button', { name: /resend confirmation code/i }))
+      .to.be.null
 
-    await screen.findByRole('dialog')
+    await waitForElementToBeRemoved(() => screen.getByText(/sending/i))
 
-    await screen.findByText(/sorry, something went wrong/i)
-    screen.getByRole('button', { name: 'Resend confirmation code' })
+    screen.getByText(/sorry, something went wrong/i)
+    screen.getByRole('button', { name: /resend confirmation code/i })
   })
 
   it('sorts emails with primary first, then confirmed, then unconfirmed', async function () {
@@ -204,7 +195,7 @@ describe('<EmailsSection />', function () {
     ]
 
     fetchMock.get('/user/emails?ensureAffiliation=true', emails)
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     await waitForElementToBeRemoved(() => screen.getByText(/loading/i))
 

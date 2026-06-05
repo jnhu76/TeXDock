@@ -62,7 +62,6 @@ const OutlineItem = memo(function OutlineItem({
       role="treeitem"
       aria-current={isHighlighted}
       aria-label={outlineItem.title}
-      translate="no"
     >
       <div className="outline-item-row">
         {!!outlineItem.children && (

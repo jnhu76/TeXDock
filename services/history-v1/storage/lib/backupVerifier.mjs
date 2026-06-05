@@ -12,7 +12,7 @@ import blobHash from './blob_hash.js'
 import { NotFoundError } from '@overleaf/object-persistor/src/Errors.js'
 import logger from '@overleaf/logger'
 import path from 'node:path'
-import projectKey from '@overleaf/object-persistor/src/ProjectKey.js'
+import projectKey from './project_key.js'
 import streams from './streams.js'
 import objectPersistor from '@overleaf/object-persistor'
 import { getEndDateForRPO } from '../../backupVerifier/utils.mjs'
@@ -115,11 +115,7 @@ export async function verifyProjectWithErrorContext(
  * @param {CachedPerProjectEncryptedS3Persistor} backupPersistorForProject
  * @return {Promise<any>}
  */
-export async function loadChunk(
-  historyId,
-  startVersion,
-  backupPersistorForProject
-) {
+async function loadChunk(historyId, startVersion, backupPersistorForProject) {
   const key = path.join(
     projectKey.format(historyId),
     projectKey.pad(startVersion)
@@ -147,40 +143,31 @@ export async function loadChunk(
 export async function verifyProject(historyId, endTimestamp) {
   const backend = chunkStore.getBackend(historyId)
   const [first, last] = await Promise.all([
-    backend.getChunkForVersion(historyId, 0),
-    backend.getChunkForTimestamp(historyId, endTimestamp),
+    backend.getFirstChunkBeforeTimestamp(historyId, endTimestamp),
+    backend.getLastActiveChunkBeforeTimestamp(historyId, endTimestamp),
   ])
 
   const chunksRecordsToVerify = [
     {
       chunkId: first.id,
       chunkLabel: 'first',
-      ...first,
     },
   ]
   if (first.startVersion !== last.startVersion) {
     chunksRecordsToVerify.push({
       chunkId: last.id,
       chunkLabel: 'last before RPO',
-      ...last,
     })
   }
 
   const projectCache = await getProjectPersistor(historyId)
+
   const chunks = await Promise.all(
     chunksRecordsToVerify.map(async chunk => {
       try {
-        const chunkContents = await loadChunk(
-          historyId,
-          chunk.startVersion,
-          projectCache
+        return History.fromRaw(
+          await loadChunk(historyId, chunk.startVersion, projectCache)
         )
-        // filter the raw changes to only those that are <= endTimestamp
-        // to simulate the state of the project at endTimestamp
-        chunkContents.changes = chunkContents.changes.filter(
-          change => new Date(change.timestamp) <= endTimestamp
-        )
-        return History.fromRaw(chunkContents)
       } catch (err) {
         if (err instanceof Chunk.NotPersistedError) {
           throw new BackupRPOViolationChunkNotBackedUpError(

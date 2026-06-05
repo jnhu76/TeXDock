@@ -1,22 +1,19 @@
-import crypto from 'node:crypto'
 import settings from '@overleaf/settings'
 import logger from '@overleaf/logger'
 import OError from '@overleaf/o-error'
-import TeamInvitesHandler from './TeamInvitesHandler.mjs'
-import SessionManager from '../Authentication/SessionManager.mjs'
-import SubscriptionLocator from './SubscriptionLocator.mjs'
-import SubscriptionHelper from './SubscriptionHelper.mjs'
-import ErrorController from '../Errors/ErrorController.mjs'
-import EmailHelper from '../Helpers/EmailHelper.mjs'
-import UserGetter from '../User/UserGetter.mjs'
+import TeamInvitesHandler from './TeamInvitesHandler.js'
+import SessionManager from '../Authentication/SessionManager.js'
+import SubscriptionLocator from './SubscriptionLocator.js'
+import ErrorController from '../Errors/ErrorController.js'
+import EmailHelper from '../Helpers/EmailHelper.js'
+import UserGetter from '../User/UserGetter.js'
 import { expressify } from '@overleaf/promise-utils'
-import HttpErrorHandler from '../Errors/HttpErrorHandler.mjs'
-import PermissionsManager from '../Authorization/PermissionsManager.mjs'
-import EmailHandler from '../Email/EmailHandler.mjs'
-import { RateLimiter } from '../../infrastructure/RateLimiter.mjs'
-import Modules from '../../infrastructure/Modules.mjs'
-import UserAuditLogHandler from '../User/UserAuditLogHandler.mjs'
-import { sanitizeSessionUserForFrontEnd } from '../../infrastructure/FrontEndUser.mjs'
+import HttpErrorHandler from '../Errors/HttpErrorHandler.js'
+import PermissionsManager from '../Authorization/PermissionsManager.js'
+import EmailHandler from '../Email/EmailHandler.js'
+import { RateLimiter } from '../../infrastructure/RateLimiter.js'
+import Modules from '../../infrastructure/Modules.js'
+import UserAuditLogHandler from '../User/UserAuditLogHandler.js'
 
 const rateLimiters = {
   resendGroupInvite: new RateLimiter('resend-group-invite', {
@@ -25,11 +22,6 @@ const rateLimiters = {
   }),
 }
 
-/**
- * @param {any} req
- * @param {any} res
- * @param {any} next
- */
 async function createInvite(req, res, next) {
   const teamManagerId = SessionManager.getLoggedInUserId(req.session)
   const subscription = req.entity
@@ -44,15 +36,10 @@ async function createInvite(req, res, next) {
   }
 
   try {
-    const auditLog = {
-      initiatorId: teamManagerId,
-      ipAddress: req.ip,
-    }
     const invitedUserData = await TeamInvitesHandler.promises.createInvite(
       teamManagerId,
       subscription,
-      email,
-      auditLog
+      email
     )
     return res.json({ user: invitedUserData })
   } catch (err) {
@@ -75,11 +62,6 @@ async function createInvite(req, res, next) {
   }
 }
 
-/**
- * @param {any} req
- * @param {any} res
- * @param {any} next
- */
 async function viewInvite(req, res, next) {
   const { token } = req.params
   const sessionUser = SessionManager.getSessionUser(req.session)
@@ -100,10 +82,12 @@ async function viewInvite(req, res, next) {
     const personalSubscription =
       await SubscriptionLocator.promises.getUsersSubscription(userId)
 
-    const hasIndividualPaidSubscription =
-      SubscriptionHelper.isIndividualActivePaidSubscription(
-        personalSubscription
-      )
+    const hasIndividualRecurlySubscription =
+      personalSubscription &&
+      personalSubscription.groupPlan === false &&
+      personalSubscription.recurlyStatus?.state !== 'canceled' &&
+      personalSubscription.recurlySubscription_id &&
+      personalSubscription.recurlySubscription_id !== ''
 
     if (subscription?.managedUsersEnabled) {
       if (!subscription.populated('groupPolicy')) {
@@ -144,9 +128,6 @@ async function viewInvite(req, res, next) {
         logger.error({ err }, 'error getting subscription admin email')
       }
 
-      const usersSubscription =
-        await SubscriptionLocator.promises.getUserSubscriptionStatus(userId)
-
       return res.render('subscriptions/team/invite-managed', {
         inviterName: invite.inviterName,
         inviteToken: invite.token,
@@ -155,8 +136,7 @@ async function viewInvite(req, res, next) {
         currentManagedUserAdminEmail,
         groupSSOActive,
         subscriptionId: subscription._id.toString(),
-        user: sanitizeSessionUserForFrontEnd(sessionUser),
-        usersSubscription,
+        user: sessionUser,
       })
     } else {
       let currentManagedUserAdminEmail
@@ -170,13 +150,13 @@ async function viewInvite(req, res, next) {
       return res.render('subscriptions/team/invite', {
         inviterName: invite.inviterName,
         inviteToken: invite.token,
-        hasIndividualPaidSubscription,
+        hasIndividualRecurlySubscription,
         expired: req.query.expired,
         userRestrictions: Array.from(req.userRestrictions || []),
         currentManagedUserAdminEmail,
         groupSSOActive,
         subscriptionId: subscription._id.toString(),
-        user: sanitizeSessionUserForFrontEnd(sessionUser),
+        user: sessionUser,
       })
     }
   } else {
@@ -196,11 +176,6 @@ async function viewInvite(req, res, next) {
   }
 }
 
-/**
- * @param {any} req
- * @param {any} res
- * @param {any} next
- */
 async function viewInvites(req, res, next) {
   const user = SessionManager.getSessionUser(req.session)
   const groupSubscriptions =
@@ -216,19 +191,13 @@ async function viewInvites(req, res, next) {
   })
 }
 
-/**
- * @param {any} req
- * @param {any} res
- * @param {any} next
- */
 async function acceptInvite(req, res, next) {
   const { token } = req.params
   const userId = SessionManager.getLoggedInUserId(req.session)
 
   const subscription = await TeamInvitesHandler.promises.acceptInvite(
     token,
-    userId,
-    req.ip
+    userId
   )
   const groupSSOActive = (
     await Modules.promises.hooks.fire('hasGroupSSOEnabled', subscription)
@@ -252,11 +221,6 @@ async function acceptInvite(req, res, next) {
   res.json({ groupSSOActive })
 }
 
-/**
- * @param {any} req
- * @param {any} res
- * @param {any} next
- */
 function revokeInvite(req, res, next) {
   const subscription = req.entity
   const email = EmailHelper.parseEmail(req.params.email)
@@ -269,10 +233,6 @@ function revokeInvite(req, res, next) {
     teamManagerId,
     subscription,
     email,
-    /**
-     * @param {any} err
-     * @param {any} results
-     */
     function (err, results) {
       if (err) {
         return next(err)
@@ -282,11 +242,6 @@ function revokeInvite(req, res, next) {
   )
 }
 
-/**
- * @param {any} req
- * @param {any} res
- * @param {any} next
- */
 async function resendInvite(req, res, next) {
   const { entity: subscription } = req
   const userEmail = EmailHelper.parseEmail(req.body.email)
@@ -304,30 +259,11 @@ async function resendInvite(req, res, next) {
     return await createInvite(req, res)
   }
 
-  let acceptInviteUrl
-  if (subscription.domainCaptureEnabled) {
-    const samlInitPath = (
-      await Modules.promises.hooks.fire(
-        'getGroupSSOInitPath',
-        subscription,
-        userEmail
-      )
-    )?.[0]
-    acceptInviteUrl = `${settings.siteUrl}${samlInitPath}`
-  } else {
-    if (!currentInvite.token) {
-      currentInvite.token = crypto.randomBytes(32).toString('hex')
-      currentInvite.domainCapture = false
-      await subscription.save()
-    }
-    acceptInviteUrl = `${settings.siteUrl}/subscription/invites/${currentInvite.token}/`
-  }
-
   const opts = {
     to: userEmail,
     admin: subscription.admin_id,
     inviter: currentInvite.inviterName,
-    acceptInviteUrl,
+    acceptInviteUrl: `${settings.siteUrl}/subscription/invites/${currentInvite.token}/`,
     reminder: true,
   }
 

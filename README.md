@@ -1,16 +1,13 @@
 <h1 align="center">
   <br>
-  <a href="https://www.overleaf.com"><img src="doc/logo.png" alt="Overleaf" width="300"></a>
+  TeXDock
 </h1>
 
-<h4 align="center">An open-source online real-time collaborative LaTeX editor.</h4>
+<h4 align="center">基于 Overleaf Community Edition 的中文本地化构建</h4>
 
 <p align="center">
-  <a href="https://github.com/overleaf/overleaf/wiki">Wiki</a> •
-  <a href="https://www.overleaf.com/for/enterprises">Server Pro</a> •
-  <a href="#contributing">Contributing</a> •
-  <a href="https://mailchi.mp/overleaf.com/community-edition-and-server-pro">Mailing List</a> •
-  <a href="#authors">Authors</a> •
+  <a href="https://github.com/jnhu76/TeXDock">GitHub</a> •
+  <a href="https://github.com/overleaf/overleaf">Upstream</a> •
   <a href="#license">License</a>
 </p>
 
@@ -19,7 +16,46 @@
   Figure 1: A screenshot of a project being edited in Overleaf Community Edition.
 </p>
 
-## Community Edition
+## TeXDock
+
+TeXDock 是 [Overleaf Community Edition](https://github.com/overleaf/overleaf) 的中文本地化构建，主要改动：
+
+- apt 源切换为清华镜像（`mirrors.tuna.tsinghua.edu.cn`）
+- npm/yarn registry 切换为 `registry.npmmirror.com`
+- CTAN/TexLive 镜像切换为清华镜像
+- Docker 构建优化，适配国内网络环境
+
+## 快速开始
+
+```bash
+docker compose up -d
+```
+
+首次启动后需要初始化 MongoDB 副本集：
+
+```bash
+docker compose exec mongo mongosh --eval "rs.initiate({ _id: 'overleaf', members: [{ _id: 0, host: 'localhost:27017' }] })"
+```
+
+然后重启服务：
+
+```bash
+docker compose restart
+```
+
+访问 `http://localhost` 即可使用。
+
+## 构建
+
+```bash
+# 构建基础镜像
+cd server-ce && make build-base
+
+# 构建社区版镜像
+cd server-ce && make build-community
+```
+
+## Upstream
 
 [Overleaf](https://www.overleaf.com) is an open-source online real-time collaborative LaTeX editor. We run a hosted version at [www.overleaf.com](https://www.overleaf.com), but you can also run your own local version, and contribute to the development of Overleaf.
 
@@ -65,13 +101,10 @@ in which to run the Overleaf services. Baseimage uses the `runit` service
 manager to manage services, and we add our init-scripts from the `server-ce/runit`
 folder.
 
-## Contributing
+[Overleaf](https://www.overleaf.com) 是一个开源的在线实时协作 LaTeX 编辑器。
 
-Please see the [CONTRIBUTING](CONTRIBUTING.md) file for information on contributing to the development of Overleaf.
-
-## Authors
-
-[The Overleaf Team](https://www.overleaf.com/about)
+> [!CAUTION]
+> Overleaf Community Edition 适用于所有用户可信的环境，不支持沙箱编译。
 
 ## License
 

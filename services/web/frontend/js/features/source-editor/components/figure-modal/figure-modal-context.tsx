@@ -1,5 +1,5 @@
 import { FC, createContext, useContext, useReducer } from 'react'
-import { PastedImageData } from '../../utils/paste-image'
+import { PastedImageData } from '../../extensions/figure-modal'
 
 /* eslint-disable no-unused-vars */
 export enum FigureModalSource {

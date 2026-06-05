@@ -5,19 +5,12 @@ type RowLinkProps = {
   heading: string
   subtext: string
   icon: string
-  onClick?: () => void
 }
 
-export function RowLink({
-  href,
-  heading,
-  subtext,
-  icon,
-  onClick,
-}: RowLinkProps) {
+export function RowLink({ href, heading, subtext, icon }: RowLinkProps) {
   return (
     <li className="list-group-item row-link">
-      <a href={href} className="row-link-inner" onClick={onClick}>
+      <a href={href} className="row-link-inner">
         <MaterialIcon type={icon} className="p-2 p-md-3" />
         <div className="flex-grow-1">
           <strong>{heading}</strong>

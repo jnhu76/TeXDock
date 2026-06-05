@@ -1,7 +1,6 @@
 import FileTreeRoot from '../../../../../frontend/js/features/file-tree/components/file-tree-root'
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { SocketIOMock } from '@/ide/connection/SocketIoShim'
-import type { Socket } from '@/features/ide-react/connection/types/socket'
 
 describe('FileTree Rename Entity Flow', function () {
   beforeEach(function () {
@@ -10,9 +9,9 @@ describe('FileTree Rename Entity Flow', function () {
     })
   })
 
-  let socket: SocketIOMock & Socket
+  let socket: SocketIOMock
   beforeEach(function () {
-    socket = new SocketIOMock() as any
+    socket = new SocketIOMock()
     const rootFolder = [
       {
         _id: 'root-folder-id',
@@ -85,7 +84,7 @@ describe('FileTree Rename Entity Flow', function () {
       'renameFile'
     )
 
-    cy.findByLabelText('Expand').click()
+    cy.findByRole('button', { name: 'Expand' }).click()
 
     renameItem('c.tex', 'd.tex')
 
@@ -108,34 +107,38 @@ describe('FileTree Rename Entity Flow', function () {
   it('shows error modal on invalid filename', function () {
     renameItem('a.tex', '///')
 
-    cy.findByText('File name is empty or contains invalid characters', {
-      selector: '[role="alert"]',
+    cy.findByRole('alert', {
+      name: 'File name is empty or contains invalid characters',
+      hidden: true,
     })
   })
 
   it('shows error modal on duplicate filename', function () {
     renameItem('a.tex', 'folder')
 
-    cy.findByText('A file or folder with this name already exists', {
-      selector: '[role="alert"]',
+    cy.findByRole('alert', {
+      name: 'A file or folder with this name already exists',
+      hidden: true,
     })
   })
 
   it('shows error modal on duplicate filename in subfolder', function () {
-    cy.findByLabelText('Expand').click()
+    cy.findByRole('button', { name: 'Expand' }).click()
 
     renameItem('c.tex', 'e.tex')
 
-    cy.findByText('A file or folder with this name already exists', {
-      selector: '[role="alert"]',
+    cy.findByRole('alert', {
+      name: 'A file or folder with this name already exists',
+      hidden: true,
     })
   })
 
   it('shows error modal on blocked filename', function () {
     renameItem('a.tex', 'prototype')
 
-    cy.findByText('This file name is blocked.', {
-      selector: '[role="alert"]',
+    cy.findByRole('alert', {
+      name: 'This file name is blocked.',
+      hidden: true,
     })
   })
 

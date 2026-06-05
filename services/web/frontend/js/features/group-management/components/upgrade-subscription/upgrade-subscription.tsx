@@ -1,52 +1,35 @@
 import getMeta from '@/utils/meta'
-import { FetchError, postJSON } from '@/infrastructure/fetch-json'
+import { postJSON } from '@/infrastructure/fetch-json'
 import { useTranslation, Trans } from 'react-i18next'
 import { Card, Row, Col } from 'react-bootstrap'
-import IconButton from '@/shared/components/button/icon-button'
-import Button from '@/shared/components/button/button'
+import IconButton from '@/features/ui/components/bootstrap-5/icon-button'
+import Button from '@/features/ui/components/bootstrap-5/button'
 import UpgradeSubscriptionPlanDetails from './upgrade-subscription-plan-details'
+import useAsync from '@/shared/hooks/use-async'
 import RequestStatus from '../request-status'
 import UpgradeSummary, {
   SubscriptionChange,
 } from './upgrade-subscription-upgrade-summary'
 import { debugConsole } from '@/utils/debugging'
 import { sendMB } from '../../../../infrastructure/event-tracking'
-import handleStripePaymentAction from '@/features/subscription/util/handle-stripe-payment-action'
-import { useState } from 'react'
 
 function UpgradeSubscription() {
   const { t } = useTranslation()
   const groupName = getMeta('ol-groupName')
   const preview = getMeta('ol-subscriptionChangePreview') as SubscriptionChange
-  const isRedirectedPaymentError = Boolean(
-    getMeta('ol-subscriptionPaymentErrorCode')
-  )
-  const [isError, setIsError] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
-  const onSubmit = async () => {
+  const { isError, runAsync, isSuccess, isLoading } = useAsync()
+  const onSubmit = () => {
     sendMB('flex-upgrade-form', {
       action: 'click-upgrade-button',
     })
-    setIsLoading(true)
-
-    try {
-      await postJSON('/user/subscription/group/upgrade-subscription')
-      sendMB('flex-upgrade-success')
-      setIsSuccess(true)
-    } catch (error) {
-      const { handled } = await handleStripePaymentAction(error as FetchError)
-      if (handled) {
+    runAsync(postJSON('/user/subscription/group/upgrade-subscription'))
+      .then(() => {
         sendMB('flex-upgrade-success')
-        setIsSuccess(true)
-        return
-      }
-      debugConsole.error(error)
-      sendMB('flex-upgrade-error')
-      setIsError(true)
-    } finally {
-      setIsLoading(false)
-    }
+      })
+      .catch(() => {
+        debugConsole.error()
+        sendMB('flex-upgrade-error')
+      })
   }
 
   if (isSuccess) {
@@ -59,7 +42,7 @@ function UpgradeSubscription() {
     )
   }
 
-  if (isRedirectedPaymentError || isError) {
+  if (isError) {
     return (
       <RequestStatus
         variant="danger"

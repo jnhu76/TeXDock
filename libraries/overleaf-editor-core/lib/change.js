@@ -13,7 +13,7 @@ const V2DocVersions = require('./v2_doc_versions')
 
 /**
  * @import Author from "./author"
- * @import { BlobStore, RawChange, ReadonlyBlobStore } from "./types"
+ * @import { BlobStore, RawChange } from "./types"
  */
 
 /**
@@ -74,14 +74,6 @@ class Change {
 
   static fromRaw(raw) {
     if (!raw) return null
-    return Change.mustFromRaw(raw)
-  }
-
-  /**
-   * @param {RawChange} raw
-   * @return {Change}
-   */
-  static mustFromRaw(raw) {
     assert.array.of.object(raw.operations, 'bad raw.operations')
     assert.nonEmptyString(raw.timestamp, 'bad raw.timestamp')
 
@@ -227,7 +219,7 @@ class Change {
    * If this Change contains any File objects, load them.
    *
    * @param {string} kind see {File#load}
-   * @param {ReadonlyBlobStore} blobStore
+   * @param {BlobStore} blobStore
    * @return {Promise<void>}
    */
   async loadFiles(kind, blobStore) {
@@ -302,8 +294,6 @@ class Change {
     if (this.v2DocVersions) {
       snapshot.updateV2DocVersions(this.v2DocVersions)
     }
-
-    snapshot.setTimestamp(this.timestamp)
   }
 
   /**

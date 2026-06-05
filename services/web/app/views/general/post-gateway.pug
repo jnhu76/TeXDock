@@ -4,19 +4,23 @@ block vars
 	- var suppressNavbar = true
 	- var suppressFooter = true
 	- var suppressSkipToContent = true
-	- var suppressPugCookieBanner = true
+	- var suppressCookieBanner = true
+	- bootstrap5PageStatus = 'disabled'
 
 block content
 	.content.content-alt
 		.container
 			.row
-				.col-lg-6.offset-lg-3
+				.col-md-6.col-md-offset-3
 					.card
-						.card-body
-							p.text-center #{translate('processing_your_request')}
+						p.text-center #{translate('processing_your_request')}
 
-	form(data-ol-regular-form data-ol-auto-submit method='POST')
-		input(name='_csrf' type='hidden' value=csrfToken)
-		input(name='viaGateway' hidden type='submit' value='true')
-		each name in Object.keys(form_data)
-			input(name=name type='hidden' value=form_data[name])
+	form(
+		data-ol-regular-form
+		data-ol-auto-submit
+		method="POST"
+	)
+		input(name="_csrf" type="hidden" value=csrfToken)
+		input(hidden name="viaGateway" type="submit" value="true")
+		for name in Object.keys(form_data)
+			input(name=name type="hidden" value=form_data[name])

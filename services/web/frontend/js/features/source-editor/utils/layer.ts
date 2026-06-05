@@ -271,6 +271,7 @@ function rectanglesForRange(
         for (
           let pos = Math.max(r.from, start), endPos = Math.min(r.to, end);
           ;
+
         ) {
           const docLine = view.state.doc.lineAt(pos)
           for (const span of view.bidiSpans(docLine)) {

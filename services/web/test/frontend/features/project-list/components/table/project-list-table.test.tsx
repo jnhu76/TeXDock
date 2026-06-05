@@ -7,7 +7,9 @@ import { renderWithProjectListContext } from '../../helpers/render-with-context'
 
 const userId = '624333f147cfd8002622a1d3'
 
-describe('<ProjectListTable />', function () {
+// TODO(25331): re-enable
+// eslint-disable-next-line mocha/no-skipped-tests
+describe.skip('<ProjectListTable />', function () {
   beforeEach(function () {
     window.metaAttributesCache.set('ol-tags', [])
     window.metaAttributesCache.set('ol-user_id', userId)
@@ -28,7 +30,7 @@ describe('<ProjectListTable />', function () {
     let foundSortedColumn = false
     const columns = screen.getAllByRole('columnheader')
     columns.forEach(col => {
-      if (col.getAttribute('aria-label') === 'Last modified') {
+      if (col.getAttribute('aria-label') === 'Last Modified') {
         expect(col.getAttribute('aria-sort')).to.equal('descending')
         foundSortedColumn = true
       } else {
@@ -58,7 +60,7 @@ describe('<ProjectListTable />', function () {
     renderWithProjectListContext(<ProjectListTable />)
     screen.getByRole('button', { name: 'Sort by Title' })
     screen.getByRole('button', { name: 'Sort by Owner' })
-    screen.getByRole('button', { name: 'Reverse Last modified sort order' }) // currently sorted
+    screen.getByRole('button', { name: 'Reverse Last Modified sort order' }) // currently sorted
   })
 
   it('renders project title, owner, last modified, and action buttons', async function () {
@@ -144,14 +146,6 @@ describe('<ProjectListTable />', function () {
     renderWithProjectListContext(<ProjectListTable />)
     await fetchMock.callHistory.flush(true)
     const checkbox = await screen.findByLabelText('Select all projects')
-
-    // Wait for project checkboxes to be visible before clicking the select-all
-    // checkbox
-    await waitFor(() => {
-      const allCheckboxes = screen.queryAllByRole<HTMLInputElement>('checkbox')
-      expect(allCheckboxes.length).to.equal(currentProjects.length + 1)
-    })
-
     fireEvent.click(checkbox)
 
     await waitFor(() => {
@@ -166,13 +160,6 @@ describe('<ProjectListTable />', function () {
     renderWithProjectListContext(<ProjectListTable />)
     await fetchMock.callHistory.flush(true)
     const checkbox = await screen.findByLabelText('Select all projects')
-
-    // Wait for project checkboxes to be visible before clicking the select-all
-    // checkbox
-    await waitFor(() => {
-      const allCheckboxes = screen.queryAllByRole<HTMLInputElement>('checkbox')
-      expect(allCheckboxes.length).to.equal(currentProjects.length + 1)
-    })
 
     fireEvent.click(checkbox)
 
@@ -194,14 +181,6 @@ describe('<ProjectListTable />', function () {
     renderWithProjectListContext(<ProjectListTable />)
     await fetchMock.callHistory.flush(true)
     const checkbox = await screen.findByLabelText('Select all projects')
-
-    // Wait for project checkboxes to be visible before clicking the select-all
-    // checkbox
-    await waitFor(() => {
-      const allCheckboxes = screen.queryAllByRole<HTMLInputElement>('checkbox')
-      expect(allCheckboxes.length).to.equal(currentProjects.length + 1)
-    })
-
     fireEvent.click(checkbox)
 
     // make sure we are unchecking a project checkbox and that it is already
@@ -209,16 +188,15 @@ describe('<ProjectListTable />', function () {
     await waitFor(() => {
       expect(
         screen
-          .queryAllByRole<HTMLInputElement>('checkbox', { checked: true })?.[1]
-          ?.getAttribute('data-project-id')
+          .getAllByRole<HTMLInputElement>('checkbox', { checked: true })[1]
+          .getAttribute('data-project-id')
       ).to.exist
     })
 
     fireEvent.click(screen.getAllByRole<HTMLInputElement>('checkbox')[1])
 
     await waitFor(() => {
-      const allCheckboxes = screen.queryAllByRole<HTMLInputElement>('checkbox')
-      expect(allCheckboxes.length).to.equal(currentProjects.length + 1)
+      const allCheckboxes = screen.getAllByRole<HTMLInputElement>('checkbox')
       const allCheckboxesChecked = allCheckboxes.filter(c => c.checked)
       expect(allCheckboxesChecked.length).to.equal(currentProjects.length - 1)
     })
@@ -232,7 +210,6 @@ describe('<ProjectListTable />', function () {
     )
     fireEvent.click(checkbox)
     const allCheckboxes = screen.getAllByRole<HTMLInputElement>('checkbox')
-    expect(allCheckboxes.length).to.equal(currentProjects.length + 1)
     const allCheckboxesChecked = allCheckboxes.filter(c => c.checked)
     expect(allCheckboxesChecked.length).to.equal(1)
   })

@@ -13,6 +13,9 @@ import { Affiliation } from '../../../../../types/affiliation'
 import { normalize, NormalizedObject } from '../../../utils/normalize'
 import { getJSON } from '../../../infrastructure/fetch-json'
 import useAsync from '../../../shared/hooks/use-async'
+import usePersistedState from '../../../shared/hooks/use-persisted-state'
+
+const ONE_WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000
 
 // eslint-disable-next-line no-unused-vars
 export enum Actions {
@@ -218,6 +221,10 @@ const reducer = (state: State, action: Action) => {
 }
 
 function useUserEmails() {
+  const [
+    showInstitutionalLeaversSurveyUntil,
+    setShowInstitutionalLeaversSurveyUntil,
+  ] = usePersistedState('showInstitutionalLeaversSurveyUntil', 0, true)
   const [state, unsafeDispatch] = useReducer(reducer, initialState)
   const dispatch = useSafeDispatch(unsafeDispatch)
   const { data, isLoading, isError, isSuccess, runAsync } =
@@ -238,12 +245,34 @@ function useUserEmails() {
     getEmails()
   }, [getEmails])
 
+  const resetLeaversSurveyExpiration = useCallback(
+    (deletedEmail: UserEmailData) => {
+      if (
+        deletedEmail.emailHasInstitutionLicence ||
+        deletedEmail.affiliation?.pastReconfirmDate
+      ) {
+        const stillHasLicenseAccess = Object.values(state.data.byId).some(
+          userEmail =>
+            userEmail.email !== deletedEmail.email &&
+            userEmail.emailHasInstitutionLicence
+        )
+        if (!stillHasLicenseAccess) {
+          setShowInstitutionalLeaversSurveyUntil(Date.now() + ONE_WEEK_IN_MS)
+        }
+      }
+    },
+    [state, setShowInstitutionalLeaversSurveyUntil]
+  )
+
   return {
     state,
     isInitializing: isLoading && !data,
     isInitializingSuccess: isSuccess,
     isInitializingError: isError,
     getEmails,
+    showInstitutionalLeaversSurveyUntil,
+    setShowInstitutionalLeaversSurveyUntil,
+    resetLeaversSurveyExpiration,
     setLoading: useCallback(
       (flag: boolean) => dispatch(ActionCreators.setLoading(flag)),
       [dispatch]
@@ -283,13 +312,13 @@ type UserEmailsProviderProps = {
   children: React.ReactNode
 } & Record<string, unknown>
 
-export function UserEmailsProvider(props: UserEmailsProviderProps) {
+function UserEmailsProvider(props: UserEmailsProviderProps) {
   const value = useUserEmails()
 
   return <UserEmailsContext.Provider value={value} {...props} />
 }
 
-export const useUserEmailsContext = () => {
+const useUserEmailsContext = () => {
   const context = useContext(UserEmailsContext)
 
   if (context === undefined) {
@@ -299,4 +328,6 @@ export const useUserEmailsContext = () => {
   return context
 }
 
-export type EmailContextType = ReturnType<typeof useUserEmailsContext>
+type EmailContextType = ReturnType<typeof useUserEmailsContext>
+
+export { UserEmailsProvider, useUserEmailsContext, EmailContextType }

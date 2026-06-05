@@ -6,7 +6,7 @@ type SearchEventSegmentation = {
         searchType: 'full-project'
       } & (
         | { method: 'keyboard' }
-        | { method: 'button'; location: 'toolbar' | 'search-form' | 'rail' }
+        | { method: 'button'; location: 'toolbar' | 'search-form' }
       ))
     | ({
         searchType: 'document'
@@ -17,7 +17,6 @@ type SearchEventSegmentation = {
     searchType: 'full-project'
     totalDocs: number
     totalResults: number
-    'editor-redesign'?: 'enabled'
   }
   'search-result-click': {
     searchType: 'full-project'

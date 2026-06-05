@@ -1,7 +1,11 @@
-import { renderInReactLayout } from '@/react'
+import '../../marketing'
 
-import ConfirmSecondaryEmailForm from '@/features/settings/components/emails/confirm-secondary-email-form'
+import { createRoot } from 'react-dom/client'
+import ConfirmSecondaryEmailForm from '../../features/settings/components/emails/confirm-secondary-email-form'
 
-renderInReactLayout('confirm-secondary-email', () => (
-  <ConfirmSecondaryEmailForm />
-))
+const confirmEmailContainer = document.getElementById('confirm-secondary-email')
+
+if (confirmEmailContainer) {
+  const root = createRoot(confirmEmailContainer)
+  root.render(<ConfirmSecondaryEmailForm />)
+}

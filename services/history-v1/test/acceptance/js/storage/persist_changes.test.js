@@ -67,7 +67,7 @@ describe('persistChanges', function () {
     expect(chunk.getChanges().length).to.equal(1)
   })
 
-  it('persists changes in three chunks', async function () {
+  it('persists changes in two chunks', async function () {
     const limitsToPersistImmediately = {
       maxChunkChanges: 1,
       minChangeTimestamp: farFuture,
@@ -84,12 +84,7 @@ describe('persistChanges', function () {
       new Date(),
       []
     )
-    const thirdChange = new Change(
-      [new AddFileOperation('c.tex', File.fromString(''))],
-      new Date(),
-      []
-    )
-    const changes = [firstChange, secondChange, thirdChange]
+    const changes = [firstChange, secondChange]
 
     await chunkStore.initializeProject(projectId)
     const result = await persistChanges(
@@ -104,24 +99,20 @@ describe('persistChanges', function () {
         'a.tex': {
           content: '',
         },
-        'b.tex': {
-          content: '',
-        },
       },
-      timestamp: thirdChange.getTimestamp().toISOString(),
     })
-    const history = new History(snapshot, [thirdChange])
-    const currentChunk = new Chunk(history, 2)
+    const history = new History(snapshot, [secondChange])
+    const currentChunk = new Chunk(history, 1)
     expect(result).to.deep.equal({
-      numberOfChangesPersisted: 3,
+      numberOfChangesPersisted: 2,
       originalEndVersion: 0,
       currentChunk,
       resyncNeeded: false,
     })
 
     const chunk = await chunkStore.loadLatest(projectId)
-    expect(chunk.getStartVersion()).to.equal(2)
-    expect(chunk.getEndVersion()).to.equal(3)
+    expect(chunk.getStartVersion()).to.equal(1)
+    expect(chunk.getEndVersion()).to.equal(2)
     expect(chunk.getChanges().length).to.equal(1)
   })
 

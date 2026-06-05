@@ -1,7 +1,4 @@
-import {
-  EditorProviders,
-  makeEditorPropertiesProvider,
-} from '../../../helpers/editor-providers'
+import { EditorProviders } from '../../../helpers/editor-providers'
 import CodemirrorEditor from '../../../../../frontend/js/features/source-editor/components/codemirror-editor'
 import { mockScope } from '../helpers/mock-scope'
 import { TestContainer } from '../helpers/test-container'
@@ -10,18 +7,11 @@ const menuIconsText = 'content_copyexpand_more'
 
 const mountEditor = (content = '') => {
   const scope = mockScope(content)
+  scope.editor.showVisual = true
 
   cy.mount(
     <TestContainer>
-      <EditorProviders
-        scope={scope}
-        providers={{
-          EditorPropertiesProvider: makeEditorPropertiesProvider({
-            showVisual: true,
-            showSymbolPalette: false,
-          }),
-        }}
-      >
+      <EditorProviders scope={scope}>
         <CodemirrorEditor />
       </EditorProviders>
     </TestContainer>
@@ -752,7 +742,7 @@ describe('<CodeMirrorEditor/> paste HTML in Visual mode', function () {
   })
 
   // FIXME: need to assert on source code
-  // eslint-disable-next-line mocha/no-pending-tests
+  // eslint-disable-next-line mocha/no-skipped-tests
   it.skip('tidies whitespace in pasted tables', function () {
     mountEditor()
 
@@ -813,7 +803,7 @@ test test test</p>
   it('treats a pasted image as a figure even if there is HTML', function () {
     mountEditor()
 
-    cy.fixture<ArrayBuffer>('images/gradient.png').then(image => {
+    cy.fixture<Uint8Array>('images/gradient.png').then(image => {
       const file = new File([image], 'gradient.png', { type: 'image/png' })
       const html = `<meta charset="utf-8"><img src="https://example.com/gradient.png" alt="gradient">`
 
@@ -830,7 +820,7 @@ test test test</p>
   it('does not treat a pasted image as a figure if there is Office HTML', function () {
     mountEditor()
 
-    cy.fixture<ArrayBuffer>('images/gradient.png').then(image => {
+    cy.fixture<Uint8Array>('images/gradient.png').then(image => {
       const file = new File([image], 'gradient.png', { type: 'image/png' })
       const html = `<meta charset="utf-8"><meta name="ProgId" content="MS.Word"><img src="https://example.com/gradient.png" alt="gradient">`
 

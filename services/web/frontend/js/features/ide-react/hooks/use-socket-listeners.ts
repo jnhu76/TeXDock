@@ -4,7 +4,7 @@ import {
   listProjectInvites,
   listProjectMembers,
 } from '@/features/share-project-modal/utils/api'
-import { useProjectContext } from '@/shared/context/project-context'
+import useScopeValue from '@/shared/hooks/use-scope-value'
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
 import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { useModalsContext } from '@/features/ide-react/context/modals-context'
@@ -12,13 +12,17 @@ import { debugConsole } from '@/utils/debugging'
 import { useCallback } from 'react'
 import { PublicAccessLevel } from '../../../../../types/public-access-level'
 import { useLocation } from '@/shared/hooks/use-location'
+import { useEditorContext } from '@/shared/context/editor-context'
 
 function useSocketListeners() {
   const { t } = useTranslation()
   const { socket } = useConnectionContext()
+  const { projectId } = useIdeReactContext()
   const { showGenericMessageModal } = useModalsContext()
-  const { permissionsLevel } = useIdeReactContext()
-  const { projectId, updateProject } = useProjectContext()
+  const { permissionsLevel } = useEditorContext()
+  const [, setPublicAccessLevel] = useScopeValue('project.publicAccesLevel')
+  const [, setProjectMembers] = useScopeValue('project.members')
+  const [, setProjectInvites] = useScopeValue('project.invites')
   const location = useLocation()
 
   useSocketListener(
@@ -49,10 +53,10 @@ function useSocketListeners() {
     useCallback(
       (data: { newAccessLevel?: PublicAccessLevel }) => {
         if (data.newAccessLevel) {
-          updateProject({ publicAccessLevel: data.newAccessLevel })
+          setPublicAccessLevel(data.newAccessLevel)
         }
       },
-      [updateProject]
+      [setPublicAccessLevel]
     )
   )
 
@@ -63,13 +67,13 @@ function useSocketListeners() {
       listProjectMembers(projectId)
         .then(({ members }) => {
           if (members) {
-            updateProject({ members })
+            setProjectMembers(members)
           }
         })
         .catch(err => {
           debugConsole.error('Error fetching members for project', err)
         })
-    }, [projectId, updateProject])
+    }, [projectId, setProjectMembers])
   )
 
   useSocketListener(
@@ -81,7 +85,7 @@ function useSocketListeners() {
           listProjectMembers(projectId)
             .then(({ members }) => {
               if (members) {
-                updateProject({ members })
+                setProjectMembers(members)
               }
             })
             .catch(err => {
@@ -93,7 +97,7 @@ function useSocketListeners() {
           listProjectInvites(projectId)
             .then(({ invites }) => {
               if (invites) {
-                updateProject({ invites })
+                setProjectInvites(invites)
               }
             })
             .catch(err => {
@@ -101,29 +105,7 @@ function useSocketListeners() {
             })
         }
       },
-      [projectId, updateProject, permissionsLevel]
-    )
-  )
-
-  useSocketListener(
-    socket,
-    'mainBibliographyDocUpdated',
-    useCallback(
-      (payload: string) => {
-        updateProject({ mainBibliographyDocId: payload })
-      },
-      [updateProject]
-    )
-  )
-
-  useSocketListener(
-    socket,
-    'projectNameUpdated',
-    useCallback(
-      (payload: string) => {
-        updateProject({ name: payload })
-      },
-      [updateProject]
+      [projectId, setProjectInvites, setProjectMembers, permissionsLevel]
     )
   )
 }

@@ -10,12 +10,13 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { expect } from 'chai'
+const { expect } = require('chai')
 
-import RealTimeClient from './helpers/RealTimeClient.js'
-import MockWebServer from './helpers/MockWebServer.js'
-import FixturesManager from './helpers/FixturesManager.js'
-import async from 'async'
+const RealTimeClient = require('./helpers/RealTimeClient')
+const MockWebServer = require('./helpers/MockWebServer')
+const FixturesManager = require('./helpers/FixturesManager')
+
+const async = require('async')
 
 describe('clientTracking', function () {
   describe('when another logged in user joins a project', function () {

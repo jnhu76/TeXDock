@@ -155,7 +155,6 @@ export const enterNode = (
 
     const thisNode = {
       line: state.doc.lineAt(command.from).number,
-      toLine: state.doc.lineAt(command.to).number,
       title: getEntryText(state, name),
       from: command.from,
       to: command.to,
@@ -182,7 +181,6 @@ export const enterNode = (
           : ''
         const thisNode = {
           line: state.doc.lineAt(beginEnv.from).number,
-          toLine: state.doc.lineAt(beginEnv.to).number,
           title,
           from: beginEnv.from,
           to: beginEnv.to,

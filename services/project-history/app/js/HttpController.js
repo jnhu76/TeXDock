@@ -1,5 +1,6 @@
 import logger from '@overleaf/logger'
 import OError from '@overleaf/o-error'
+import request from 'request'
 import * as UpdatesProcessor from './UpdatesProcessor.js'
 import * as SummarizedUpdatesManager from './SummarizedUpdatesManager.js'
 import * as DiffManager from './DiffManager.js'
@@ -14,140 +15,14 @@ import * as LabelsManager from './LabelsManager.js'
 import * as HistoryApiManager from './HistoryApiManager.js'
 import * as RetryManager from './RetryManager.js'
 import * as FlushManager from './FlushManager.js'
-import Stream, { pipeline } from 'node:stream'
-import { fetchNothing, RequestFailedError } from '@overleaf/fetch-utils'
-import { z, zz, parseReq } from '@overleaf/validation-tools'
-import { IncrementalResponse } from '@overleaf/stream-utils'
+import { pipeline } from 'node:stream'
+import { RequestFailedError } from '@overleaf/fetch-utils'
 
 const ONE_DAY_IN_SECONDS = 24 * 60 * 60
 
-const cloneProjectSchema = z.object({
-  body: z.object({
-    targetProjectId: z.string(),
-  }),
-
-  params: z.object({
-    project_id: z.string(),
-  }),
-})
-
-export function cloneProject(req, res) {
-  const {
-    params: { project_id: sourceProjectId },
-    body: { targetProjectId },
-  } = parseReq(req, cloneProjectSchema)
-  const incrResp = new IncrementalResponse({
-    res,
-    timeout: 10 * 60_000 - 5_000,
-    logger,
-    label: 'clone history in project-history',
-    info: { targetProjectId, sourceProjectId },
-  })
-
-  incrResp.sendUpdate('best effort history flush: pending')
-  UpdatesProcessor.processUpdatesForProject(sourceProjectId, err => {
-    if (err) {
-      logger.warn(
-        { err, sourceProjectId },
-        'failed to flush during history clone'
-      )
-      incrResp.sendUpdate(
-        'best effort history flush: failed, a resync will be required'
-      )
-    } else {
-      incrResp.sendUpdate('best effort history flush: done')
-    }
-
-    WebApiManager.getHistoryId(targetProjectId, (err, targetHistoryId) => {
-      if (err) return incrResp.fail(OError.tag(err, 'get target historyId'))
-      WebApiManager.getHistoryId(sourceProjectId, (err, sourceHistoryId) => {
-        if (err) return incrResp.fail(OError.tag(err, 'get source historyId'))
-
-        incrResp.sendUpdate('cloning full project history data: pending')
-        HistoryStoreManager.cloneProject(
-          sourceHistoryId.toString(),
-          targetHistoryId.toString(),
-          incrResp.signal(),
-          (err, stream) => {
-            if (err) {
-              incrResp.fail(OError.tag(err, 'clone history-v1 data'))
-              return
-            }
-
-            // aborted. pipeline() would throw.
-            if (res.destroyed) {
-              stream.destroy()
-              incrResp.fail(new Error('request aborted'))
-              return
-            }
-
-            // The stream.pipeline callback API does not support options.
-            Stream.promises.pipeline(stream, res, { end: false }).then(
-              () => {
-                incrResp.sendUpdate('clone labels: pending')
-                LabelsManager.cloneLabels(
-                  sourceProjectId,
-                  targetProjectId,
-                  err => {
-                    if (err) {
-                      incrResp.fail(OError.tag(err, 'clone labels'))
-                      return
-                    }
-                    incrResp.sendUpdate('clone labels: done')
-
-                    incrResp.sendUpdate('clone resync state: pending')
-                    SyncManager.cloneResyncState(
-                      sourceProjectId,
-                      targetProjectId,
-                      err => {
-                        if (err) {
-                          incrResp.fail(OError.tag(err, 'clone resync state'))
-                          return
-                        }
-                        incrResp.sendUpdate('clone resync state: done')
-
-                        incrResp.sendUpdate('clone failure record: pending')
-                        ErrorRecorder.cloneFailure(
-                          sourceProjectId,
-                          targetProjectId,
-                          err => {
-                            if (err) {
-                              incrResp.fail(OError.tag(err, 'clone failure'))
-                              return
-                            }
-                            incrResp.sendUpdate('clone failure record: done')
-
-                            incrResp.sendUpdate('done')
-                            incrResp.end()
-                          }
-                        )
-                      }
-                    )
-                  }
-                )
-              },
-              err => {
-                incrResp.fail(OError.tag(err, 'stream history-v1 response'))
-              }
-            )
-          }
-        )
-      })
-    })
-  })
-}
-
-const getProjectBlobSchema = z.object({
-  params: z.object({
-    history_id: zz.objectId().or(z.coerce.number()),
-    hash: z.string(),
-  }),
-})
-
 export function getProjectBlob(req, res, next) {
-  const { params } = parseReq(req, getProjectBlobSchema)
-  const historyId = params.history_id
-  const blobHash = params.hash
+  const historyId = req.params.history_id
+  const blobHash = req.params.hash
   HistoryStoreManager.getProjectBlobStream(
     historyId,
     blobHash,
@@ -177,20 +52,9 @@ export function initializeProject(req, res, next) {
   })
 }
 
-const flushProjectSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-  query: z.object({
-    debug: z.stringbool().default(false),
-    bisect: z.stringbool().default(false),
-  }),
-})
-
 export function flushProject(req, res, next) {
-  const { query, params } = parseReq(req, flushProjectSchema)
-  const projectId = params.project_id
-  if (query.debug) {
+  const projectId = req.params.project_id
+  if (req.query.debug) {
     logger.debug(
       { projectId },
       'compressing project history in single-step mode'
@@ -201,7 +65,7 @@ export function flushProject(req, res, next) {
       }
       res.sendStatus(204)
     })
-  } else if (query.bisect) {
+  } else if (req.query.bisect) {
     logger.debug({ projectId }, 'compressing project history in bisect mode')
     UpdatesProcessor.processUpdatesForProjectUsingBisect(
       projectId,
@@ -224,19 +88,9 @@ export function flushProject(req, res, next) {
   }
 }
 
-const dumpProjectSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-  query: z.object({
-    count: z.coerce.number().int().optional(),
-  }),
-})
-
 export function dumpProject(req, res, next) {
-  const { query, params } = parseReq(req, dumpProjectSchema)
-  const projectId = params.project_id
-  const batchSize = query.count || UpdatesProcessor.REDIS_READ_BATCH_SIZE
+  const projectId = req.params.project_id
+  const batchSize = req.query.count || UpdatesProcessor.REDIS_READ_BATCH_SIZE
   logger.debug({ projectId }, 'retrieving raw updates')
   UpdatesProcessor.getRawUpdates(projectId, batchSize, (error, rawUpdates) => {
     if (error != null) {
@@ -246,30 +100,8 @@ export function dumpProject(req, res, next) {
   })
 }
 
-const flushOldSchema = z.object({
-  query: z.object({
-    // flush projects with queued ops older than this
-    maxAge: z.coerce
-      .number()
-      .int()
-      .default(6 * 3600),
-    // pause this amount of time between checking queues
-    queueDelay: z.coerce.number().int().default(100),
-    // maximum number of queues to check
-    limit: z.coerce.number().int().default(1000),
-    //  maximum amount of time allowed
-    timeout: z.coerce
-      .number()
-      .int()
-      .default(60 * 1000),
-    // whether to run in the background
-    background: z.stringbool().default(false),
-  }),
-})
-
 export function flushOld(req, res, next) {
-  const { query } = parseReq(req, flushOldSchema)
-  const { maxAge, queueDelay, limit, timeout, background } = query
+  const { maxAge, queueDelay, limit, timeout, background } = req.query
   const options = { maxAge, queueDelay, limit, timeout, background }
   FlushManager.flushOldOps(options, (error, results) => {
     if (error != null) {
@@ -279,21 +111,12 @@ export function flushOld(req, res, next) {
   })
 }
 
-const getDiffSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-  query: z.object({
-    pathname: z.string(),
-    from: z.coerce.number().int(),
-    to: z.coerce.number().int(),
-  }),
-})
-
 export function getDiff(req, res, next) {
-  const { query, params } = parseReq(req, getDiffSchema)
-  const { pathname, from, to } = query
-  const projectId = params.project_id
+  const projectId = req.params.project_id
+  const { pathname, from, to } = req.query
+  if (pathname == null) {
+    return res.sendStatus(400)
+  }
 
   logger.debug({ projectId, pathname, from, to }, 'getting diff')
   DiffManager.getDiff(projectId, pathname, from, to, (error, diff) => {
@@ -304,20 +127,9 @@ export function getDiff(req, res, next) {
   })
 }
 
-const getFileTreeDiffSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-  query: z.object({
-    from: z.coerce.number().int(),
-    to: z.coerce.number().int(),
-  }),
-})
-
 export function getFileTreeDiff(req, res, next) {
-  const { query, params } = parseReq(req, getFileTreeDiffSchema)
-  const { from, to } = query
-  const projectId = params.project_id
+  const projectId = req.params.project_id
+  const { to, from } = req.query
 
   DiffManager.getFileTreeDiff(projectId, from, to, (error, diff) => {
     if (error != null) {
@@ -327,20 +139,9 @@ export function getFileTreeDiff(req, res, next) {
   })
 }
 
-const getUpdatesSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-  query: z.object({
-    before: z.coerce.number().int().optional(),
-    min_count: z.coerce.number().int().optional(),
-  }),
-})
-
 export function getUpdates(req, res, next) {
-  const { query, params } = parseReq(req, getUpdatesSchema)
-  const projectId = params.project_id
-  const { before, min_count: minCount } = query
+  const projectId = req.params.project_id
+  const { before, min_count: minCount } = req.query
   SummarizedUpdatesManager.getSummarizedProjectUpdates(
     projectId,
     { before, min_count: minCount },
@@ -360,63 +161,8 @@ export function getUpdates(req, res, next) {
   )
 }
 
-const getResyncPendingSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId(),
-  }),
-})
-
-export function getResyncPending(req, res, next) {
-  const {
-    params: { project_id: projectId },
-  } = parseReq(req, getResyncPendingSchema)
-  SyncManager.getResyncState(projectId, (err, state) => {
-    if (err) return next(err)
-    res.json({
-      resyncPending: state.isSyncOngoing(),
-      syncStuck: state.isSyncStuck(),
-    })
-  })
-}
-
-const getDebugInfoSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId(),
-  }),
-})
-
-export function getDebugInfo(req, res, next) {
-  const {
-    params: { project_id: projectId },
-  } = parseReq(req, getDebugInfoSchema)
-  SyncManager.getResyncState(projectId, (err, state) => {
-    if (err) return next(err)
-    ErrorRecorder.getFailureRecord(projectId, (err, failureRecord) => {
-      if (err) return next(err)
-      res.json({
-        failureRecord,
-        syncState: {
-          resyncPending: state.isSyncOngoing(),
-          resyncCount: state.resyncCount,
-          resyncPendingSince: state.resyncPendingSince,
-          lastUpdated: state.lastUpdated,
-          history: state.history,
-          ...state.toRaw(),
-        },
-      })
-    })
-  })
-}
-
-const latestVersionSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-})
-
 export function latestVersion(req, res, next) {
-  const { params } = parseReq(req, latestVersionSchema)
-  const projectId = params.project_id
+  const projectId = req.params.project_id
   logger.debug({ projectId }, 'compressing project history and getting version')
   UpdatesProcessor.processUpdatesForProject(projectId, error => {
     if (error != null) {
@@ -444,17 +190,8 @@ export function latestVersion(req, res, next) {
   })
 }
 
-const getFileSnapshotSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-    version: z.coerce.number().int(),
-    pathname: z.string(),
-  }),
-})
-
 export function getFileSnapshot(req, res, next) {
-  const { params } = parseReq(req, getFileSnapshotSchema)
-  const { project_id: projectId, version, pathname } = params
+  const { project_id: projectId, version, pathname } = req.params
   SnapshotManager.getFileSnapshotStream(
     projectId,
     version,
@@ -471,17 +208,8 @@ export function getFileSnapshot(req, res, next) {
   )
 }
 
-const getRangesSnapshotSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-    version: z.coerce.number().int(),
-    pathname: z.string(),
-  }),
-})
-
 export function getRangesSnapshot(req, res, next) {
-  const { params } = parseReq(req, getRangesSnapshotSchema)
-  const { project_id: projectId, version, pathname } = params
+  const { project_id: projectId, version, pathname } = req.params
   SnapshotManager.getRangesSnapshot(
     projectId,
     version,
@@ -495,17 +223,8 @@ export function getRangesSnapshot(req, res, next) {
   )
 }
 
-const getFileMetadataSnapshotSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-    version: z.coerce.number().int(),
-    pathname: z.string(),
-  }),
-})
-
 export function getFileMetadataSnapshot(req, res, next) {
-  const { params } = parseReq(req, getFileMetadataSnapshotSchema)
-  const { project_id: projectId, version, pathname } = params
+  const { project_id: projectId, version, pathname } = req.params
   SnapshotManager.getFileMetadataSnapshot(
     projectId,
     version,
@@ -519,15 +238,8 @@ export function getFileMetadataSnapshot(req, res, next) {
   )
 }
 
-const getLatestSnapshotSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-})
-
 export function getLatestSnapshot(req, res, next) {
-  const { params } = parseReq(req, getLatestSnapshotSchema)
-  const { project_id: projectId } = params
+  const { project_id: projectId } = req.params
   WebApiManager.getHistoryId(projectId, (error, historyId) => {
     if (error) return next(OError.tag(error))
     SnapshotManager.getLatestSnapshot(
@@ -544,19 +256,9 @@ export function getLatestSnapshot(req, res, next) {
   })
 }
 
-const getChangesInChunkSinceSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-  query: z.object({
-    since: z.coerce.number().int().min(0),
-  }),
-})
-
 export function getChangesInChunkSince(req, res, next) {
-  const { query, params } = parseReq(req, getChangesInChunkSinceSchema)
-  const { project_id: projectId } = params
-  const { since } = query
+  const { project_id: projectId } = req.params
+  const { since } = req.query
   WebApiManager.getHistoryId(projectId, (error, historyId) => {
     if (error) return next(OError.tag(error))
     SnapshotManager.getChangesInChunkSince(
@@ -577,16 +279,8 @@ export function getChangesInChunkSince(req, res, next) {
   })
 }
 
-const getProjectSnapshotSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-    version: z.coerce.number().int(),
-  }),
-})
-
 export function getProjectSnapshot(req, res, next) {
-  const { params } = parseReq(req, getProjectSnapshotSchema)
-  const { project_id: projectId, version } = params
+  const { project_id: projectId, version } = req.params
   SnapshotManager.getProjectSnapshot(
     projectId,
     version,
@@ -599,16 +293,8 @@ export function getProjectSnapshot(req, res, next) {
   )
 }
 
-const getPathsAtVersionSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-    version: z.coerce.number().int(),
-  }),
-})
-
 export function getPathsAtVersion(req, res, next) {
-  const { params } = parseReq(req, getPathsAtVersionSchema)
-  const { project_id: projectId, version } = params
+  const { project_id: projectId, version } = req.params
   SnapshotManager.getPathsAtVersion(projectId, version, (error, result) => {
     if (error != null) {
       return next(error)
@@ -639,40 +325,16 @@ export function checkLock(req, res) {
   })
 }
 
-const resyncProjectSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-  query: z.object({
-    force: z.stringbool().default(false),
-    recoverCorruptedFiles: z.stringbool().default(false),
-  }),
-  body: z.object({
-    force: z.boolean().default(false),
-    recoverCorruptedFiles: z.boolean().default(false),
-    origin: z
-      .object({
-        kind: z.string(),
-      })
-      .optional(),
-    historyRangesMigration: z.enum(['forwards', 'backwards']).optional(),
-  }),
-})
-
 export function resyncProject(req, res, next) {
-  const { query, params, body } = parseReq(req, resyncProjectSchema)
-  const projectId = params.project_id
+  const projectId = req.params.project_id
   const options = {}
-  if (body.origin) {
-    options.origin = body.origin
+  if (req.body.origin) {
+    options.origin = req.body.origin
   }
-  if (body.historyRangesMigration) {
-    options.historyRangesMigration = body.historyRangesMigration
+  if (req.body.historyRangesMigration) {
+    options.historyRangesMigration = req.body.historyRangesMigration
   }
-  if (query.force || body.force) {
-    if (query.recoverCorruptedFiles || body.recoverCorruptedFiles) {
-      options.recoverCorruptedFiles = true
-    }
+  if (req.query.force || req.body.force) {
     // this will delete the queue and clear the sync state
     // use if the project is completely broken
     SyncManager.startHardResync(projectId, options, error => {
@@ -703,20 +365,10 @@ export function resyncProject(req, res, next) {
   }
 }
 
-const forceDebugProjectSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-  query: z.object({
-    clear: z.stringbool().default(false),
-  }),
-})
-
 export function forceDebugProject(req, res, next) {
-  const { query, params } = parseReq(req, forceDebugProjectSchema)
-  const projectId = params.project_id
+  const projectId = req.params.project_id
   // set the debug flag to true unless we see ?clear=true
-  const state = !query.clear
+  const state = !req.query.clear
   ErrorRecorder.setForceDebug(projectId, state, error => {
     if (error != null) {
       return next(error)
@@ -740,13 +392,6 @@ export function getFailures(req, res, next) {
   })
 }
 
-export function getFailuresFull(req, res, next) {
-  ErrorRecorder.getFailuresFull((error, result) => {
-    if (error) return next(error)
-    res.send(result)
-  })
-}
-
 export function getQueueCounts(req, res, next) {
   RedisManager.getProjectIdsWithHistoryOpsCount((err, queuedProjectsCount) => {
     if (err != null) {
@@ -756,15 +401,8 @@ export function getQueueCounts(req, res, next) {
   })
 }
 
-const getLabelsSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-})
-
 export function getLabels(req, res, next) {
-  const { params } = parseReq(req, getLabelsSchema)
-  const projectId = params.project_id
+  const projectId = req.params.project_id
   HistoryApiManager.shouldUseProjectHistory(
     projectId,
     (error, shouldUseProjectHistory) => {
@@ -785,30 +423,15 @@ export function getLabels(req, res, next) {
   )
 }
 
-const createLabelSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-    user_id: zz.objectId().optional(),
-  }),
-  body: z.object({
-    version: z.number().int(),
-    comment: z.string(),
-    created_at: z.string().optional(),
-    validate_exists: z.boolean().default(true),
-    user_id: zz.objectId().nullable().optional(),
-  }),
-})
-
 export function createLabel(req, res, next) {
-  const { params, body } = parseReq(req, createLabelSchema)
-  const { project_id: projectId, user_id: userIdParam } = params
+  const { project_id: projectId, user_id: userIdParam } = req.params
   const {
     version,
     comment,
     user_id: userIdBody,
     created_at: createdAt,
     validate_exists: validateExists,
-  } = body
+  } = req.body
 
   // Temporarily looking up both params and body while rolling out changes
   // in the router path - https://github.com/overleaf/internal/pull/20200
@@ -857,17 +480,12 @@ export function createLabel(req, res, next) {
  * This will delete a label if it is owned by the current user. If you wish to
  * delete a label regardless of the current user, then use `deleteLabel` instead.
  */
-const deleteLabelForUserSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-    user_id: zz.objectId(),
-    label_id: zz.objectId(),
-  }),
-})
-
 export function deleteLabelForUser(req, res, next) {
-  const { params } = parseReq(req, deleteLabelForUserSchema)
-  const { project_id: projectId, user_id: userId, label_id: labelId } = params
+  const {
+    project_id: projectId,
+    user_id: userId,
+    label_id: labelId,
+  } = req.params
 
   LabelsManager.deleteLabelForUser(projectId, userId, labelId, error => {
     if (error != null) {
@@ -877,16 +495,8 @@ export function deleteLabelForUser(req, res, next) {
   })
 }
 
-const deleteLabelSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-    label_id: zz.objectId(),
-  }),
-})
-
 export function deleteLabel(req, res, next) {
-  const { params } = parseReq(req, deleteLabelSchema)
-  const { project_id: projectId, label_id: labelId } = params
+  const { project_id: projectId, label_id: labelId } = req.params
 
   LabelsManager.deleteLabel(projectId, labelId, error => {
     if (error != null) {
@@ -896,20 +506,8 @@ export function deleteLabel(req, res, next) {
   })
 }
 
-const retryFailuresSchema = z.object({
-  query: z.object({
-    failureType: z.enum(['soft', 'hard']).optional(),
-    // bail out after this time limit
-    timeout: z.coerce.number().int().default(300),
-    // maximum number of projects to check
-    limit: z.coerce.number().int().default(100),
-    callbackUrl: z.string().optional(),
-  }),
-})
-
 export function retryFailures(req, res, next) {
-  const { query } = parseReq(req, retryFailuresSchema)
-  const { failureType, timeout, limit, callbackUrl } = query
+  const { failureType, timeout, limit, callbackUrl } = req.query
   if (callbackUrl) {
     // send response but run in background when callbackUrl provided
     res.send({ retryStatus: 'running retryFailures in background' })
@@ -929,9 +527,7 @@ export function retryFailures(req, res, next) {
             const found = key.match(/^X-CALLBACK-(.*)/i)
             callbackHeaders[found[1]] = req.headers[key]
           }
-          fetchNothing(callbackUrl, { headers: callbackHeaders }).catch(err => {
-            logger.warn({ err }, 'failed to ping callback url')
-          })
+          request({ url: callbackUrl, headers: callbackHeaders })
         }
       } else {
         if (error != null) {
@@ -943,16 +539,8 @@ export function retryFailures(req, res, next) {
   )
 }
 
-const transferLabelsSchema = z.object({
-  params: z.object({
-    from_user: zz.objectId(),
-    to_user: zz.objectId(),
-  }),
-})
-
 export function transferLabels(req, res, next) {
-  const { params } = parseReq(req, transferLabelsSchema)
-  const { from_user: fromUser, to_user: toUser } = params
+  const { from_user: fromUser, to_user: toUser } = req.params
   LabelsManager.transferLabels(fromUser, toUser, error => {
     if (error != null) {
       return next(error)
@@ -961,15 +549,8 @@ export function transferLabels(req, res, next) {
   })
 }
 
-const deleteProjectSchema = z.object({
-  params: z.object({
-    project_id: zz.objectId().or(z.coerce.number()),
-  }),
-})
-
 export function deleteProject(req, res, next) {
-  const { params } = parseReq(req, deleteProjectSchema)
-  const { project_id: projectId } = params
+  const { project_id: projectId } = req.params
   // clear the timestamp before clearing the queue,
   // because the queue location is used in the migration
   RedisManager.clearFirstOpTimestamp(projectId, err => {

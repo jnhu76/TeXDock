@@ -7,11 +7,11 @@ function GitLogoOrange({ size = 40 }: { size?: number }) {
       viewBox="0 0 92 92"
     >
       <defs>
-        <clipPath id="git-logo-path">
+        <clipPath id="a">
           <path d="M0 .113h91.887V92H0Zm0 0" />
         </clipPath>
       </defs>
-      <g clipPath="url(#git-logo-path)">
+      <g clipPath="url(#a)">
         <path
           style={{
             stroke: 'none',

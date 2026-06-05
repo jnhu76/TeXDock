@@ -4,7 +4,8 @@ import localesPromise from '@/i18n'
 import './shared/commands'
 import './shared/exceptions'
 import './ct/commands'
-import '../../test/frontend/helpers/bootstrap'
+import './ct/codemirror'
+import '../../test/frontend/helpers/bootstrap-5'
 
 beforeEach(function () {
   cy.wrap(localesPromise).then(resetMeta)

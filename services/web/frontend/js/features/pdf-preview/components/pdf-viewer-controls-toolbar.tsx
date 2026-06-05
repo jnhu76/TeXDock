@@ -9,7 +9,6 @@ import { useDetachCompileContext as useCompileContext } from '../../../shared/co
 import { useCommandProvider } from '@/features/ide-react/hooks/use-command-provider'
 import { useTranslation } from 'react-i18next'
 import { useLayoutContext } from '@/shared/context/layout-context'
-import { PdfHybridThemeButton } from './pdf-hybrid-theme-button'
 
 type PdfViewerControlsToolbarProps = {
   requestPresentationMode: () => void
@@ -92,7 +91,7 @@ function PdfViewerControlsToolbar({
   }
 
   const InnerControlsComponent =
-    availableWidth >= 320
+    availableWidth >= 300
       ? PdfViewerControlsToolbarFull
       : PdfViewerControlsToolbarSmall
 
@@ -134,7 +133,6 @@ function PdfViewerControlsToolbarFull({
 }: InnerControlsProps) {
   return (
     <>
-      <PdfHybridThemeButton />
       <PdfPageNumberControl
         setPage={setPage}
         page={page}
@@ -163,7 +161,6 @@ function PdfViewerControlsToolbarSmall({
 }: InnerControlsProps) {
   return (
     <div className="pdfjs-viewer-controls-small">
-      <PdfHybridThemeButton />
       <PdfZoomDropdown
         requestPresentationMode={requestPresentationMode}
         rawScale={rawScale}

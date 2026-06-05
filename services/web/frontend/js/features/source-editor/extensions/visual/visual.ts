@@ -9,7 +9,6 @@ import {
 import { visualHighlightStyle, visualTheme } from './visual-theme'
 import { atomicDecorations } from './atomic-decorations'
 import { markDecorations } from './mark-decorations'
-import importOverleafModules from '../../../../../macros/import-overleaf-module.macro'
 import { EditorView, ViewPlugin } from '@codemirror/view'
 import { visualKeymap } from './visual-keymap'
 import { mousedown, mouseDownEffect } from './selection'
@@ -27,15 +26,6 @@ type Options = {
   visual: boolean
   previewByPath: (path: string) => PreviewPath | null
 }
-
-// Language-specific visual editor extensions provided by modules (e.g. the
-// markdown visual editor). They live in the visual bundle so they are only
-// active in visual mode and react to switching editor modes.
-const visualEditorExtensions: Array<(options: Options) => Extension> =
-  importOverleafModules('sourceEditorMarkdownExtensions').map(
-    (item: { import: { extension: (options: Options) => Extension } }) =>
-      item.import.extension
-  )
 
 const visualConf = new Compartment()
 
@@ -104,7 +94,7 @@ const parsedAttributesConf = new Compartment()
  * A view plugin which shows the editor content, makes it focusable,
  * and restores the scroll position, once the initial decorations have been applied.
  */
-export const showContentWhenParsed = [
+const showContentWhenParsed = [
   parsedAttributesConf.of([EditorView.editable.of(false)]),
   ViewPlugin.define(view => {
     const showContent = () => {
@@ -181,7 +171,6 @@ const extension = (options: Options) => [
   mousedown,
   listItemMarker,
   atomicDecorations(options),
-  visualEditorExtensions.map(extension => extension(options)),
   markDecorations, // NOTE: must be after atomicDecorations, so that mark decorations wrap inline widgets
   visualKeymap,
   commandTooltip,
@@ -189,5 +178,4 @@ const extension = (options: Options) => [
   showContentWhenParsed,
   pasteHtml,
   tableGeneratorTheme,
-  EditorView.contentAttributes.of({ 'aria-label': 'Visual Editor editing' }),
 ]

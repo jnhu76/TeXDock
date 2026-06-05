@@ -1,6 +1,6 @@
-import AuthenticationManager from '../../../app/src/Features/Authentication/AuthenticationManager.mjs'
+import AuthenticationManager from '../../../app/src/Features/Authentication/AuthenticationManager.js'
 import UserHelper from './helpers/UserHelper.mjs'
-import Features from '../../../app/src/infrastructure/Features.mjs'
+import Features from '../../../app/src/infrastructure/Features.js'
 import { expect } from 'chai'
 
 describe('UserHelper', function () {

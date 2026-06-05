@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useEffect } from 'react'
 import classNames from 'classnames'
 
 import {
@@ -46,13 +46,9 @@ function FileTreeFolder({
     }
   }, [id, selectedEntityParentIds, setExpanded])
 
-  const handleExpandCollapseClick = useCallback(() => {
-    setExpanded(expanded => !expanded)
-  }, [setExpanded])
-
-  const onClick = useCallback(() => {
-    handleExpandCollapseClick()
-  }, [handleExpandCollapseClick])
+  function handleExpandCollapseClick() {
+    setExpanded(!expanded)
+  }
 
   const { isOver: isOverRoot, dropRef: dropRefRoot } = useDroppable(id)
   const { isOver: isOverList, dropRef: dropRefList } = useDroppable(id)
@@ -66,19 +62,23 @@ function FileTreeFolder({
         {...selectableEntityProps}
         aria-expanded={expanded}
         aria-label={name}
+        tabIndex={0}
         ref={dropRefRoot}
         className={classNames(selectableEntityProps.className, {
           'dnd-droppable-hover': isOverRoot || isOverList,
         })}
-        translate="no"
       >
         <FileTreeItemInner
           id={id}
           name={name}
           type="folder"
           isSelected={isSelected}
-          onClick={onClick}
-          icons={<FileTreeFolderIcons expanded={expanded} />}
+          icons={
+            <FileTreeFolderIcons
+              expanded={expanded}
+              onExpandCollapseClick={handleExpandCollapseClick}
+            />
+          }
         />
       </li>
       {expanded ? (

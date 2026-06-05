@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import PropTypes from 'prop-types'
 import RegisterForm from './register-form'
-import OLRow from '@/shared/components/ol/ol-row'
-import OLCol from '@/shared/components/ol/ol-col'
-import OLCard from '@/shared/components/ol/ol-card'
-import Notification from '@/shared/components/notification'
+import OLRow from '@/features/ui/components/ol/ol-row'
+import OLCol from '@/features/ui/components/ol/ol-col'
+import OLCard from '@/features/ui/components/ol/ol-card'
 
 function UserActivateRegister() {
   const [emails, setEmails] = useState([])
@@ -17,7 +16,7 @@ function UserActivateRegister() {
       <OLCol>
         <OLCard>
           <div className="page-header">
-            <h1>Register new users</h1>
+            <h1>Register New Users</h1>
           </div>
           <RegisterForm
             setRegistrationSuccess={setRegistrationSuccess}
@@ -43,17 +42,11 @@ function UserActivateRegister() {
 
 function UserActivateError({ failedEmails }) {
   return (
-    <div className="row-spaced">
-      <Notification
-        type="error"
-        content="Sorry, an error occured, failed to register these email:"
-        className="mb-3"
-      />
-      <ul>
-        {failedEmails.map(email => (
-          <li key={email}>{email}</li>
-        ))}
-      </ul>
+    <div className="row-spaced text-danger">
+      <p>Sorry, an error occured, failed to register these emails.</p>
+      {failedEmails.map(email => (
+        <p key={email}>{email}</p>
+      ))}
     </div>
   )
 }

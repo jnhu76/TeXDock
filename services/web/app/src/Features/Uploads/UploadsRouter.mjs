@@ -1,10 +1,9 @@
-import AuthorizationMiddleware from '../Authorization/AuthorizationMiddleware.mjs'
-import AuthenticationController from '../Authentication/AuthenticationController.mjs'
+import AuthorizationMiddleware from '../Authorization/AuthorizationMiddleware.js'
+import AuthenticationController from '../Authentication/AuthenticationController.js'
 import ProjectUploadController from './ProjectUploadController.mjs'
-import { RateLimiter } from '../../infrastructure/RateLimiter.mjs'
-import RateLimiterMiddleware from '../Security/RateLimiterMiddleware.mjs'
+import { RateLimiter } from '../../infrastructure/RateLimiter.js'
+import RateLimiterMiddleware from '../Security/RateLimiterMiddleware.js'
 import Settings from '@overleaf/settings'
-import AsyncLocalStorage from '../../infrastructure/AsyncLocalStorage.mjs'
 
 const rateLimiters = {
   projectUpload: new RateLimiter('project-upload', {
@@ -27,28 +26,6 @@ export default {
       ProjectUploadController.uploadProject
     )
 
-    if (Settings.enablePandocConversions) {
-      webRouter.post(
-        '/project/new/import-document',
-        AuthenticationController.requireLogin(),
-        RateLimiterMiddleware.rateLimit(rateLimiters.projectUpload),
-        ProjectUploadController.multerMiddleware,
-        ProjectUploadController.importDocument
-      )
-      // Keep old route for backwards compatibility with old frontends that haven't reloaded
-      webRouter.post(
-        '/project/new/import-docx',
-        AuthenticationController.requireLogin(),
-        RateLimiterMiddleware.rateLimit(rateLimiters.projectUpload),
-        ProjectUploadController.multerMiddleware,
-        (req, res, next) => {
-          req.query.type = 'docx'
-          next()
-        },
-        ProjectUploadController.importDocument
-      )
-    }
-
     const fileUploadEndpoint = '/Project/:Project_id/upload'
     const fileUploadRateLimit = RateLimiterMiddleware.rateLimit(
       rateLimiters.fileUpload,
@@ -60,7 +37,6 @@ export default {
       webRouter.post(
         fileUploadEndpoint,
         fileUploadRateLimit,
-        AsyncLocalStorage.middleware,
         AuthorizationMiddleware.ensureUserCanWriteProjectContent,
         ProjectUploadController.multerMiddleware,
         ProjectUploadController.uploadFile
@@ -70,7 +46,6 @@ export default {
         fileUploadEndpoint,
         fileUploadRateLimit,
         AuthenticationController.requireLogin(),
-        AsyncLocalStorage.middleware,
         AuthorizationMiddleware.ensureUserCanWriteProjectContent,
         ProjectUploadController.multerMiddleware,
         ProjectUploadController.uploadFile

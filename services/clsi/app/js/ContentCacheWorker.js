@@ -1,4 +1,4 @@
-import workerpool from 'workerpool'
-import ContentCacheManager from './ContentCacheManager.js'
+const workerpool = require('workerpool')
+const ContentCacheManager = require('./ContentCacheManager')
 
 workerpool.worker(ContentCacheManager.promises)

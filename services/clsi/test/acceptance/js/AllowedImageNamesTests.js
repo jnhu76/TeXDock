@@ -1,9 +1,9 @@
-import Client from './helpers/Client.js'
-import ClsiApp from './helpers/ClsiApp.js'
-import { expect } from 'chai'
+const Client = require('./helpers/Client')
+const ClsiApp = require('./helpers/ClsiApp')
+const { expect } = require('chai')
 
 describe('AllowedImageNames', function () {
-  beforeEach(async function () {
+  beforeEach(function (done) {
     this.project_id = Client.randomId()
     this.request = {
       options: {
@@ -21,21 +21,22 @@ Hello world
         },
       ],
     }
-    await ClsiApp.ensureRunning()
+    ClsiApp.ensureRunning(done)
   })
 
   describe('with a valid name', function () {
-    beforeEach(async function () {
+    beforeEach(function (done) {
       this.request.options.imageName = process.env.TEXLIVE_IMAGE
 
-      try {
-        this.body = await Client.compile(this.project_id, this.request)
-      } catch (error) {
+      Client.compile(this.project_id, this.request, (error, res, body) => {
         this.error = error
-      }
+        this.res = res
+        this.body = body
+        done(error)
+      })
     })
     it('should return success', function () {
-      expect(this.error).not.to.exist
+      expect(this.res.statusCode).to.equal(200)
     })
 
     it('should return a PDF', function () {
@@ -48,16 +49,17 @@ Hello world
   })
 
   describe('with an invalid name', function () {
-    beforeEach(async function () {
+    beforeEach(function (done) {
       this.request.options.imageName = 'something/evil:1337'
-      try {
-        this.body = await Client.compile(this.project_id, this.request)
-      } catch (error) {
+      Client.compile(this.project_id, this.request, (error, res, body) => {
         this.error = error
-      }
+        this.res = res
+        this.body = body
+        done(error)
+      })
     })
     it('should return non success', function () {
-      expect(this.error.response.status).to.equal(500)
+      expect(this.res.statusCode).to.not.equal(200)
     })
 
     it('should not return a PDF', function () {
@@ -70,109 +72,118 @@ Hello world
   })
 
   describe('syncToCode', function () {
-    beforeEach(async function () {
-      await Client.compile(this.project_id, this.request)
+    beforeEach(function (done) {
+      Client.compile(this.project_id, this.request, done)
     })
-    it('should error out with an invalid imageName', async function () {
-      const rejects = () =>
-        expect(
-          Client.syncFromCodeWithImage(
-            this.project_id,
-            'main.tex',
-            3,
-            5,
-            'something/evil:1337'
-          )
-        ).to.eventually.be.rejected
-
-      await rejects().and.have.property('body', 'invalid image')
-      await rejects().and.have.property('info').to.contain({ status: 400 })
-    })
-
-    it('should produce a mapping a valid imageName', async function () {
-      const result = await Client.syncFromCodeWithImage(
+    it('should error out with an invalid imageName', function (done) {
+      Client.syncFromCodeWithImage(
         this.project_id,
         'main.tex',
         3,
         5,
-        process.env.TEXLIVE_IMAGE
+        'something/evil:1337',
+        (error, body) => {
+          expect(String(error)).to.include('statusCode=400')
+          expect(body).to.equal('invalid image')
+          done()
+        }
       )
-      expect(result).to.deep.equal({
-        pdf: [
-          {
-            page: 1,
-            h: 133.768356,
-            v: 134.764618,
-            height: 6.918498,
-            width: 343.71106,
-          },
-        ],
-        downloadedFromCache: false,
-      })
+    })
+
+    it('should produce a mapping a valid imageName', function (done) {
+      Client.syncFromCodeWithImage(
+        this.project_id,
+        'main.tex',
+        3,
+        5,
+        process.env.TEXLIVE_IMAGE,
+        (error, result) => {
+          expect(error).to.not.exist
+          expect(result).to.deep.equal({
+            pdf: [
+              {
+                page: 1,
+                h: 133.768356,
+                v: 134.764618,
+                height: 6.918498,
+                width: 343.71106,
+              },
+            ],
+            downloadedFromCache: false,
+          })
+          done()
+        }
+      )
     })
   })
 
   describe('syncToPdf', function () {
-    beforeEach(async function () {
-      await Client.compile(this.project_id, this.request)
+    beforeEach(function (done) {
+      Client.compile(this.project_id, this.request, done)
     })
-    it('should error out with an invalid imageName', async function () {
-      const rejects = () =>
-        expect(
-          Client.syncFromPdfWithImage(
-            this.project_id,
-            'main.tex',
-            100,
-            200,
-            'something/evil:1337'
-          )
-        ).to.eventually.be.rejected
-
-      await rejects().and.have.property('body', 'invalid image')
-      await rejects().and.have.property('info').to.contain({ status: 400 })
+    it('should error out with an invalid imageName', function (done) {
+      Client.syncFromPdfWithImage(
+        this.project_id,
+        'main.tex',
+        100,
+        200,
+        'something/evil:1337',
+        (error, body) => {
+          expect(String(error)).to.include('statusCode=400')
+          expect(body).to.equal('invalid image')
+          done()
+        }
+      )
     })
 
-    it('should produce a mapping a valid imageName', async function () {
-      const result = await Client.syncFromPdfWithImage(
+    it('should produce a mapping a valid imageName', function (done) {
+      Client.syncFromPdfWithImage(
         this.project_id,
         1,
         100,
         200,
-        process.env.TEXLIVE_IMAGE
+        process.env.TEXLIVE_IMAGE,
+        (error, result) => {
+          expect(error).to.not.exist
+          expect(result).to.deep.equal({
+            code: [{ file: 'main.tex', line: 3, column: -1 }],
+            downloadedFromCache: false,
+          })
+          done()
+        }
       )
-      expect(result).to.deep.equal({
-        code: [{ file: 'main.tex', line: 3, column: -1 }],
-        downloadedFromCache: false,
-      })
     })
   })
 
   describe('wordcount', function () {
-    beforeEach(async function () {
-      await Client.compile(this.project_id, this.request)
+    beforeEach(function (done) {
+      Client.compile(this.project_id, this.request, done)
     })
-    it('should error out with an invalid imageName', async function () {
-      const rejects = () =>
-        expect(
-          Client.wordcountWithImage(
-            this.project_id,
-            'main.tex',
-            'something/evil:1337'
-          )
-        ).to.eventually.be.rejected
-
-      await rejects().and.have.property('body', 'invalid image')
-      await rejects().and.have.property('info').to.contain({ status: 400 })
-    })
-
-    it('should produce a texcout a valid imageName', async function () {
-      const result = await Client.wordcountWithImage(
+    it('should error out with an invalid imageName', function (done) {
+      Client.wordcountWithImage(
         this.project_id,
         'main.tex',
-        process.env.TEXLIVE_IMAGE
+        'something/evil:1337',
+        (error, body) => {
+          expect(String(error)).to.include('statusCode=400')
+          expect(body).to.equal('invalid image')
+          done()
+        }
       )
-      expect(result).to.exist
-      expect(result.texcount).to.exist
+    })
+
+    it('should produce a texcout a valid imageName', function (done) {
+      Client.wordcountWithImage(
+        this.project_id,
+        'main.tex',
+        process.env.TEXLIVE_IMAGE,
+        (error, result) => {
+          expect(error).to.not.exist
+          expect(result).to.exist
+          expect(result.texcount).to.exist
+          done()
+        }
+      )
     })
   })
 })

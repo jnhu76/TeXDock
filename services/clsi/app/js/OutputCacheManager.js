@@ -1,20 +1,21 @@
-import { callbackify, promisify } from 'node:util'
-import async from 'async'
-import fs from 'node:fs'
-import Path from 'node:path'
-import logger from '@overleaf/logger'
-import _ from 'lodash'
-import Settings from '@overleaf/settings'
-import crypto from 'node:crypto'
-import Metrics from '@overleaf/metrics'
-import OutputFileOptimiser from './OutputFileOptimiser.js'
-import ContentCacheManager from './ContentCacheManager.js'
-import {
+let OutputCacheManager
+const { callbackify, promisify } = require('node:util')
+const async = require('async')
+const fs = require('node:fs')
+const Path = require('node:path')
+const logger = require('@overleaf/logger')
+const _ = require('lodash')
+const Settings = require('@overleaf/settings')
+const crypto = require('node:crypto')
+const Metrics = require('./Metrics')
+
+const OutputFileOptimiser = require('./OutputFileOptimiser')
+const ContentCacheManager = require('./ContentCacheManager')
+const {
   QueueLimitReachedError,
   TimedOutError,
   NoXrefTableError,
-} from './Errors.js'
-let OutputCacheManager
+} = require('./Errors')
 
 const OLDEST_BUILD_DIR = new Map()
 const PENDING_PROJECT_ACTIONS = new Map()
@@ -100,7 +101,7 @@ async function queueDirOperation(dir, fn) {
   return p
 }
 
-export default OutputCacheManager = {
+module.exports = OutputCacheManager = {
   CONTENT_SUBDIR: 'content',
   CACHE_SUBDIR: 'generated-files',
   ARCHIVE_SUBDIR: 'archived-logs',
@@ -684,5 +685,4 @@ OutputCacheManager.promises = {
     OutputCacheManager.saveOutputFilesInBuildDir
   ),
   queueDirOperation,
-  generateBuildId: promisify(OutputCacheManager.generateBuildId),
 }

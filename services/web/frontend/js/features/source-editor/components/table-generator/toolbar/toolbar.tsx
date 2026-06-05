@@ -21,6 +21,7 @@ import { useCodeMirrorViewContext } from '../../codemirror-context'
 import { useTableContext } from '../contexts/table-context'
 import { useTabularContext } from '../contexts/tabular-context'
 import { useTranslation } from 'react-i18next'
+import { FeedbackBadge } from '@/shared/components/feedback-badge'
 import classNames from 'classnames'
 
 type CaptionPosition = 'no_caption' | 'above' | 'below'
@@ -457,7 +458,22 @@ export const Toolbar = memo(function Toolbar() {
           label={t('help')}
           command={showHelp}
         />
+        <div className="toolbar-beta-badge">
+          <FeedbackBadge
+            id="table-generator-feedback"
+            url="https://forms.gle/9dHxXPGugxEHgY3L9"
+            text={<FeedbackBadgeContent />}
+          />
+        </div>
       </div>
     </div>
   )
 })
+
+const FeedbackBadgeContent = () => (
+  <>
+    We have a new way to insert and edit tables.
+    <br />
+    Click to give feedback
+  </>
+)

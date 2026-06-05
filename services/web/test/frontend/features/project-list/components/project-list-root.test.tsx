@@ -894,9 +894,7 @@ describe('<ProjectListRoot />', function () {
             expect(confirmButton.disabled).to.be.true
 
             // no name
-            const input = screen.getByLabelText(
-              /New name/i
-            ) as HTMLButtonElement
+            const input = screen.getByLabelText('New Name') as HTMLButtonElement
             fireEvent.change(input, {
               target: { value: '' },
             })
@@ -930,7 +928,7 @@ describe('<ProjectListRoot />', function () {
             // a valid name
             const newProjectName = 'A new project name'
             const input = (await within(modal).findByLabelText(
-              /New name/i
+              'New Name'
             )) as HTMLButtonElement
             const oldName = input.value
             fireEvent.change(input, {

@@ -4,7 +4,7 @@ import { postJSON } from '../../../infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
 import { UserSettings } from '../../../../../types/user-settings'
 
-export interface ProjectSettings {
+export type ProjectSettings = {
   compiler: ProjectCompiler
   imageName: string
   rootDocId: string

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { getOwnerName } from '../../../util/project'
 import { Project } from '../../../../../../../types/project/dashboard/api'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
 import MaterialIcon from '@/shared/components/material-icon'
 
 type LinkSharingIconProps = {
@@ -47,7 +47,7 @@ export default function OwnerCell({ project }: OwnerCellProps) {
 
   return (
     <>
-      <span translate="no">{ownerName === 'You' ? t('you') : ownerName}</span>
+      {ownerName === 'You' ? t('you') : ownerName}
       {project.source === 'token' && (
         <LinkSharingIcon project={project} prependSpace={!!project.owner} />
       )}

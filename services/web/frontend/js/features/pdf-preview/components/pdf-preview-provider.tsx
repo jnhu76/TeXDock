@@ -12,7 +12,7 @@ export const usePdfPreviewContext = () => {
   const context = useContext(PdfPreviewContext)
   if (!context) {
     throw new Error(
-      'usePdfPreviewContext is only available inside PdfPreviewProvider'
+      'usePdfPreviewContext is only avalable inside PdfPreviewProvider'
     )
   }
   return context

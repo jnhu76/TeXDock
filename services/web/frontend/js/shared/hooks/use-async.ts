@@ -31,8 +31,7 @@ function useAsync<T = any, E extends Error | FetchError = Error>(
   const safeSetState = useSafeDispatch(setState)
 
   const setData = React.useCallback(
-    (data: Nullable<T>) =>
-      safeSetState({ data, error: null, status: 'resolved' }),
+    (data: Nullable<T>) => safeSetState({ data, status: 'resolved' }),
     [safeSetState]
   )
 

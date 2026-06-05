@@ -15,7 +15,6 @@ describe('ProjectHistoryRedisManager', function () {
 
     this.Limits = {
       docIsTooLarge: sinon.stub().returns(false),
-      stringFileDataContentIsTooLarge: sinon.stub().returns(false),
     }
 
     this.ProjectHistoryRedisManager = SandboxedModule.require(modulePath, {
@@ -62,18 +61,22 @@ describe('ProjectHistoryRedisManager', function () {
     })
 
     it('should queue an update', function () {
-      this.multi.rpush.should.have.been.calledWithExactly(
-        `ProjectHistory:Ops:${this.project_id}`,
-        this.ops[0],
-        this.ops[1]
-      )
+      this.multi.rpush
+        .calledWithExactly(
+          `ProjectHistory:Ops:${this.project_id}`,
+          this.ops[0],
+          this.ops[1]
+        )
+        .should.equal(true)
     })
 
     it('should set the queue timestamp if not present', function () {
-      this.multi.setnx.should.have.been.calledWithExactly(
-        `ProjectHistory:FirstOpTimestamp:${this.project_id}`,
-        Date.now()
-      )
+      this.multi.setnx
+        .calledWithExactly(
+          `ProjectHistory:FirstOpTimestamp:${this.project_id}`,
+          Date.now()
+        )
+        .should.equal(true)
     })
   })
 
@@ -115,10 +118,9 @@ describe('ProjectHistoryRedisManager', function () {
         file: this.file_id,
       }
 
-      this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-        this.project_id,
-        JSON.stringify(update)
-      )
+      this.ProjectHistoryRedisManager.promises.queueOps
+        .calledWithExactly(this.project_id, JSON.stringify(update))
+        .should.equal(true)
     })
   })
 
@@ -164,10 +166,9 @@ describe('ProjectHistoryRedisManager', function () {
         doc: this.doc_id,
       }
 
-      this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-        this.project_id,
-        JSON.stringify(update)
-      )
+      this.ProjectHistoryRedisManager.promises.queueOps
+        .calledWithExactly(this.project_id, JSON.stringify(update))
+        .should.equal(true)
     })
 
     it('should queue an update with file metadata', async function () {
@@ -349,10 +350,9 @@ describe('ProjectHistoryRedisManager', function () {
         doc: this.doc_id,
       }
 
-      this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-        this.project_id,
-        JSON.stringify(update)
-      )
+      this.ProjectHistoryRedisManager.promises.queueOps
+        .calledWithExactly(this.project_id, JSON.stringify(update))
+        .should.equal(true)
     })
 
     it('should not forward ranges if history ranges support is undefined', async function () {
@@ -402,10 +402,9 @@ describe('ProjectHistoryRedisManager', function () {
         doc: this.doc_id,
       }
 
-      this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-        this.project_id,
-        JSON.stringify(update)
-      )
+      this.ProjectHistoryRedisManager.promises.queueOps
+        .calledWithExactly(this.project_id, JSON.stringify(update))
+        .should.equal(true)
     })
 
     it('should pass "false" as the createdBlob field if not provided', async function () {
@@ -433,10 +432,9 @@ describe('ProjectHistoryRedisManager', function () {
         doc: this.doc_id,
       }
 
-      this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-        this.project_id,
-        JSON.stringify(update)
-      )
+      this.ProjectHistoryRedisManager.promises.queueOps
+        .calledWithExactly(this.project_id, JSON.stringify(update))
+        .should.equal(true)
     })
 
     it('should pass through the value of the createdBlob field', async function () {
@@ -465,10 +463,9 @@ describe('ProjectHistoryRedisManager', function () {
         doc: this.doc_id,
       }
 
-      this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-        this.project_id,
-        JSON.stringify(update)
-      )
+      this.ProjectHistoryRedisManager.promises.queueOps
+        .calledWithExactly(this.project_id, JSON.stringify(update))
+        .should.equal(true)
     })
   })
 
@@ -496,8 +493,8 @@ describe('ProjectHistoryRedisManager', function () {
       beforeEach(async function () {
         this.update = {
           resyncDocContent: {
-            version: this.version,
             content: 'one\ntwo',
+            version: this.version,
           },
           projectHistoryId: this.projectHistoryId,
           path: this.pathname,
@@ -519,18 +516,19 @@ describe('ProjectHistoryRedisManager', function () {
       })
 
       it('should check if the doc is too large', function () {
-        this.Limits.docIsTooLarge.should.have.been.calledWith(
-          JSON.stringify(this.update).length,
-          this.lines,
-          this.settings.max_doc_length
-        )
+        this.Limits.docIsTooLarge
+          .calledWith(
+            JSON.stringify(this.update).length,
+            this.lines,
+            this.settings.max_doc_length
+          )
+          .should.equal(true)
       })
 
       it('should queue an update', function () {
-        this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-          this.project_id,
-          JSON.stringify(this.update)
-        )
+        this.ProjectHistoryRedisManager.promises.queueOps
+          .calledWithExactly(this.project_id, JSON.stringify(this.update))
+          .should.equal(true)
       })
     })
 
@@ -553,8 +551,9 @@ describe('ProjectHistoryRedisManager', function () {
       })
 
       it('should not queue an update if the doc is too large', function () {
-        this.ProjectHistoryRedisManager.promises.queueOps.should.not.have.been
-          .called
+        this.ProjectHistoryRedisManager.promises.queueOps.called.should.equal(
+          false
+        )
       })
     })
 
@@ -562,10 +561,10 @@ describe('ProjectHistoryRedisManager', function () {
       beforeEach(async function () {
         this.update = {
           resyncDocContent: {
+            content: 'onedeleted\ntwo',
             version: this.version,
             ranges: this.ranges,
             resolvedCommentIds: this.resolvedCommentIds,
-            content: 'onedeleted\ntwo',
           },
           projectHistoryId: this.projectHistoryId,
           path: this.pathname,
@@ -602,76 +601,9 @@ describe('ProjectHistoryRedisManager', function () {
       })
 
       it('should queue an update', function () {
-        this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-          this.project_id,
-          JSON.stringify(this.update)
-        )
-      })
-    })
-
-    describe('history-ot', function () {
-      beforeEach(async function () {
-        this.lines = {
-          content: 'onedeleted\ntwo',
-          comments: [{ id: 'id1', ranges: [{ pos: 0, length: 3 }] }],
-          trackedChanges: [
-            {
-              range: { pos: 3, length: 7 },
-              tracking: {
-                type: 'delete',
-                userId: 'user-id',
-                ts: '2025-06-16T14:31:44.910Z',
-              },
-            },
-          ],
-        }
-        this.update = {
-          resyncDocContent: {
-            version: this.version,
-            historyOTRanges: {
-              comments: this.lines.comments,
-              trackedChanges: this.lines.trackedChanges,
-            },
-            content: this.lines.content,
-          },
-          projectHistoryId: this.projectHistoryId,
-          path: this.pathname,
-          doc: this.doc_id,
-          meta: { ts: new Date() },
-        }
-
-        await this.ProjectHistoryRedisManager.promises.queueResyncDocContent(
-          this.project_id,
-          this.projectHistoryId,
-          this.doc_id,
-          this.lines,
-          this.ranges,
-          this.resolvedCommentIds,
-          this.version,
-          this.pathname,
-          true
-        )
-      })
-
-      it('should include tracked deletes in the update', function () {
-        this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-          this.project_id,
-          JSON.stringify(this.update)
-        )
-      })
-
-      it('should check the doc length without tracked deletes', function () {
-        this.Limits.stringFileDataContentIsTooLarge.should.have.been.calledWith(
-          this.lines,
-          this.settings.max_doc_length
-        )
-      })
-
-      it('should queue an update', function () {
-        this.ProjectHistoryRedisManager.promises.queueOps.should.have.been.calledWithExactly(
-          this.project_id,
-          JSON.stringify(this.update)
-        )
+        this.ProjectHistoryRedisManager.promises.queueOps
+          .calledWithExactly(this.project_id, JSON.stringify(this.update))
+          .should.equal(true)
       })
     })
   })

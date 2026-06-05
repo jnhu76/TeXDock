@@ -1,16 +1,15 @@
 import App from '../../../../app.mjs'
-import QueueWorkers from '../../../../app/src/infrastructure/QueueWorkers.mjs'
+import QueueWorkers from '../../../../app/src/infrastructure/QueueWorkers.js'
 import MongoHelper from './MongoHelper.mjs'
 import RedisHelper from './RedisHelper.mjs'
 import Settings from '@overleaf/settings'
 import MockReCAPTCHAApi from '../mocks/MockReCaptchaApi.mjs'
-import { gracefulShutdown } from '../../../../app/src/infrastructure/GracefulShutdown.mjs'
+import { gracefulShutdown } from '../../../../app/src/infrastructure/GracefulShutdown.js'
 import Server from '../../../../app/src/infrastructure/Server.mjs'
 import { injectRouteAfter } from './injectRoute.mjs'
-import SplitTestHandler from '../../../../app/src/Features/SplitTests/SplitTestHandler.mjs'
-import SplitTestSessionHandler from '../../../../app/src/Features/SplitTests/SplitTestSessionHandler.mjs'
-import Modules from '../../../../app/src/infrastructure/Modules.mjs'
-import testLogRecorder from '@overleaf/logger/test-log-recorder.js'
+import SplitTestHandler from '../../../../app/src/Features/SplitTests/SplitTestHandler.js'
+import SplitTestSessionHandler from '../../../../app/src/Features/SplitTests/SplitTestSessionHandler.js'
+import Modules from '../../../../app/src/infrastructure/Modules.js'
 
 const app = Server.app
 
@@ -53,11 +52,10 @@ before('start main app', function (done) {
     route => route.path && route.path === '/dev/csrf',
     router => {
       router.get('/dev/split_test/get_assignment', (req, res) => {
-        const { splitTestName, includeReferer } = req.query
+        const { splitTestName } = req.query
         SplitTestHandler.promises
           .getAssignment(req, res, splitTestName, {
             sync: true,
-            includeReferer: includeReferer === 'true',
           })
           .then(assignment => res.json(assignment))
           .catch(error => {
@@ -116,7 +114,3 @@ after('stop main app', async function () {
   Settings.gracefulShutdownDelayInMs = 1
   await gracefulShutdown(server, 'tests')
 })
-
-if (process.env.CI === 'true') {
-  beforeEach('record error logs in junit', testLogRecorder)
-}

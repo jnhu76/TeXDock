@@ -8,6 +8,6 @@ else
 fi
 
 echo "Running migrations for $environment"
-cd /overleaf/tools/migrations
-/sbin/setuser www-data yarn run migrations migrate -t "$environment"
+cd /overleaf/services/web
+/sbin/setuser www-data npm run migrations -- migrate -t "$environment"
 echo "Finished migrations"

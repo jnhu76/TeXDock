@@ -8,9 +8,6 @@ describe('<PdfPreviewDetachedRoot/>', function () {
     window.metaAttributesCache.set('ol-detachRole', 'detached')
     window.metaAttributesCache.set('ol-projectName', 'Project Name')
     window.metaAttributesCache.set('ol-preventCompileOnLoad', true)
-    window.metaAttributesCache.set('ol-compileSettings', {
-      compileTimeout: 240,
-    })
 
     cy.interceptEvents()
   })

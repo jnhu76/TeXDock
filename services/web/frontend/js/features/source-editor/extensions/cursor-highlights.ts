@@ -166,7 +166,7 @@ export const setCursorHighlights = (
 
 class CursorMarker extends RectangleMarker {
   constructor(
-    public highlight: Highlight,
+    private highlight: Highlight,
     className: string,
     left: number,
     top: number,
@@ -181,25 +181,13 @@ class CursorMarker extends RectangleMarker {
     element.style.setProperty('--hue', String(this.highlight.hue))
     return element
   }
-
-  update(element: HTMLDivElement, prev: CursorMarker) {
-    if (!super.update(element, prev)) {
-      return false
-    }
-    element.style.setProperty('--hue', String(this.highlight.hue))
-    return true
-  }
-
-  eq(other: CursorMarker) {
-    return super.eq(other) && this.highlight.hue === other.highlight.hue
-  }
 }
 
 // draw the collaborator cursors in a separate layer, so they don't affect word wrapping
 const cursorHighlightsLayer = layer({
   above: true,
   class: 'ol-cm-cursorHighlightsLayer',
-  update: update => {
+  update: (update, layer) => {
     return (
       update.docChanged ||
       update.selectionSet ||

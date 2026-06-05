@@ -5,7 +5,7 @@ export const MenuBar: FC<
   React.PropsWithChildren<HTMLProps<HTMLDivElement> & { id: string }>
 > = ({ children, id, ...props }) => {
   return (
-    <div {...props} role="menubar">
+    <div {...props}>
       <NestableDropdownContextProvider id={id}>
         {children}
       </NestableDropdownContextProvider>

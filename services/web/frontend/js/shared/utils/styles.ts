@@ -1,4 +1,4 @@
-export type OverallTheme = '' | 'light-' | 'system'
+export type OverallTheme = '' | 'light-'
 
 export const fontFamilies = {
   monaco: ['Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'monospace'],

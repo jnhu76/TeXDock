@@ -7,25 +7,20 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import UrlCache from './UrlCache.js'
-import CompileManager from './CompileManager.js'
-import async from 'async'
-import logger from '@overleaf/logger'
-import Metrics from '@overleaf/metrics'
-import Settings from '@overleaf/settings'
-import { callbackify } from 'node:util'
-import Path from 'node:path'
-import fs from 'node:fs'
-import * as HistoryResourceWriter from './HistoryResourceWriter.js'
-import { LAST_ACCESS } from './LastProjectAccess.js'
-
 let ProjectPersistenceManager
+const UrlCache = require('./UrlCache')
+const CompileManager = require('./CompileManager')
+const async = require('async')
+const logger = require('@overleaf/logger')
 const oneDay = 24 * 60 * 60 * 1000
+const Metrics = require('@overleaf/metrics')
+const Settings = require('@overleaf/settings')
+const { callbackify } = require('node:util')
+const Path = require('node:path')
+const fs = require('node:fs')
 
-function setLastAccessIfNewer(id, ts) {
-  const prev = LAST_ACCESS.get(id) ?? 0
-  LAST_ACCESS.set(id, Math.max(ts, prev))
-}
+// projectId -> timestamp mapping.
+const LAST_ACCESS = new Map()
 
 let ANY_DISK_LOW = false
 let ANY_DISK_CRITICAL_LOW = false
@@ -92,7 +87,7 @@ async function refreshExpiryTimeout() {
   )
 }
 
-export default ProjectPersistenceManager = {
+module.exports = ProjectPersistenceManager = {
   EXPIRY_TIMEOUT: Settings.project_cache_length_ms || oneDay * 2.5,
 
   isAnyDiskLow() {
@@ -123,23 +118,14 @@ export default ProjectPersistenceManager = {
             Settings.path.compilesDir,
             projectAndUserId
           )
-          if (!/^[a-f0-9]{24}(-[a-f0-9]{24})?$/.test(projectAndUserId)) {
-            // Submissions etc. Schedule for cleanup in 5-10min with jitter.
-            const delay = (5 + 5 * Math.random()) * 60_000
-            setLastAccessIfNewer(
-              projectAndUserId,
-              Date.now() - ProjectPersistenceManager.EXPIRY_TIMEOUT + delay
-            )
-            return cb()
-          }
           const projectId = projectAndUserId.slice(0, 24)
           fs.stat(compileDir, (err, stats) => {
             if (err) {
               // Schedule for immediate cleanup
-              setLastAccessIfNewer(projectId, 0)
+              LAST_ACCESS.set(projectId, 0)
             } else {
               // Cleanup eventually.
-              setLastAccessIfNewer(projectId, stats.mtime.getTime())
+              LAST_ACCESS.set(projectId, stats.mtime.getTime())
             }
             cb()
           })
@@ -218,16 +204,19 @@ export default ProjectPersistenceManager = {
     }
     logger.debug({ projectId, userId }, 'clearing project for user')
     return CompileManager.clearProject(projectId, userId, function (error) {
-      if (error) return callback(error)
-      const cacheKey = userId ? `${projectId}-${userId}` : projectId
-      HistoryResourceWriter.clearCacheCb(projectId, userId, cacheKey, error => {
-        if (error) return callback(error)
-        ProjectPersistenceManager.clearProjectFromCache(
-          projectId,
-          { reason: 'cleared' },
-          callback
-        )
-      })
+      if (error != null) {
+        return callback(error)
+      }
+      return ProjectPersistenceManager.clearProjectFromCache(
+        projectId,
+        { reason: 'cleared' },
+        function (error) {
+          if (error != null) {
+            return callback(error)
+          }
+          return callback()
+        }
+      )
     })
   },
 

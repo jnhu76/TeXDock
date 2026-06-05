@@ -1,9 +1,11 @@
-import settings from '@overleaf/settings'
-import projectKey from '@overleaf/object-persistor/src/ProjectKey.js'
+const settings = require('@overleaf/settings')
+const projectKey = require('./project_key')
 
-export default {
+module.exports = {
   getConvertedFolderKey,
   addCachingToKey,
+  userFileKeyMiddleware,
+  userProjectKeyMiddleware,
   bucketFileKeyMiddleware,
   globalBlobFileKeyMiddleware,
   projectBlobFileKeyMiddleware,
@@ -28,6 +30,21 @@ function addCachingToKey(key, opts) {
   }
 
   return key
+}
+
+function userFileKeyMiddleware(req, res, next) {
+  const { project_id: projectId, file_id: fileId } = req.params
+  req.key = `${projectId}/${fileId}`
+  req.bucket = settings.filestore.stores.user_files
+  next()
+}
+
+function userProjectKeyMiddleware(req, res, next) {
+  const { project_id: projectId } = req.params
+  req.project_id = projectId
+  req.key = `${projectId}/`
+  req.bucket = settings.filestore.stores.user_files
+  next()
 }
 
 function bucketFileKeyMiddleware(req, res, next) {

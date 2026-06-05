@@ -1,9 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { UserEmailData } from '../../../../../../types/user-email'
 import { ssoAvailableForInstitution } from '../../utils/sso'
-import OLBadge from '@/shared/components/ol/ol-badge'
+import OLBadge from '@/features/ui/components/ol/ol-badge'
 import ResendConfirmationCodeModal from '@/features/settings/components/emails/resend-confirmation-code-modal'
-import { useUserEmailsContext } from '@/features/settings/context/user-email-context'
 
 type EmailProps = {
   userEmailData: UserEmailData
@@ -11,21 +10,17 @@ type EmailProps = {
 
 function Email({ userEmailData }: EmailProps) {
   const { t } = useTranslation()
-  const {
-    state,
-    setLoading: setUserEmailsContextLoading,
-    getEmails,
-  } = useUserEmailsContext()
+
   const ssoAvailable = ssoAvailableForInstitution(
     userEmailData.affiliation?.institution || null
   )
 
   const isPrimary = userEmailData.default
-  const hasInstitutionalSubscription =
+  const isProfessional =
     userEmailData.confirmedAt &&
     userEmailData.affiliation?.institution.confirmed &&
     userEmailData.affiliation.licence !== 'free'
-  const hasBadges = isPrimary || hasInstitutionalSubscription
+  const hasBadges = isPrimary || isProfessional
 
   return (
     <>
@@ -35,13 +30,7 @@ function Email({ userEmailData }: EmailProps) {
           <strong>{t('unconfirmed')}.</strong>
           <br />
           {!ssoAvailable && (
-            <ResendConfirmationCodeModal
-              email={userEmailData.email}
-              setGroupLoading={setUserEmailsContextLoading}
-              groupLoading={state.isLoading}
-              onSuccess={getEmails}
-              triggerVariant="link"
-            />
+            <ResendConfirmationCodeModal email={userEmailData.email} />
           )}
         </div>
       )}
@@ -52,8 +41,8 @@ function Email({ userEmailData }: EmailProps) {
               <OLBadge bg="info">Primary</OLBadge>{' '}
             </>
           )}
-          {hasInstitutionalSubscription && (
-            <OLBadge bg="primary">{t('commons')}</OLBadge>
+          {isProfessional && (
+            <OLBadge bg="primary">{t('professional')}</OLBadge>
           )}
         </div>
       )}

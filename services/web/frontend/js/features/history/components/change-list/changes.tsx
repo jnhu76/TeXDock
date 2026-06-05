@@ -23,7 +23,6 @@ function Changes({ pathnames, projectOps }: ChangesProps) {
           <div
             className="history-version-change-doc"
             data-testid="history-version-change-doc"
-            translate="no"
           >
             {pathname}
           </div>
@@ -42,7 +41,6 @@ function Changes({ pathnames, projectOps }: ChangesProps) {
           <div
             className="history-version-change-doc"
             data-testid="history-version-change-doc"
-            translate="no"
           >
             {getProjectOpDoc(op)}
           </div>

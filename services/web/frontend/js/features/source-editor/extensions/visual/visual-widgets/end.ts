@@ -7,7 +7,7 @@ export class EndWidget extends WidgetType {
     return element
   }
 
-  eq() {
+  eq(widget: EndWidget) {
     return true
   }
 

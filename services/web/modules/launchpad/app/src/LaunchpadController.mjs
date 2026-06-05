@@ -2,18 +2,18 @@ import OError from '@overleaf/o-error'
 import { expressify } from '@overleaf/promise-utils'
 import Settings from '@overleaf/settings'
 import Path from 'node:path'
-import crypto from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 import logger from '@overleaf/logger'
-import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
-import EmailHandler from '../../../../app/src/Features/Email/EmailHandler.mjs'
-import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
-import { User } from '../../../../app/src/models/User.mjs'
-import AuthenticationManager from '../../../../app/src/Features/Authentication/AuthenticationManager.mjs'
-import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
-import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
-import AdminAuthorizationHelper from '../../../../app/src/Features/Helpers/AdminAuthorizationHelper.mjs'
+import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.js'
+import EmailHandler from '../../../../app/src/Features/Email/EmailHandler.js'
+import UserGetter from '../../../../app/src/Features/User/UserGetter.js'
+import { User } from '../../../../app/src/models/User.js'
+import AuthenticationManager from '../../../../app/src/Features/Authentication/AuthenticationManager.js'
+import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.js'
+import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.js'
+import { hasAdminAccess } from '../../../../app/src/Features/Helpers/AdminAuthorizationHelper.js'
 
-const { hasAdminAccess } = AdminAuthorizationHelper
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 /**
  * Container for functions that need to be mocked in tests
@@ -53,7 +53,7 @@ async function launchpadPage(req, res) {
 
   if (!sessionUser) {
     if (!adminUserExists) {
-      res.render(Path.resolve(import.meta.dirname, '../views/launchpad'), {
+      res.render(Path.resolve(__dirname, '../views/launchpad'), {
         adminUserExists,
         authMethod,
       })
@@ -66,7 +66,7 @@ async function launchpadPage(req, res) {
       isAdmin: 1,
     })
     if (hasAdminAccess(user)) {
-      res.render(Path.resolve(import.meta.dirname, '../views/launchpad'), {
+      res.render(Path.resolve(__dirname, '../views/launchpad'), {
         wsUrl: Settings.wsUrl,
         adminUserExists,
         authMethod,
@@ -125,12 +125,12 @@ function registerExternalAuthAdmin(authMethod) {
 
     const body = {
       email,
-      password: crypto.randomBytes(32).toString('hex'),
+      password: 'password_here',
       first_name: email,
       last_name: '',
     }
     logger.debug(
-      { email, authMethod },
+      { body, authMethod },
       'creating admin account for specified external-auth user'
     )
 

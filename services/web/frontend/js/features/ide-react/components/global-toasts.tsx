@@ -1,14 +1,10 @@
-import { OLToast, OLToastProps } from '@/shared/components/ol/ol-toast'
+import { OLToast, OLToastProps } from '@/features/ui/components/ol/ol-toast'
 import useEventListener from '@/shared/hooks/use-event-listener'
-import { Fragment, memo, ReactElement, useCallback, useState } from 'react'
+import { Fragment, ReactElement, useCallback, useState } from 'react'
 
 import { debugConsole } from '@/utils/debugging'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
-import { OLToastContainer } from '@/shared/components/ol/ol-toast-container'
-import clipboardToastGenerators from '@/features/source-editor/components/clipboard-toasts'
-import importDocumentFeedbackToastGenerators from '@/features/project-list/components/new-project-button/import-document-feedback-toast'
-import exportDocumentToastGenerators from '@/features/ide-react/components/toolbar/export-document-toasts'
-import pythonOutputToastGenerators from '@/features/ide-react/components/editor/python/python-output-toasts'
+import { OLToastContainer } from '@/features/ui/components/ol/ol-toast-container'
 
 const moduleGeneratorsImport = importOverleafModules('toastGenerators') as {
   import: { default: GlobalToastGeneratorEntry[] }
@@ -27,22 +23,16 @@ type GlobalToastGenerator = (
   args: Record<string, any>
 ) => Omit<OLToastProps, 'onDismiss'>
 
-const GENERATOR_LIST: GlobalToastGeneratorEntry[] = [
-  ...moduleGenerators.flat(),
-  ...clipboardToastGenerators,
-  ...importDocumentFeedbackToastGenerators,
-  ...exportDocumentToastGenerators,
-  ...pythonOutputToastGenerators,
-]
+const GENERATOR_LIST: GlobalToastGeneratorEntry[] = moduleGenerators.flat()
 const GENERATOR_MAP: Map<string, GlobalToastGenerator> = new Map(
   GENERATOR_LIST.map(({ key, generator }) => [key, generator])
 )
 
 let toastCounter = 1
 
-export const GlobalToasts = memo(function GlobalToasts() {
+export const GlobalToasts = () => {
   const [toasts, setToasts] = useState<
-    { component: ReactElement; id: string; handle?: string }[]
+    { component: ReactElement; id: string }[]
   >([])
 
   const removeToast = useCallback((id: string) => {
@@ -74,13 +64,13 @@ export const GlobalToasts = memo(function GlobalToasts() {
   )
 
   const addToast = useCallback(
-    (key: string, handle?: string, data?: any) => {
+    (key: string, data?: any) => {
       const id = `toast-${toastCounter++}`
       const component = createToast(id, key, data)
       if (!component) {
         return
       }
-      setToasts(current => [...current, { id, handle, component }])
+      setToasts(current => [...current, { id, component }])
     },
     [createToast]
   )
@@ -91,24 +81,13 @@ export const GlobalToasts = memo(function GlobalToasts() {
         debugConsole.error('No key provided for toast')
         return
       }
-      const { key, handle, ...rest } = event.detail
-      addToast(key, handle, rest)
+      const { key, ...rest } = event.detail
+      addToast(key, rest)
     },
     [addToast]
   )
 
   useEventListener('ide:show-toast', showToastListener)
-
-  const dismissToastListener = useCallback((event: CustomEvent) => {
-    const { handle } = event.detail || {}
-    if (!handle) {
-      debugConsole.error('No handle provided for dismissing toast')
-      return
-    }
-    setToasts(current => current.filter(toast => toast.handle !== handle))
-  }, [])
-
-  useEventListener('ide:dismiss-toast', dismissToastListener)
 
   return (
     <OLToastContainer className="global-toasts">
@@ -117,4 +96,4 @@ export const GlobalToasts = memo(function GlobalToasts() {
       ))}
     </OLToastContainer>
   )
-})
+}

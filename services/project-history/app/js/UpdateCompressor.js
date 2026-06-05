@@ -1,15 +1,8 @@
 // @ts-check
 
-import Metrics from '@overleaf/metrics'
 import OError from '@overleaf/o-error'
 import DMP from 'diff-match-patch'
 import { EditOperationBuilder } from 'overleaf-editor-core'
-import zlib from 'node:zlib'
-import { ReadableString, WritableBuffer } from '@overleaf/stream-utils'
-import Stream from 'node:stream'
-import logger from '@overleaf/logger'
-import { callbackify } from '@overleaf/promise-utils'
-import Settings from '@overleaf/settings'
 
 /**
  * @import { DeleteOp, InsertOp, Op, Update } from './types'
@@ -169,9 +162,7 @@ export function concatUpdatesWithSameVersion(updates) {
         lastUpdate.op != null &&
         lastUpdate.v === update.v &&
         lastUpdate.doc === update.doc &&
-        lastUpdate.pathname === update.pathname &&
-        EditOperationBuilder.isValid(update.op[0]) ===
-          EditOperationBuilder.isValid(lastUpdate.op[0])
+        lastUpdate.pathname === update.pathname
       ) {
         lastUpdate.op = lastUpdate.op.concat(update.op)
         if (update.meta.doc_hash == null) {
@@ -187,66 +178,6 @@ export function concatUpdatesWithSameVersion(updates) {
     }
   }
   return concattedUpdates
-}
-
-async function estimateStorage(updates) {
-  const blob = JSON.stringify(updates)
-  const bytes = Buffer.from(blob).byteLength
-  const read = new ReadableString(blob)
-  const compress = zlib.createGzip()
-  const write = new WritableBuffer()
-  await Stream.promises.pipeline(read, compress, write)
-  const bytesGz = write.size()
-  return { bytes, bytesGz, nUpdates: updates.length }
-}
-
-/**
- * @param {Update[]} rawUpdates
- * @param {string} projectId
- * @param {import("./Profiler").Profiler} profile
- * @return {Promise<Update[]>}
- */
-async function compressRawUpdatesWithMetrics(rawUpdates, projectId, profile) {
-  if (100 * Math.random() > Settings.estimateCompressionSample) {
-    return compressRawUpdatesWithProfile(rawUpdates, projectId, profile)
-  }
-  const before = await estimateStorage(rawUpdates)
-  profile.log('estimateRawUpdatesSize')
-  const updates = compressRawUpdatesWithProfile(rawUpdates, projectId, profile)
-  const after = await estimateStorage(updates)
-  for (const [path, values] of Object.entries({ before, after })) {
-    for (const [method, v] of Object.entries(values)) {
-      Metrics.summary('updates_compression_estimate', v, { path, method })
-    }
-  }
-  for (const method of Object.keys(before)) {
-    const percentage = Math.ceil(100 * (after[method] / before[method]))
-    Metrics.summary('updates_compression_percentage', percentage, { method })
-  }
-  profile.log('estimateCompressedUpdatesSize')
-  return updates
-}
-
-export const compressRawUpdatesWithMetricsCb = callbackify(
-  compressRawUpdatesWithMetrics
-)
-
-/**
- * @param {Update[]} rawUpdates
- * @param {string} projectId
- * @param {import("./Profiler").Profiler} profile
- * @return {Update[]}
- */
-function compressRawUpdatesWithProfile(rawUpdates, projectId, profile) {
-  const updates = compressRawUpdates(rawUpdates)
-  const timeTaken = profile.log('compressRawUpdates').getTimeDelta()
-  if (timeTaken >= 1000) {
-    logger.debug(
-      { projectId, updates: rawUpdates, timeTaken },
-      'slow compression of raw updates'
-    )
-  }
-  return updates
 }
 
 export function compressRawUpdates(rawUpdates) {
@@ -311,15 +242,6 @@ function _concatTwoUpdates(firstUpdate, secondUpdate) {
     firstUpdate.doc !== secondUpdate.doc ||
     firstUpdate.pathname !== secondUpdate.pathname
   ) {
-    return [firstUpdate, secondUpdate]
-  }
-
-  if (firstUpdate.meta.resync || secondUpdate.meta.resync) {
-    // Do not merge ops where one of them is a resync. We produce a list of
-    // resync ops that first corrects the content, then the ranges. By
-    // compressing the content updates seperately from the ranges updates,
-    // the ranges can become out-of-sync. To stop this, disallow compressing
-    // any resync updates.
     return [firstUpdate, secondUpdate]
   }
 
@@ -402,16 +324,6 @@ function _concatTwoUpdates(firstUpdate, secondUpdate) {
   const secondOpInsideFirstOp =
     firstOp.p <= secondOp.p && secondOp.p <= firstOp.p + firstSize
   const combinedLengthUnderLimit = firstSize + secondSize < MAX_UPDATE_SIZE
-
-  // When ops come from a multi-component update, the history position offset
-  // (hpos - p) may differ between ops because each component's hpos is computed
-  // against a different tracked-change state. Merging ops with different
-  // offsets would produce incorrect history positions, so we bail out.
-  const firstHposOffset = (firstOp.hpos ?? firstOp.p) - firstOp.p
-  const secondHposOffset = (secondOp.hpos ?? secondOp.p) - secondOp.p
-  if (firstHposOffset !== secondHposOffset) {
-    return [firstUpdate, secondUpdate]
-  }
 
   // Two inserts
   if (

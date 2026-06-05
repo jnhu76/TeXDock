@@ -1,11 +1,11 @@
 import { FC, useEffect, useMemo, useState } from 'react'
 import { WordCountData } from '@/features/word-count-modal/components/word-count-data'
+import { WordCountLoading } from '@/features/word-count-modal/components/word-count-loading'
 import { WordCountError } from '@/features/word-count-modal/components/word-count-error'
 import { useProjectContext } from '@/shared/context/project-context'
 import useAbortController from '@/shared/hooks/use-abort-controller'
 import { useProjectSettingsContext } from '@/features/editor-left-menu/context/project-settings-context'
 import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
-import { useEditorOpenDocContext } from '@/features/ide-react/context/editor-open-doc-context'
 import { useFileTreePathContext } from '@/features/file-tree/contexts/file-tree-path'
 import { debugConsole } from '@/utils/debugging'
 import { signalWithTimeout } from '@/utils/abort-signal'
@@ -13,17 +13,14 @@ import { isMainFile } from '@/features/pdf-preview/util/editor-files'
 import { countWordsInFile } from '@/features/word-count-modal/utils/count-words-in-file'
 import { createSegmenters } from '@/features/word-count-modal/utils/segmenters'
 import { WordCountsClient } from './word-counts-client'
-import LoadingSpinner from '@/shared/components/loading-spinner'
 
 export const WordCountClient: FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [data, setData] = useState<WordCountData | null>(null)
-  const { projectSnapshot, project } = useProjectContext()
-  const rootDocId = project?.rootDocId
+  const { projectSnapshot, rootDocId } = useProjectContext()
   const { spellCheckLanguage } = useProjectSettingsContext()
-  const { openDocs } = useEditorManagerContext()
-  const { currentDocument } = useEditorOpenDocContext()
+  const { openDocs, currentDocument } = useEditorManagerContext()
   const { pathInFolder } = useFileTreePathContext()
 
   const { signal } = useAbortController()
@@ -72,13 +69,7 @@ export const WordCountClient: FC = () => {
           messages: '',
         }
 
-        countWordsInFile(
-          data,
-          projectSnapshot,
-          currentRootDocPath,
-          '/',
-          segmenters
-        )
+        countWordsInFile(data, projectSnapshot, currentRootDocPath, segmenters)
 
         return data
       }
@@ -107,7 +98,7 @@ export const WordCountClient: FC = () => {
 
   return (
     <>
-      {loading && !error && <LoadingSpinner />}
+      {loading && !error && <WordCountLoading />}
       {error && <WordCountError />}
       {data && <WordCountsClient data={data} />}
     </>

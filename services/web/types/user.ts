@@ -10,7 +10,6 @@ export type UserId = Brand<string, 'UserId'>
 
 export type Features = {
   aiErrorAssistant?: boolean
-  aiUsageQuota?: string
   collaborators?: number
   compileGroup?: 'standard' | 'priority'
   compileTimeout?: number
@@ -29,11 +28,7 @@ export type Features = {
 }
 
 export type FeatureUsage = {
-  aiWorkbench: {
-    remainingTokens: number
-    resetDate: string // date string
-  }
-  aiFeatureUsage: {
+  [feature: string]: {
     remainingUsage: number
     resetDate: string // date string
   }
@@ -44,7 +39,7 @@ export type User = {
   isAdmin?: boolean
   email: string
   allowedFreeTrial?: boolean
-  hasPaidSubscription?: boolean
+  hasRecurlySubscription?: boolean
   first_name?: string
   last_name?: string
   alphaProgram?: boolean
@@ -54,15 +49,19 @@ export type User = {
   features?: Features
   refProviders?: RefProviders
   writefull?: {
+    enabled: boolean
     autoCreatedAccount: boolean
+    firstAutoLoad: boolean
     premiumSource: string
+  }
+  aiErrorAssistant?: {
+    enabled: boolean
   }
   featureUsage?: FeatureUsage
   planCode?: string
   planName?: string
   isAnnualPlan?: boolean
   isMemberOfGroupSubscription?: boolean
-  isProfessionalGroupPlan?: boolean
   hasInstitutionLicence?: boolean
 }
 

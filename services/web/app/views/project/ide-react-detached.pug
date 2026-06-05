@@ -7,14 +7,11 @@ block vars
 	- var suppressNavbar = true
 	- var suppressFooter = true
 	- var suppressSkipToContent = true
-	- var suppressPugCookieBanner = true
+	- var suppressCookieBanner = true
 	- metadata.robotsNoindexNofollow = true
 
 block content
-	#pdf-preview-detached-root
-
-block append head-scripts
-	include ./_mixpanel_autocapture.pug
+	#pdf-preview-detached-root()
 
 block append meta
 	include editor/_meta

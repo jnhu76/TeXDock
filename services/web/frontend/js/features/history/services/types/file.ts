@@ -30,5 +30,9 @@ export interface FileRenamed extends FileWithEditable {
   operation: Extract<FileOperation, 'renamed'>
 }
 
-export type FileChanged = FileAdded | FileRemoved | FileEdited | FileRenamed
-export type FileDiff = FileChanged | FileUnchanged
+export type FileDiff =
+  | FileAdded
+  | FileRemoved
+  | FileEdited
+  | FileRenamed
+  | FileUnchanged

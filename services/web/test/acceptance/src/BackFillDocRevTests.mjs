@@ -1,4 +1,4 @@
-import { db, ObjectId } from '../../../app/src/infrastructure/mongodb.mjs'
+import { db, ObjectId } from '../../../app/src/infrastructure/mongodb.js'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import logger from '@overleaf/logger'
@@ -17,11 +17,16 @@ describe('BackFillDocRevTests', function () {
     ])
   })
 
-  async function runScript() {
+  async function runScript(dryRun) {
     let result
     try {
       result = await promisify(exec)(
-        'cd ../../tools/migrations && VERBOSE_LOGGING=true yarn run migrations migrate -t server-ce --force 20230315170739_back_fill_doc_rev'
+        [
+          'VERBOSE_LOGGING=true',
+          'node',
+          'scripts/back_fill_doc_rev.mjs',
+          dryRun,
+        ].join(' ')
       )
     } catch (error) {
       // dump details like exit code, stdErr and stdOut
@@ -42,9 +47,24 @@ describe('BackFillDocRevTests', function () {
     )
   }
 
+  describe('dry-run=true', function () {
+    beforeEach('run script', async function () {
+      await runScript('--dry-run=true')
+    })
+
+    it('should not back fill the rev', async function () {
+      const docs = await db.docs.find({}, { $sort: { _id: 1 } }).toArray()
+      expect(docs).to.deep.equal([
+        { _id: docId1, deleted: true },
+        { _id: docId2 },
+        { _id: docId3, rev: 42 },
+      ])
+    })
+  })
+
   describe('dry-run=false', function () {
     beforeEach('run script', async function () {
-      await runScript()
+      await runScript('--dry-run=false')
     })
 
     it('should back fill the rev', async function () {

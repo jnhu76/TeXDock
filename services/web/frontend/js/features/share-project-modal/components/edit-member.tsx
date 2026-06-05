@@ -6,29 +6,20 @@ import { removeMemberFromProject, updateMember } from '../utils/api'
 import { useProjectContext } from '@/shared/context/project-context'
 import { sendMB } from '@/infrastructure/event-tracking'
 import { Select } from '@/shared/components/select'
-import type { ProjectMember } from '@/shared/context/types/project-metadata'
+import type { ProjectContextMember } from '@/shared/context/types/project-context'
 import { PermissionsLevel } from '@/features/ide-react/types/permissions'
 import { linkSharingEnforcementDate } from '../utils/link-sharing'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
-import OLCol from '@/shared/components/ol/ol-col'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
+import OLCol from '@/features/ui/components/ol/ol-col'
 import MaterialIcon from '@/shared/components/material-icon'
 import { useUserContext } from '@/shared/context/user-context'
 import { upgradePlan } from '@/main/account-upgrade'
-import ShareProjectModalRow from '@/features/share-project-modal/components/share-project-modal-row'
-import {
-  Dropdown,
-  DropdownMenu,
-  DropdownToggle,
-} from '@/shared/components/dropdown/dropdown-menu'
-import OLDropdownMenuItem from '@/shared/components/ol/ol-dropdown-menu-item'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
-import classnames from 'classnames'
 
 type PermissionsOption = PermissionsLevel | 'removeAccess' | 'downgraded'
 
 type EditMemberProps = {
-  member: ProjectMember
+  member: ProjectContextMember
   hasExceededCollaboratorLimit: boolean
   hasBeenDowngraded: boolean
   canAddCollaborators: boolean
@@ -47,7 +38,6 @@ export default function EditMember({
   canAddCollaborators,
   isReviewerOnFreeProject,
 }: EditMemberProps) {
-  const isSharingUpdatesEnabled = useFeatureFlag('sharing-updates')
   const [privileges, setPrivileges] = useState<PermissionsOption>(
     member.privileges
   )
@@ -61,9 +51,8 @@ export default function EditMember({
     setPrivileges(member.privileges)
   }, [member.privileges])
 
-  const { monitorRequest, setSuccessActionMessage } = useShareProjectContext()
-  const { projectId, project, updateProject, features } = useProjectContext()
-  const { members, invites } = project || {}
+  const { updateProject, monitorRequest } = useShareProjectContext()
+  const { _id: projectId, members, invites } = useProjectContext()
   const user = useUserContext()
 
   // Immediately commit this change if it's lower impact (eg. editor > viewer)
@@ -99,15 +88,14 @@ export default function EditMember({
     } else if (newPrivileges === 'removeAccess') {
       monitorRequest(() => removeMemberFromProject(projectId, member)).then(
         () => {
-          const updatedMembers =
-            members?.filter(existing => existing !== member) || []
+          const updatedMembers = members.filter(existing => existing !== member)
           updateProject({
             members: updatedMembers,
           })
           sendMB('collaborator-removed', {
             project_id: projectId,
             current_collaborators_amount: updatedMembers.length,
-            current_invites_amount: invites?.length || 0,
+            current_invites_amount: invites.length,
           })
         }
       )
@@ -122,15 +110,10 @@ export default function EditMember({
         })
       ).then(() => {
         updateProject({
-          members:
-            members?.map(
-              (item): ProjectMember =>
-                item._id === member._id
-                  ? { ...item, privileges: newPrivileges }
-                  : item
-            ) || [],
+          members: members.map(item =>
+            item._id === member._id ? { ...item, newPrivileges } : item
+          ),
         })
-        setSuccessActionMessage(t('access_updated'))
       })
     }
   }
@@ -150,195 +133,7 @@ export default function EditMember({
   const confirmRemoval =
     privileges !== member.privileges && privilegeChangePending
 
-  const getDropdownLabel = () => {
-    if (hasBeenDowngraded) {
-      return t('select_access_level')
-    }
-    switch (privileges) {
-      case 'owner':
-        return t('make_owner')
-      case 'readAndWrite':
-        return t('editor')
-      case 'review':
-        return t('reviewer')
-      case 'readOnly':
-        return t('viewer')
-      case 'removeAccess':
-        return t('remove_access')
-      case 'downgraded':
-        return t('select_access_level')
-      default:
-        return t('remove_access')
-    }
-  }
-
-  const getPrivilegeSubtitle = (privilege: PermissionsOption) => {
-    if (!['readAndWrite', 'review'].includes(privilege)) {
-      return
-    }
-
-    if (
-      (hasBeenDowngraded && !confirmRemoval) ||
-      (!canAddCollaborators && !['readAndWrite', 'review'].includes(privileges))
-    ) {
-      return t('limited_to_n_collaborators_per_project', {
-        count: features.collaborators,
-      })
-    }
-  }
-
-  const isPrivilegeDisabled = (privilege: PermissionsOption) => {
-    return (
-      !canAddCollaborators &&
-      ['readAndWrite', 'review'].includes(privilege) &&
-      ((hasBeenDowngraded && !confirmRemoval) ||
-        !['readAndWrite', 'review'].includes(privileges))
-    )
-  }
-
-  return isSharingUpdatesEnabled ? (
-    <ShareProjectModalRow>
-      <div className="d-inline-flex align-items-center h5 m-0 gap-2">
-        <MaterialIcon
-          type={
-            shouldWarnMember() || member.pendingEditor || member.pendingReviewer
-              ? 'warning'
-              : 'person'
-          }
-          className={
-            shouldWarnMember() || member.pendingEditor || member.pendingReviewer
-              ? 'text-warning'
-              : undefined
-          }
-          unfilled
-        />
-        <div className="px-2">
-          {member.email}
-          {member.pendingEditor && (
-            <div className="small fw-normal">{t('view_only_downgraded')}</div>
-          )}
-          {member.pendingReviewer && (
-            <div className="small fw-normal">
-              {t('view_only_reviewer_downgraded')}
-            </div>
-          )}
-          {shouldWarnMember() && (
-            <div className="small fw-normal">
-              {t('will_lose_edit_access_on_date', {
-                date: linkSharingEnforcementDate,
-              })}
-            </div>
-          )}
-          {isReviewerOnFreeProject && (
-            <div className="small fw-normal">
-              <Trans
-                i18nKey="comment_only_upgrade_to_enable_track_changes"
-                components={[
-                  // eslint-disable-next-line react/jsx-key
-                  <OLButton
-                    variant="link"
-                    className="btn-inline-link"
-                    onClick={() => upgradePlan('track-changes')}
-                  />,
-                ]}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="text-end">
-        <Dropdown
-          align="end"
-          onSelect={(eventKey: PermissionsOption) => {
-            if (eventKey) {
-              handlePrivilegeChange(eventKey)
-            }
-          }}
-        >
-          <div className="d-flex align-items-center gap-2">
-            {hasBeenDowngraded && !confirmRemoval && (
-              <MaterialIcon type="warning" unfilled className="text-warning" />
-            )}
-            <DropdownToggle
-              variant="ghost"
-              className="d-flex align-items-center gap-2 no-default-caret"
-            >
-              {getDropdownLabel()}
-              <MaterialIcon type="keyboard_arrow_down" />
-            </DropdownToggle>
-          </div>
-          <DropdownMenu>
-            <OLDropdownMenuItem
-              as="button"
-              eventKey="owner"
-              leadingIcon={<MaterialIcon type="person_edit" unfilled />}
-              active={privileges === 'owner'}
-              trailingIcon={privileges === 'owner' ? 'check' : undefined}
-            >
-              {t('make_owner')}
-            </OLDropdownMenuItem>
-            <OLDropdownMenuItem
-              as="button"
-              eventKey="readAndWrite"
-              leadingIcon={<MaterialIcon type="edit" unfilled />}
-              active={privileges === 'readAndWrite'}
-              trailingIcon={privileges === 'readAndWrite' ? 'check' : undefined}
-              disabled={isPrivilegeDisabled('readAndWrite')}
-              description={getPrivilegeSubtitle('readAndWrite')}
-            >
-              {t('editor')}
-            </OLDropdownMenuItem>
-            {features.trackChangesVisible && (
-              <OLDropdownMenuItem
-                as="button"
-                eventKey="review"
-                leadingIcon={<MaterialIcon type="mode_comment" unfilled />}
-                active={privileges === 'review'}
-                trailingIcon={privileges === 'review' ? 'check' : undefined}
-                disabled={isPrivilegeDisabled('review')}
-                description={getPrivilegeSubtitle('review')}
-              >
-                {t('reviewer')}
-              </OLDropdownMenuItem>
-            )}
-            <OLDropdownMenuItem
-              as="button"
-              eventKey="readOnly"
-              leadingIcon={<MaterialIcon type="visibility" unfilled />}
-              active={privileges === 'readOnly'}
-              trailingIcon={privileges === 'readOnly' ? 'check' : undefined}
-            >
-              {t('viewer')}
-            </OLDropdownMenuItem>
-            <OLDropdownMenuItem
-              as="button"
-              eventKey="removeAccess"
-              variant="danger"
-              leadingIcon={<MaterialIcon type="block" unfilled />}
-              active={privileges === 'removeAccess'}
-              trailingIcon={privileges === 'removeAccess' ? 'check' : undefined}
-            >
-              {t('remove_access')}
-            </OLDropdownMenuItem>
-          </DropdownMenu>
-        </Dropdown>
-        {confirmRemoval && (
-          <form
-            onSubmit={e => {
-              e.preventDefault()
-              if (privilegeChangePending) {
-                commitPrivilegeChange(privileges)
-              }
-            }}
-          >
-            <ChangePrivilegesActions
-              handleReset={() => setPrivileges(member.privileges)}
-            />
-          </form>
-        )}
-      </div>
-    </ShareProjectModalRow>
-  ) : (
+  return (
     <form
       id="share-project-form"
       onSubmit={e => {
@@ -404,6 +199,12 @@ export default function EditMember({
         </OLCol>
 
         <OLCol xs={4} className="project-member-actions">
+          {confirmRemoval && (
+            <ChangePrivilegesActions
+              handleReset={() => setPrivileges(member.privileges)}
+            />
+          )}
+
           <div className="project-member-select">
             {hasBeenDowngraded && !confirmRemoval && (
               <MaterialIcon type="warning" className="project-member-warning" />
@@ -420,12 +221,6 @@ export default function EditMember({
               canAddCollaborators={canAddCollaborators}
             />
           </div>
-
-          {confirmRemoval && (
-            <ChangePrivilegesActions
-              handleReset={() => setPrivileges(member.privileges)}
-            />
-          )}
         </OLCol>
       </OLFormGroup>
     </form>
@@ -524,27 +319,24 @@ type ChangePrivilegesActionsProps = {
 function ChangePrivilegesActions({
   handleReset,
 }: ChangePrivilegesActionsProps) {
-  const isSharingUpdatesEnabled = useFeatureFlag('sharing-updates')
   const { t } = useTranslation()
 
   return (
-    <div
-      className={classnames('text-center d-flex gap-1 me-3', {
-        'mt-2 justify-content-end': isSharingUpdatesEnabled,
-      })}
-    >
-      <OLButton
-        type="button"
-        size="sm"
-        variant="secondary"
-        onClick={handleReset}
-      >
-        {t('cancel')}
-      </OLButton>
-
+    <div className="text-center">
       <OLButton type="submit" size="sm" variant="primary">
-        {t('confirm')}
+        {t('change_or_cancel-change')}
       </OLButton>
+      <div className="text-sm">
+        {t('change_or_cancel-or')}
+        &nbsp;
+        <OLButton
+          variant="link"
+          className="btn-inline-link"
+          onClick={handleReset}
+        >
+          {t('change_or_cancel-cancel')}
+        </OLButton>
+      </div>
     </div>
   )
 }

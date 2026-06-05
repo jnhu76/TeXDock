@@ -1,5 +1,5 @@
-import DropdownListItem from '@/shared/components/dropdown/dropdown-list-item'
-import { DropdownItem } from '@/shared/components/dropdown/dropdown-menu'
+import DropdownListItem from '@/features/ui/components/bootstrap-5/dropdown-list-item'
+import { DropdownItem } from '@/features/ui/components/bootstrap-5/dropdown-menu'
 import { useEditorAnalytics } from '@/shared/hooks/use-editor-analytics'
 import { useNestableDropdown } from '@/shared/hooks/use-nestable-dropdown'
 import { MouseEventHandler, ReactNode, useCallback } from 'react'
@@ -8,7 +8,6 @@ type MenuBarOptionProps = {
   title: string
   onClick?: MouseEventHandler
   disabled?: boolean
-  leadingIcon?: ReactNode
   trailingIcon?: ReactNode
   href?: string
   target?: string
@@ -21,7 +20,6 @@ export const MenuBarOption = ({
   onClick: clickHandler,
   href,
   disabled,
-  leadingIcon,
   trailingIcon,
   target,
   rel,
@@ -44,7 +42,6 @@ export const MenuBarOption = ({
         onMouseEnter={() => setSelected(null)}
         onClick={onClick}
         disabled={disabled}
-        leadingIcon={leadingIcon}
         trailingIcon={trailingIcon}
         href={href}
         rel={rel}

@@ -1,5 +1,5 @@
-import logger from '@overleaf/logger'
-import metrics from '@overleaf/metrics'
+const logger = require('@overleaf/logger')
+const metrics = require('@overleaf/metrics')
 
 class RequestLogger {
   constructor() {
@@ -58,4 +58,4 @@ class RequestLogger {
   }
 }
 
-export default RequestLogger
+module.exports = RequestLogger

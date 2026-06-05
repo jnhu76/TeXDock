@@ -3,7 +3,6 @@ import {
   screen,
   fireEvent,
   waitForElementToBeRemoved,
-  within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EmailsSection from '../../../../../../frontend/js/features/settings/components/emails-section'
@@ -13,8 +12,6 @@ import { UserEmailData } from '../../../../../../types/user-email'
 import { Affiliation } from '../../../../../../types/affiliation'
 import withMarkup from '../../../../helpers/with-markup'
 import getMeta from '@/utils/meta'
-import { clearDomainCache } from '../../../../../../frontend/js/features/settings/components/emails/add-email/input'
-import { SplitTestProvider } from '@/shared/context/split-test-context'
 
 const userEmailData: UserEmailData & { affiliation: Affiliation } = {
   affiliation: {
@@ -26,7 +23,6 @@ const userEmailData: UserEmailData & { affiliation: Affiliation } = {
     department: 'Art History',
     institution: {
       commonsAccount: false,
-      enterpriseCommons: false,
       writefullCommonsAccount: false,
       confirmed: true,
       id: 1,
@@ -59,31 +55,23 @@ const institutionDomainData = [
   },
 ] as const
 
-function renderEmailsSection() {
-  return render(<EmailsSection />, {
-    wrapper: ({ children }) => (
-      <SplitTestProvider>{children}</SplitTestProvider>
-    ),
-  })
-}
-
 function resetFetchMock() {
   fetchMock.removeRoutes().clearHistory()
   fetchMock.get('express:/institutions/domains', [])
 }
 
 async function confirmCodeForEmail(email: string) {
-  const inputCode = await screen.findByRole('textbox', {
-    name: /Enter the 6-digit confirmation code sent to /,
-  })
-  screen.getByText(email, { exact: false })
+  await screen.findByText(
+    `Enter the 6-digit confirmation code sent to ${email}.`
+  )
+  const inputCode = screen.getByLabelText(/6-digit confirmation code/i)
   fireEvent.change(inputCode, { target: { value: '123456' } })
   const submitCodeBtn = screen.getByRole<HTMLButtonElement>('button', {
     name: 'Confirm',
   })
   fireEvent.click(submitCodeBtn)
   await waitForElementToBeRemoved(() =>
-    screen.getByRole('button', { name: 'Confirming' })
+    screen.getByRole('button', { name: /confirming/i })
   )
 }
 
@@ -99,48 +87,47 @@ describe('<EmailsSection />', function () {
 
   afterEach(function () {
     resetFetchMock()
-    clearDomainCache()
   })
 
   it('renders "add another email" button', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
-    await screen.findByRole('button', { name: 'Add another email' })
+    await screen.findByRole('button', { name: /add another email/i })
   })
 
   it('renders input', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
     await fetchMock.callHistory.flush(true)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
     fireEvent.click(button)
 
-    await screen.findByRole('textbox', { name: 'Email' })
+    await screen.findByLabelText(/email/i, { selector: 'input' })
   })
 
   it('renders "Start adding your address" until a valid email is typed', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
     fetchMock.get(`/institutions/domains?hostname=email.com&limit=1`, 200)
     fetchMock.get(`/institutions/domains?hostname=email&limit=1`, 200)
-    renderEmailsSection()
+    render(<EmailsSection />)
     await fetchMock.callHistory.flush(true)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
     fireEvent.click(button)
 
-    const input = screen.getByRole('textbox', { name: 'Email' })
+    const input = screen.getByLabelText(/email/i, { selector: 'input' })
 
     // initially the text is displayed and the "add email" button disabled
     screen.getByText('Start by adding your email address.')
     expect(
       screen.getByRole<HTMLButtonElement>('button', {
-        name: 'Add new email',
+        name: /add new email/i,
       }).disabled
     ).to.be.true
 
@@ -151,7 +138,7 @@ describe('<EmailsSection />', function () {
     screen.getByText('Start by adding your email address.')
     expect(
       screen.getByRole<HTMLButtonElement>('button', {
-        name: 'Add new email',
+        name: /add new email/i,
       }).disabled
     ).to.be.true
 
@@ -162,21 +149,21 @@ describe('<EmailsSection />', function () {
     expect(screen.queryByText('Start by adding your email address.')).to.be.null
     expect(
       screen.getByRole<HTMLButtonElement>('button', {
-        name: 'Add new email',
+        name: /add new email/i,
       }).disabled
     ).to.be.false
   })
 
   it('renders "add new email" button', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
     fireEvent.click(button)
 
-    screen.getByRole('button', { name: 'Add new email' })
+    screen.getByRole('button', { name: /add new email/i })
   })
 
   it('prevent users from adding new emails when the limit is reached', async function () {
@@ -185,24 +172,24 @@ describe('<EmailsSection />', function () {
       emails.push({ email: `bar${i}@overleaf.com` })
     }
     fetchMock.get('/user/emails?ensureAffiliation=true', emails)
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const findByTextWithMarkup = withMarkup(screen.findByText)
     await findByTextWithMarkup(
       'You can have a maximum of 10 email addresses on this account. To add another email address, please delete an existing one.'
     )
 
-    expect(screen.queryByRole('button', { name: 'Add another email' })).to.not
+    expect(screen.queryByRole('button', { name: /add another email/i })).to.not
       .exist
   })
 
   it('adds new email address', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const addAnotherEmailBtn = await screen.findByRole<HTMLButtonElement>(
       'button',
-      { name: 'Add another email' }
+      { name: /add another email/i }
     )
 
     await fetchMock.callHistory.flush(true)
@@ -213,14 +200,14 @@ describe('<EmailsSection />', function () {
       .post('/user/emails/confirm-secondary', 200)
 
     fireEvent.click(addAnotherEmailBtn)
-    const input = screen.getByRole('textbox', { name: 'Email' })
+    const input = screen.getByLabelText(/email/i, { selector: 'input' })
 
     fireEvent.change(input, {
       target: { value: userEmailData.email },
     })
 
     const submitBtn = screen.getByRole<HTMLButtonElement>('button', {
-      name: 'Add new email',
+      name: /add new email/i,
     })
 
     expect(submitBtn.disabled).to.be.false
@@ -231,22 +218,21 @@ describe('<EmailsSection />', function () {
 
     await waitForElementToBeRemoved(() =>
       screen.getByRole('button', {
-        name: /adding/i,
+        name: /Loading/i,
       })
     )
 
     await confirmCodeForEmail(userEmailData.email)
-    const elements = await screen.findAllByText(userEmailData.email)
-    expect(elements.length).to.equal(2)
+    await screen.findByText(userEmailData.email)
   })
 
   it('fails to add add new email address', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const addAnotherEmailBtn = await screen.findByRole<HTMLButtonElement>(
       'button',
-      { name: 'Add another email' }
+      { name: /add another email/i }
     )
 
     await fetchMock.callHistory.flush(true)
@@ -256,14 +242,14 @@ describe('<EmailsSection />', function () {
       .post('/user/emails/secondary', 400)
 
     fireEvent.click(addAnotherEmailBtn)
-    const input = screen.getByRole('textbox', { name: 'Email' })
+    const input = screen.getByLabelText(/email/i, { selector: 'input' })
 
     fireEvent.change(input, {
       target: { value: userEmailData.email },
     })
 
     const submitBtn = screen.getByRole<HTMLButtonElement>('button', {
-      name: 'Add new email',
+      name: /add new email/i,
     })
 
     expect(submitBtn.disabled).to.be.false
@@ -273,7 +259,7 @@ describe('<EmailsSection />', function () {
     expect(submitBtn.disabled).to.be.true
 
     await screen.findByText(
-      'Invalid Request. Please correct the data and try again.'
+      /Invalid Request. Please correct the data and try again./i
     )
     expect(submitBtn).to.not.be.null
     expect(submitBtn.disabled).to.be.false
@@ -281,10 +267,10 @@ describe('<EmailsSection />', function () {
 
   it('can link email address to an existing SSO institution', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
 
     await fetchMock.callHistory.flush(true)
@@ -293,7 +279,7 @@ describe('<EmailsSection />', function () {
 
     await userEvent.click(button)
 
-    const input = screen.getByRole('textbox', { name: 'Email' })
+    const input = screen.getByLabelText(/email/i, { selector: 'input' })
     fireEvent.change(input, {
       target: { value: 'user@autocomplete.edu' },
     })
@@ -301,40 +287,14 @@ describe('<EmailsSection />', function () {
     await screen.findByRole('button', { name: 'Link accounts and add email' })
   })
 
-  it('prevents user from linking to same SSO institution twice', async function () {
-    fetchMock.get('/user/emails?ensureAffiliation=true', [
-      { email: 'bar@autocomplete.edu', samlProviderId: '1234' },
-    ])
-    renderEmailsSection()
-
-    const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
-    })
-
-    await fetchMock.callHistory.flush(true)
-    fetchMock.removeRoutes().clearHistory()
-    fetchMock.get('express:/institutions/domains', institutionDomainData)
-
-    await userEvent.click(button)
-
-    const input = screen.getByRole('textbox', { name: 'Email' })
-    fireEvent.change(input, {
-      target: { value: 'baz@autocomplete.edu' },
-    })
-
-    await screen.findByText(
-      'This institution is already linked with your account via another email address.'
-    )
-  })
-
   it('adds new email address with existing institution and custom departments', async function () {
     const country = 'Germany'
     const customDepartment = 'Custom department'
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
 
     await fetchMock.callHistory.flush(true)
@@ -343,14 +303,14 @@ describe('<EmailsSection />', function () {
     await userEvent.click(button)
 
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'Email' }),
+      screen.getByLabelText(/email/i, { selector: 'input' }),
       userEmailData.email
     )
 
-    await userEvent.click(screen.getByRole('button', { name: 'Let us know' }))
+    await userEvent.click(screen.getByRole('button', { name: /let us know/i }))
 
     const universityInput = screen.getByRole<HTMLInputElement>('combobox', {
-      name: 'University',
+      name: /university/i,
     })
 
     expect(universityInput.disabled).to.be.true
@@ -367,7 +327,7 @@ describe('<EmailsSection />', function () {
     // Select the country from dropdown
     await userEvent.type(
       screen.getByRole('combobox', {
-        name: 'Country',
+        name: /country/i,
       }),
       country
     )
@@ -384,10 +344,10 @@ describe('<EmailsSection />', function () {
       await screen.findByText(userEmailData.affiliation.institution.name)
     )
 
-    const roleInput = screen.getByRole('combobox', { name: 'Role' })
+    const roleInput = screen.getByRole('combobox', { name: /role/i })
     await userEvent.type(roleInput, userEmailData.affiliation.role!)
     const departmentInput = screen.getByRole('combobox', {
-      name: 'Department',
+      name: /department/i,
     })
     await userEvent.click(departmentInput)
     await userEvent.click(screen.getByText(customDepartment))
@@ -407,7 +367,7 @@ describe('<EmailsSection />', function () {
 
     await userEvent.click(
       screen.getByRole('button', {
-        name: 'Add new email',
+        name: /add new email/i,
       })
     )
 
@@ -424,7 +384,9 @@ describe('<EmailsSection />', function () {
       department: customDepartment,
     })
 
-    await screen.findByText(/Enter the 6-digit confirmation code sent to /)
+    await screen.findByText(
+      `Enter the 6-digit confirmation code sent to ${userEmailData.email}.`
+    )
 
     await confirmCodeForEmail(userEmailData.email)
 
@@ -434,10 +396,10 @@ describe('<EmailsSection />', function () {
 
   it('autocompletes institution name', async function () {
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
 
     await fetchMock.callHistory.flush(true)
@@ -457,14 +419,14 @@ describe('<EmailsSection />', function () {
     // open "add new email" section and click "let us know" to open the Country/University form
     await userEvent.click(button)
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'Email' }),
+      screen.getByLabelText(/email/i, { selector: 'input' }),
       userEmailData.email
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Let us know' }))
+    await userEvent.click(screen.getByRole('button', { name: /let us know/i }))
 
     // select a country
     const countryInput = screen.getByRole<HTMLInputElement>('combobox', {
-      name: 'Country',
+      name: /country/i,
     })
     await userEvent.click(countryInput)
     await userEvent.type(countryInput, 'Germ')
@@ -472,7 +434,7 @@ describe('<EmailsSection />', function () {
 
     // match several universities on initial typing
     const universityInput = screen.getByRole<HTMLInputElement>('combobox', {
-      name: 'University',
+      name: /university/i,
     })
     await userEvent.click(universityInput)
     await userEvent.type(universityInput, 'bo')
@@ -490,10 +452,10 @@ describe('<EmailsSection />', function () {
     const countryCode = 'de'
     const newUniversity = 'Abcdef'
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
 
     await fetchMock.callHistory.flush(true)
@@ -502,14 +464,14 @@ describe('<EmailsSection />', function () {
     await userEvent.click(button)
 
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'Email' }),
+      screen.getByLabelText(/email/i, { selector: 'input' }),
       userEmailData.email
     )
 
-    await userEvent.click(screen.getByRole('button', { name: 'Let us know' }))
+    await userEvent.click(screen.getByRole('button', { name: /let us know/i }))
 
     const universityInput = screen.getByRole<HTMLInputElement>('combobox', {
-      name: 'University',
+      name: /university/i,
     })
 
     expect(universityInput.disabled).to.be.true
@@ -526,7 +488,7 @@ describe('<EmailsSection />', function () {
     // Select the country from dropdown
     await userEvent.type(
       screen.getByRole('combobox', {
-        name: 'Country',
+        name: /country/i,
       }),
       country
     )
@@ -540,10 +502,10 @@ describe('<EmailsSection />', function () {
     // Enter the university manually
     await userEvent.type(universityInput, newUniversity)
 
-    const roleInput = screen.getByRole('combobox', { name: 'Role' })
+    const roleInput = screen.getByRole('combobox', { name: /role/i })
     await userEvent.type(roleInput, userEmailData.affiliation.role!)
     const departmentInput = screen.getByRole('combobox', {
-      name: 'Department',
+      name: /department/i,
     })
     await userEvent.type(departmentInput, userEmailData.affiliation.department!)
 
@@ -565,7 +527,7 @@ describe('<EmailsSection />', function () {
 
     await userEvent.click(
       screen.getByRole('button', {
-        name: 'Add new email',
+        name: /add new email/i,
       })
     )
 
@@ -585,8 +547,7 @@ describe('<EmailsSection />', function () {
       department: userEmailData.affiliation?.department,
     })
 
-    const elements = await screen.findAllByText(userEmailData.email)
-    expect(elements.length).to.equal(2)
+    await screen.findByText(userEmailData.email)
     await screen.findByText(newUniversity)
     await screen.findByText(userEmailData.affiliation.role!, { exact: false })
     await screen.findByText(userEmailData.affiliation.department!, {
@@ -606,10 +567,10 @@ describe('<EmailsSection />', function () {
     ]
     const hostnameFirstChar = institutionDomainDataCopy[0].hostname.charAt(0)
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
 
     await fetchMock.callHistory.flush(true)
@@ -622,7 +583,7 @@ describe('<EmailsSection />', function () {
     await userEvent.click(button)
 
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'Email' }),
+      screen.getByLabelText(/email/i, { selector: 'input' }),
       `user@${hostnameFirstChar}`
     )
 
@@ -632,37 +593,37 @@ describe('<EmailsSection />', function () {
 
     expect(
       screen.queryByRole('combobox', {
-        name: 'Country',
+        name: /country/i,
       })
     ).to.be.null
     expect(
       screen.queryByRole('combobox', {
-        name: 'University',
+        name: /university/i,
       })
     ).to.be.null
     screen.getByRole('combobox', {
-      name: 'Role',
+      name: /role/i,
     })
     screen.getByRole('combobox', {
-      name: 'Department',
+      name: /department/i,
     })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Change' }))
+    await userEvent.click(screen.getByRole('button', { name: /change/i }))
 
     screen.getByRole('combobox', {
-      name: 'Country',
+      name: /country/i,
     })
     screen.getByRole('combobox', {
-      name: 'University',
+      name: /university/i,
     })
     expect(
       screen.queryByRole('combobox', {
-        name: 'Role',
+        name: /role/i,
       })
     ).to.be.null
     expect(
       screen.queryByRole('combobox', {
-        name: 'Department',
+        name: /department/i,
       })
     ).to.be.null
   })
@@ -679,10 +640,10 @@ describe('<EmailsSection />', function () {
     ]
     const hostnameFirstChar = institutionDomainDataCopy[0].hostname.charAt(0)
     fetchMock.get('/user/emails?ensureAffiliation=true', [])
-    renderEmailsSection()
+    render(<EmailsSection />)
 
     const button = await screen.findByRole<HTMLButtonElement>('button', {
-      name: 'Add another email',
+      name: /add another email/i,
     })
 
     await fetchMock.callHistory.flush(true)
@@ -695,7 +656,7 @@ describe('<EmailsSection />', function () {
     await userEvent.click(button)
 
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'Email' }),
+      screen.getByLabelText(/email/i, { selector: 'input' }),
       `user@${hostnameFirstChar}`
     )
 
@@ -722,16 +683,16 @@ describe('<EmailsSection />', function () {
       .post('/user/emails/confirm-secondary', 200)
 
     await userEvent.type(
-      screen.getByRole('combobox', { name: 'Role' }),
+      screen.getByRole('combobox', { name: /role/i }),
       userEmailData.affiliation.role!
     )
     await userEvent.type(
-      screen.getByRole('combobox', { name: 'Department' }),
+      screen.getByRole('combobox', { name: /department/i }),
       userEmailData.affiliation.department!
     )
     await userEvent.click(
       screen.getByRole('button', {
-        name: 'Add new email',
+        name: /add new email/i,
       })
     )
 
@@ -746,381 +707,6 @@ describe('<EmailsSection />', function () {
     screen.getByText(userEmailDataCopy.affiliation.role!, { exact: false })
     screen.getByText(userEmailDataCopy.affiliation.department!, {
       exact: false,
-    })
-  })
-
-  describe('when domain is captured by a group', function () {
-    describe('and managed users is not enabled', function () {
-      beforeEach(async function () {
-        await fetchMock.callHistory.flush(true)
-        fetchMock.removeRoutes().clearHistory()
-        const institution = {
-          university: {
-            id: 1234,
-            ssoEnabled: false,
-            name: 'Auto Complete University',
-          },
-          hostname: 'autocomplete.edu',
-          confirmed: true,
-          group: {
-            domainCaptureEnabled: true,
-            ssoConfig: {
-              enabled: true,
-            },
-          },
-        }
-
-        fetchMock.get('express:/institutions/domains', [institution])
-      })
-
-      it('can add email address via SSO', async function () {
-        // note: this UI is a WIP
-        fetchMock.get('/user/emails?ensureAffiliation=true', [])
-        renderEmailsSection()
-
-        const button = await screen.findByRole<HTMLButtonElement>('button', {
-          name: 'Add another email',
-        })
-
-        await userEvent.click(button)
-
-        const input = screen.getByRole('textbox', { name: 'Email' })
-        fireEvent.change(input, {
-          target: { value: 'user@autocomplete.edu' },
-        })
-        await screen.findByText('This feature is currently unavailable.')
-      })
-    })
-
-    describe('and managed users is enabled', function () {
-      beforeEach(async function () {
-        await fetchMock.callHistory.flush(true)
-        fetchMock.removeRoutes().clearHistory()
-        const institution = {
-          university: {
-            id: 1234,
-            ssoEnabled: false,
-            name: 'Auto Complete University',
-          },
-          hostname: 'autocomplete.edu',
-          confirmed: true,
-          group: {
-            domainCaptureEnabled: true,
-            managedUsersEnabled: true,
-            ssoConfig: {
-              enabled: true,
-            },
-          },
-        }
-
-        fetchMock.get('express:/institutions/domains', [institution])
-      })
-
-      it('renders error', async function () {
-        // note: this UI is a WIP
-        fetchMock.get('/user/emails?ensureAffiliation=true', [])
-        renderEmailsSection()
-
-        const button = await screen.findByRole<HTMLButtonElement>('button', {
-          name: 'Add another email',
-        })
-
-        await userEvent.click(button)
-
-        const input = screen.getByRole('textbox', { name: 'Email' })
-        fireEvent.change(input, {
-          target: { value: 'user@autocomplete.edu' },
-        })
-
-        const notification = await screen.findByRole('alert')
-        within(notification).getByText(
-          'Your company email address has been registered under a verified domain, and cannot be added as a secondary email.',
-          { exact: false }
-        )
-      })
-    })
-
-    describe('if Commons SSO is enabled and managed users is not enabled, Commons takes priority over group UI', function () {
-      beforeEach(async function () {
-        await fetchMock.callHistory.flush(true)
-        fetchMock.removeRoutes().clearHistory()
-        const institution = {
-          university: {
-            id: 1234,
-            ssoEnabled: true,
-            name: 'Auto Complete University',
-          },
-          hostname: 'autocomplete.edu',
-          confirmed: true,
-          group: {
-            domainCaptureEnabled: true,
-            ssoConfig: {
-              enabled: true,
-            },
-          },
-        }
-
-        fetchMock.get('express:/institutions/domains', [institution])
-      })
-
-      it('renders Commons UI', async function () {
-        fetchMock.get('/user/emails?ensureAffiliation=true', [])
-        renderEmailsSection()
-
-        const button = await screen.findByRole<HTMLButtonElement>('button', {
-          name: 'Add another email',
-        })
-
-        await userEvent.click(button)
-
-        const input = screen.getByRole('textbox', { name: 'Email' })
-        fireEvent.change(input, {
-          target: { value: 'user@autocomplete.edu' },
-        })
-
-        await screen.findByRole('button', {
-          name: 'Link accounts and add email',
-        })
-      })
-    })
-
-    describe('if Commons SSO is enabled and managed users is enabled, group domain capture takes priority', function () {
-      beforeEach(async function () {
-        await fetchMock.callHistory.flush(true)
-        fetchMock.removeRoutes().clearHistory()
-        const institution = {
-          university: {
-            id: 1234,
-            ssoEnabled: true,
-            name: 'Auto Complete University',
-          },
-          hostname: 'autocomplete.edu',
-          confirmed: true,
-          group: {
-            domainCaptureEnabled: true,
-            managedUsersEnabled: true,
-            ssoConfig: {
-              enabled: true,
-            },
-          },
-        }
-
-        fetchMock.get('express:/institutions/domains', [institution])
-      })
-
-      it('renders group domain-capture error instead of Commons UI', async function () {
-        fetchMock.get('/user/emails?ensureAffiliation=true', [])
-        renderEmailsSection()
-
-        const button = await screen.findByRole<HTMLButtonElement>('button', {
-          name: 'Add another email',
-        })
-
-        await userEvent.click(button)
-
-        const input = screen.getByRole('textbox', { name: 'Email' })
-        fireEvent.change(input, {
-          target: { value: 'user@autocomplete.edu' },
-        })
-
-        const notification = await screen.findByRole('alert')
-        within(notification).getByText(
-          'Your company email address has been registered under a verified domain, and cannot be added as a secondary email.',
-          { exact: false }
-        )
-        expect(
-          screen.queryByRole('button', {
-            name: 'Link accounts and add email',
-          })
-        ).to.be.null
-      })
-    })
-
-    describe('when the domain-captured-by-group feature flag is enabled', function () {
-      beforeEach(function () {
-        window.metaAttributesCache.set('ol-splitTestVariants', {
-          'domain-captured-by-group': 'enabled',
-        })
-      })
-
-      afterEach(function () {
-        window.metaAttributesCache.set('ol-splitTestVariants', {})
-      })
-
-      describe('and capturedByGroup is true with managedUsersEnabled', function () {
-        beforeEach(async function () {
-          await fetchMock.callHistory.flush(true)
-          fetchMock.removeRoutes().clearHistory()
-          const institution = {
-            university: {
-              id: 1234,
-              ssoEnabled: false,
-              name: 'Auto Complete University',
-            },
-            hostname: 'autocomplete.edu',
-            confirmed: true,
-            capturedByGroup: true,
-            group: {
-              domainCaptureEnabled: true,
-              managedUsersEnabled: true,
-              ssoConfig: { enabled: true },
-            },
-          }
-
-          fetchMock.get('express:/institutions/domains', [institution])
-        })
-
-        it('renders the domain-capture error', async function () {
-          fetchMock.get('/user/emails?ensureAffiliation=true', [])
-          renderEmailsSection()
-
-          const button = await screen.findByRole<HTMLButtonElement>('button', {
-            name: 'Add another email',
-          })
-
-          await userEvent.click(button)
-
-          const input = screen.getByRole('textbox', { name: 'Email' })
-          fireEvent.change(input, {
-            target: { value: 'user@autocomplete.edu' },
-          })
-
-          const notification = await screen.findByRole('alert')
-          within(notification).getByText(
-            'Your company email address has been registered under a verified domain, and cannot be added as a secondary email.',
-            { exact: false }
-          )
-        })
-      })
-
-      describe('and capturedByGroup is false with managedUsersEnabled (domainCaptureEnabled alone is not enough)', function () {
-        beforeEach(async function () {
-          await fetchMock.callHistory.flush(true)
-          fetchMock.removeRoutes().clearHistory()
-          const institution = {
-            university: {
-              id: 1234,
-              ssoEnabled: false,
-              name: 'Auto Complete University',
-            },
-            hostname: 'autocomplete.edu',
-            confirmed: true,
-            capturedByGroup: false,
-            group: {
-              domainCaptureEnabled: true,
-              managedUsersEnabled: true,
-              ssoConfig: { enabled: true },
-            },
-          }
-
-          fetchMock.get('express:/institutions/domains', [institution])
-        })
-
-        it('does not render the domain-capture error and shows regular institution fields', async function () {
-          fetchMock.get('/user/emails?ensureAffiliation=true', [])
-          renderEmailsSection()
-
-          const button = await screen.findByRole<HTMLButtonElement>('button', {
-            name: 'Add another email',
-          })
-
-          await userEvent.click(button)
-
-          const input = screen.getByRole('textbox', { name: 'Email' })
-          fireEvent.change(input, {
-            target: { value: 'user@autocomplete.edu' },
-          })
-
-          await screen.findByRole('button', { name: 'Add new email' })
-          expect(screen.queryByRole('alert')).to.be.null
-        })
-      })
-
-      describe('and capturedByGroup is true with ssoConfig enabled (no managedUsers)', function () {
-        beforeEach(async function () {
-          await fetchMock.callHistory.flush(true)
-          fetchMock.removeRoutes().clearHistory()
-          const institution = {
-            university: {
-              id: 1234,
-              ssoEnabled: false,
-              name: 'Auto Complete University',
-            },
-            hostname: 'autocomplete.edu',
-            confirmed: true,
-            capturedByGroup: true,
-            group: {
-              domainCaptureEnabled: true,
-              managedUsersEnabled: false,
-              ssoConfig: { enabled: true },
-            },
-          }
-
-          fetchMock.get('express:/institutions/domains', [institution])
-        })
-
-        it('renders the group SSO unavailable message', async function () {
-          fetchMock.get('/user/emails?ensureAffiliation=true', [])
-          renderEmailsSection()
-
-          const button = await screen.findByRole<HTMLButtonElement>('button', {
-            name: 'Add another email',
-          })
-
-          await userEvent.click(button)
-
-          const input = screen.getByRole('textbox', { name: 'Email' })
-          fireEvent.change(input, {
-            target: { value: 'user@autocomplete.edu' },
-          })
-
-          await screen.findByText('This feature is currently unavailable.')
-        })
-      })
-
-      describe('and capturedByGroup is false with ssoConfig enabled', function () {
-        beforeEach(async function () {
-          await fetchMock.callHistory.flush(true)
-          fetchMock.removeRoutes().clearHistory()
-          const institution = {
-            university: {
-              id: 1234,
-              ssoEnabled: false,
-              name: 'Auto Complete University',
-            },
-            hostname: 'autocomplete.edu',
-            confirmed: true,
-            capturedByGroup: false,
-            group: {
-              domainCaptureEnabled: true,
-              managedUsersEnabled: false,
-              ssoConfig: { enabled: true },
-            },
-          }
-
-          fetchMock.get('express:/institutions/domains', [institution])
-        })
-
-        it('does not render SSO UI and shows regular institution fields', async function () {
-          fetchMock.get('/user/emails?ensureAffiliation=true', [])
-          renderEmailsSection()
-
-          const button = await screen.findByRole<HTMLButtonElement>('button', {
-            name: 'Add another email',
-          })
-
-          await userEvent.click(button)
-
-          const input = screen.getByRole('textbox', { name: 'Email' })
-          fireEvent.change(input, {
-            target: { value: 'user@autocomplete.edu' },
-          })
-
-          await screen.findByRole('button', { name: 'Add new email' })
-          expect(screen.queryByText('This feature is currently unavailable.'))
-            .to.be.null
-        })
-      })
     })
   })
 })

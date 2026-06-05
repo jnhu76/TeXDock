@@ -1,35 +1,23 @@
-import { fetchJson } from '@overleaf/fetch-utils'
-import Settings from '@overleaf/settings'
+const request = require('request')
+const Settings = require('@overleaf/settings')
 
 const buildUrl = path =>
   `http://${Settings.internal.clsi.host}:${Settings.internal.clsi.port}/${path}`
 
 const url = buildUrl(`project/smoketest-${process.pid}/compile`)
 
-export default {
-  async sendNewResult(res) {
-    let error
-    try {
-      await this._run()
-    } catch (err) {
-      error = err
-    }
-
-    this._sendResponse(res, error)
+module.exports = {
+  sendNewResult(res) {
+    this._run(error => this._sendResponse(res, error))
   },
   sendLastResult(res) {
     this._sendResponse(res, this._lastError)
   },
   triggerRun(cb) {
-    this._run()
-      .then(() => {
-        this._lastError = null
-        cb()
-      })
-      .catch(error => {
-        this._lastError = error
-        cb(error)
-      })
+    this._run(error => {
+      this._lastError = error
+      cb(error)
+    })
   },
   lastRunSuccessful() {
     return this._lastError == null
@@ -48,26 +36,24 @@ export default {
     res.contentType('text/plain')
     res.status(code).send(body)
   },
-  async _run() {
-    const body = await fetchJson(url, {
-      method: 'POST',
-      json: {
-        compile: {
-          options: {
-            metricsPath: 'health-check',
-          },
-          resources: [
-            {
-              path: 'main.tex',
-              content: `\
+  _run(done) {
+    request.post(
+      {
+        url,
+        json: {
+          compile: {
+            options: {
+              metricsPath: 'health-check',
+            },
+            resources: [
+              {
+                path: 'main.tex',
+                content: `\
 % Membrane-like surface
 % Author: Yotam Avital
 \\documentclass{article}
 \\usepackage{tikz}
 \\usetikzlibrary{calc,fadings,decorations.pathreplacing}
-\\usepackage{ifplatform} % test shell escape, conditionals to test which platform is being used
-\\usepackage{minted}  % to test shell commands
-\\usepackage{bashful} % to test shell commands
 \\begin{document}
 \\begin{tikzpicture}
   \\def\\nuPi{3.1459265}
@@ -93,44 +79,30 @@ export default {
     }
   }
 \\end{tikzpicture}
-
-% Test minted (shell commands)
-\\begin{minted}{python}
-x = 1 + 2
-\\end{minted}
-
-% Test bashful (shell commands)
-\\bash[stdout,stderr]
-date
-\\END
-
-% Test system
-\\immediate\\write18{/bin/date > date.txt}
-\\input date.txt
-
-% Test popen
-\\input{"|date"}
-
 \\end{document}\
 `,
-            },
-          ],
+              },
+            ],
+          },
         },
       },
-    })
+      (error, response, body) => {
+        if (error) return done(error)
+        if (!body || !body.compile || !body.compile.outputFiles) {
+          return done(new Error('response payload incomplete'))
+        }
 
-    if (!body || !body.compile || !body.compile.outputFiles) {
-      throw new Error('response payload incomplete')
-    }
+        let pdfFound = false
+        let logFound = false
+        for (const file of body.compile.outputFiles) {
+          if (file.type === 'pdf') pdfFound = true
+          if (file.type === 'log') logFound = true
+        }
 
-    let pdfFound = false
-    let logFound = false
-    for (const file of body.compile.outputFiles) {
-      if (file.type === 'pdf') pdfFound = true
-      if (file.type === 'log') logFound = true
-    }
-
-    if (!pdfFound) throw new Error('no pdf returned')
-    if (!logFound) throw new Error('no log returned')
+        if (!pdfFound) return done(new Error('no pdf returned'))
+        if (!logFound) return done(new Error('no log returned'))
+        done()
+      }
+    )
   },
 }

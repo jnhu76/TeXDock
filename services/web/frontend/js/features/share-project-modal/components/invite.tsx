@@ -5,64 +5,22 @@ import MemberPrivileges from './member-privileges'
 import { resendInvite, revokeInvite } from '../utils/api'
 import { useProjectContext } from '@/shared/context/project-context'
 import { sendMB } from '@/infrastructure/event-tracking'
-import OLRow from '@/shared/components/ol/ol-row'
-import OLCol from '@/shared/components/ol/ol-col'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLBadge from '@/shared/components/ol/ol-badge'
-import OLDropdownMenuItem from '@/shared/components/ol/ol-dropdown-menu-item'
-import {
-  Dropdown,
-  DropdownMenu,
-  DropdownToggle,
-} from '@/shared/components/dropdown/dropdown-menu'
-import ShareProjectModalRow from '@/features/share-project-modal/components/share-project-modal-row'
+import OLRow from '@/features/ui/components/ol/ol-row'
+import OLCol from '@/features/ui/components/ol/ol-col'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import MaterialIcon from '@/shared/components/material-icon'
-import { ProjectMember } from '@/shared/context/types/project-metadata'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
+import { ProjectContextMember } from '@/shared/context/types/project-context'
 
 export default function Invite({
   invite,
   isProjectOwner,
 }: {
-  invite: ProjectMember
+  invite: ProjectContextMember
   isProjectOwner: boolean
 }) {
-  const isSharingUpdatesEnabled = useFeatureFlag('sharing-updates')
   const { t } = useTranslation()
-
-  return isSharingUpdatesEnabled ? (
-    <ShareProjectModalRow>
-      <div className="d-inline-flex align-items-center h5 m-0 gap-2">
-        <MaterialIcon type="person" unfilled />
-        <div className="px-2">{invite.email}</div>
-        <OLBadge bg="light" text="dark">
-          {t('pending_invite')}
-        </OLBadge>
-      </div>
-      {isProjectOwner ? (
-        <Dropdown align="end" onSelect={() => {}}>
-          <DropdownToggle
-            variant="ghost"
-            className="d-flex align-items-center gap-2 no-default-caret"
-          >
-            <MemberPrivileges privileges={invite.privileges} />
-            <MaterialIcon type="keyboard_arrow_down" />
-          </DropdownToggle>
-          <DropdownMenu>
-            <ResendInvite invite={invite} />
-            <RevokeInvite invite={invite} />
-          </DropdownMenu>
-        </Dropdown>
-      ) : (
-        <div className="h5 m-0 px-4 fw-semibold">
-          <div className="form-control-plaintext border-0">
-            <MemberPrivileges privileges={invite.privileges} />
-          </div>
-        </div>
-      )}
-    </ShareProjectModalRow>
-  ) : (
+  return (
     <OLRow className="project-invite">
       <OLCol xs={8}>
         <div>{invite.email}</div>
@@ -86,19 +44,16 @@ export default function Invite({
   )
 }
 
-function ResendInvite({ invite }: { invite: ProjectMember }) {
-  const isSharingUpdatesEnabled = useFeatureFlag('sharing-updates')
+function ResendInvite({ invite }: { invite: ProjectContextMember }) {
   const { t } = useTranslation()
-  const { monitorRequest, setError, inFlight, setSuccessActionMessage } =
-    useShareProjectContext()
-  const { projectId } = useProjectContext()
+  const { monitorRequest, setError, inFlight } = useShareProjectContext()
+  const { _id: projectId } = useProjectContext()
 
   // const buttonRef = useRef(null)
   //
   const handleClick = useCallback(
     () =>
       monitorRequest(() => resendInvite(projectId, invite))
-        .then(() => setSuccessActionMessage(t('invite_resent')))
         .catch(error => {
           if (error?.response?.status === 404) {
             setError('invite_expired')
@@ -116,19 +71,10 @@ function ResendInvite({ invite }: { invite: ProjectMember }) {
             ;(document.activeElement as HTMLElement).blur()
           }
         }),
-    [invite, monitorRequest, projectId, setError, setSuccessActionMessage, t]
+    [invite, monitorRequest, projectId, setError]
   )
 
-  return isSharingUpdatesEnabled ? (
-    <OLDropdownMenuItem
-      as="button"
-      leadingIcon={<MaterialIcon type="mail" unfilled />}
-      onClick={handleClick}
-      disabled={inFlight}
-    >
-      {t('resend_invite')}
-    </OLDropdownMenuItem>
-  ) : (
+  return (
     <OLButton
       variant="link"
       className="btn-inline-link"
@@ -141,41 +87,28 @@ function ResendInvite({ invite }: { invite: ProjectMember }) {
   )
 }
 
-function RevokeInvite({ invite }: { invite: ProjectMember }) {
-  const isSharingUpdatesEnabled = useFeatureFlag('sharing-updates')
+function RevokeInvite({ invite }: { invite: ProjectContextMember }) {
   const { t } = useTranslation()
-  const { monitorRequest, setSuccessActionMessage } = useShareProjectContext()
-  const { projectId, project, updateProject } = useProjectContext()
-  const { invites, members } = project || {}
+  const { updateProject, monitorRequest } = useShareProjectContext()
+  const { _id: projectId, invites, members } = useProjectContext()
 
   function handleClick(event: React.MouseEvent) {
     event.preventDefault()
 
     monitorRequest(() => revokeInvite(projectId, invite)).then(() => {
-      const updatedInvites =
-        invites?.filter(existing => existing !== invite) || []
+      const updatedInvites = invites.filter(existing => existing !== invite)
       updateProject({
         invites: updatedInvites,
       })
       sendMB('collaborator-invite-revoked', {
         project_id: projectId,
         current_invites_amount: updatedInvites.length,
-        current_collaborators_amount: members?.length || 0,
+        current_collaborators_amount: members.length,
       })
-      setSuccessActionMessage(t('invite_revoked'))
     })
   }
 
-  return isSharingUpdatesEnabled ? (
-    <OLDropdownMenuItem
-      as="button"
-      leadingIcon={<MaterialIcon type="block" unfilled />}
-      variant="danger"
-      onClick={handleClick}
-    >
-      {t('revoke_invite')}
-    </OLDropdownMenuItem>
-  ) : (
+  return (
     <OLTooltip
       id="revoke-invite"
       description={t('revoke_invite')}

@@ -39,7 +39,7 @@ export const environments = new Map([
 \t\\centering
 \t\\includegraphics[width=0.5\\linewidth]{$1}
 \t\\caption{\${2:Caption}}
-\t\\label{\${3:fig:placeholder}}
+\t\\label{\${3:fig:enter-label}}
 \\end{figure}`,
   ],
   [
@@ -69,7 +69,7 @@ export const environments = new Map([
 \t\t$5 & $6
 \t\\end{tabular}
 \t\\caption{\${7:Caption}}
-\t\\label{\${8:tab:placeholder}}
+\t\\label{\${8:tab:my_label}}
 \\end{table}`,
   ],
   [

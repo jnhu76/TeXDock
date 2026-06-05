@@ -1,20 +1,21 @@
 import { useTranslation, Trans } from 'react-i18next'
 import { CommonsPlanSubscription } from '../../../../../../types/project/dashboard/subscription'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
 import MaterialIcon from '@/shared/components/material-icon'
 
 type CommonsPlanProps = Pick<
   CommonsPlanSubscription,
-  'subscription' | 'featuresPageURL'
+  'subscription' | 'plan' | 'featuresPageURL'
 >
 
-function CommonsPlan({ featuresPageURL, subscription }: CommonsPlanProps) {
+function CommonsPlan({
+  featuresPageURL,
+  subscription,
+  plan,
+}: CommonsPlanProps) {
   const { t } = useTranslation()
   const currentPlanLabel = (
-    <Trans
-      i18nKey="premium_plan_label"
-      components={{ b: <strong translate="no" /> }}
-    />
+    <Trans i18nKey="premium_plan_label" components={{ b: <strong /> }} />
   )
 
   return (
@@ -22,6 +23,7 @@ function CommonsPlan({ featuresPageURL, subscription }: CommonsPlanProps) {
       <span className="current-plan-label d-md-none">{currentPlanLabel}</span>
       <OLTooltip
         description={t('commons_plan_tooltip', {
+          plan: plan.name,
           institution: subscription.name,
         })}
         id="commons-plan"

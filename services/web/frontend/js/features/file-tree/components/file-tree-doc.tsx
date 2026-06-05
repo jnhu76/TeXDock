@@ -28,7 +28,6 @@ function FileTreeDoc({
       {...selectableEntityProps}
       aria-label={name}
       tabIndex={0}
-      translate="no"
     >
       <FileTreeItemInner
         id={id}

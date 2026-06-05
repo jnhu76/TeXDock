@@ -1,16 +1,21 @@
 // Metrics must be initialized before importing anything else
-import '@overleaf/metrics/initialize.js'
+require('@overleaf/metrics/initialize')
 
-import Events from 'node:events'
-import Metrics from '@overleaf/metrics'
-import logger from '@overleaf/logger'
-import settings from '@overleaf/settings'
-import express from 'express'
-import fileController from './app/js/FileController.js'
-import keyBuilder from './app/js/KeyBuilder.js'
-import RequestLogger from './app/js/RequestLogger.js'
+const Events = require('node:events')
+const Metrics = require('@overleaf/metrics')
 
+const logger = require('@overleaf/logger')
 logger.initialize(process.env.METRICS_APP_NAME || 'filestore')
+
+const settings = require('@overleaf/settings')
+const express = require('express')
+const bodyParser = require('body-parser')
+
+const fileController = require('./app/js/FileController')
+const keyBuilder = require('./app/js/KeyBuilder')
+const healthCheckController = require('./app/js/HealthCheckController')
+
+const RequestLogger = require('./app/js/RequestLogger')
 
 Events.setMaxListeners(20)
 
@@ -44,6 +49,46 @@ app.use((req, res, next) => {
 })
 
 Metrics.injectMetricsRoute(app)
+
+if (settings.filestore.stores.user_files) {
+  app.head(
+    '/project/:project_id/file/:file_id',
+    keyBuilder.userFileKeyMiddleware,
+    fileController.getFileHead
+  )
+  app.get(
+    '/project/:project_id/file/:file_id',
+    keyBuilder.userFileKeyMiddleware,
+    fileController.getFile
+  )
+  app.post(
+    '/project/:project_id/file/:file_id',
+    keyBuilder.userFileKeyMiddleware,
+    fileController.insertFile
+  )
+  app.put(
+    '/project/:project_id/file/:file_id',
+    keyBuilder.userFileKeyMiddleware,
+    bodyParser.json(),
+    fileController.copyFile
+  )
+  app.delete(
+    '/project/:project_id/file/:file_id',
+    keyBuilder.userFileKeyMiddleware,
+    fileController.deleteFile
+  )
+  app.delete(
+    '/project/:project_id',
+    keyBuilder.userProjectKeyMiddleware,
+    fileController.deleteProject
+  )
+
+  app.get(
+    '/project/:project_id/size',
+    keyBuilder.userProjectKeyMiddleware,
+    fileController.directorySize
+  )
+}
 
 if (settings.filestore.stores.template_files) {
   app.head(
@@ -93,9 +138,7 @@ app.get('/status', function (req, res) {
   }
 })
 
-app.get('/health_check', (req, res) => {
-  res.sendStatus(200)
-})
+app.get('/health_check', healthCheckController.check)
 
 app.use(RequestLogger.errorHandler)
 
@@ -103,7 +146,7 @@ const port = settings.internal.filestore.port || 3009
 const host = settings.internal.filestore.host || '0.0.0.0'
 
 let server = null
-if (import.meta.main) {
+if (!module.parent) {
   // Called directly
   server = app.listen(port, host, error => {
     if (error) {
@@ -154,4 +197,4 @@ function handleShutdownSignal(signal) {
 
 process.on('SIGTERM', handleShutdownSignal)
 
-export default app
+module.exports = app

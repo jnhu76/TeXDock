@@ -1,26 +1,20 @@
 import { ToolbarButtonMenu } from './button-menu'
 import MaterialIcon from '@/shared/components/material-icon'
-import OLListGroupItem from '@/shared/components/ol/ol-list-group-item'
+import OLListGroupItem from '@/features/ui/components/ol/ol-list-group-item'
 import { memo, useCallback } from 'react'
 import { FigureModalSource } from '../figure-modal/figure-modal-context'
 import { useTranslation } from 'react-i18next'
 import { emitToolbarEvent } from '../../extensions/toolbar/utils/analytics'
 import { useCodeMirrorViewContext } from '../codemirror-context'
 import { insertFigure } from '../../extensions/toolbar/commands'
-import sparkleWhite from '@/shared/svgs/sparkle-small-white.svg'
-import sparkle from '@/shared/svgs/ai-sparkle-text.svg'
 import getMeta from '@/utils/meta'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { ToolbarButton } from './toolbar-button'
-import { useEditorContext } from '@/shared/context/editor-context'
-import { isSplitTestEnabled } from '@/utils/splitTestUtils'
 
 export const InsertFigureDropdown = memo(function InsertFigureDropdown() {
   const { t } = useTranslation()
   const view = useCodeMirrorViewContext()
-  const { writefullInstance } = useEditorContext()
   const { write } = usePermissionsContext()
-
   const openFigureModal = useCallback(
     (source: FigureModalSource, sourceName: string) => {
       emitToolbarEvent(view, `toolbar-figure-modal-${sourceName}`)
@@ -37,10 +31,6 @@ export const InsertFigureDropdown = memo(function InsertFigureDropdown() {
     hasLinkedProjectOutputFileFeature,
     hasLinkUrlFeature,
   } = getMeta('ol-ExposedSettings')
-
-  const hasGenerateFromTextFeature =
-    writefullInstance !== null &&
-    isSplitTestEnabled('writefull-figure-generator')
 
   if (!write) {
     return (
@@ -96,27 +86,6 @@ export const InsertFigureDropdown = memo(function InsertFigureDropdown() {
         >
           <MaterialIcon type="public" />
           {t('from_url')}
-        </OLListGroupItem>
-      )}
-      {hasGenerateFromTextFeature && (
-        <OLListGroupItem
-          onClick={() => {
-            writefullInstance!.openFigureGenerator()
-          }}
-        >
-          <img
-            alt="sparkle"
-            className="ol-cm-toolbar-ai-sparkle-gradient"
-            src={sparkle}
-            aria-hidden="true"
-          />
-          <img
-            alt="sparkle"
-            className="ol-cm-toolbar-ai-sparkle-white"
-            src={sparkleWhite}
-            aria-hidden="true"
-          />
-          <span>{t('generate_from_text')}</span>
         </OLListGroupItem>
       )}
     </ToolbarButtonMenu>

@@ -11,7 +11,7 @@ import { DomainInfo } from './input'
 import { getJSON } from '../../../../../infrastructure/fetch-json'
 import useAsync from '../../../../../shared/hooks/use-async'
 import UniversityName from './university-name'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
 
 type InstitutionFieldsProps = {
   countryCode: CountryCode | null
@@ -75,21 +75,16 @@ function InstitutionFields({
   }, [newEmailMatchedDomain, setRole, setDepartment])
 
   useEffect(() => {
-    if (newEmailMatchedDomain?.university?.departments?.length) {
-      setDepartments(newEmailMatchedDomain.university.departments)
-      return
-    }
-
-    // fallback if not matched on domain
     const selectedKnownUniversity = countryCode
       ? universities[countryCode]?.find(({ name }) => name === universityName)
       : undefined
+
     if (selectedKnownUniversity && selectedKnownUniversity.departments.length) {
       setDepartments(selectedKnownUniversity.departments)
     } else {
       setDepartments([...defaultDepartments])
     }
-  }, [countryCode, universities, universityName, newEmailMatchedDomain])
+  }, [countryCode, universities, universityName])
 
   // Fetch country institution
   useEffect(() => {
@@ -168,8 +163,8 @@ function InstitutionFields({
             <DownshiftInput
               items={getUniversityItems()}
               inputValue={universityName}
+              placeholder={t('university')}
               label={t('university')}
-              showLabel
               setValue={setUniversityName}
               disabled={!countryCode}
             />
@@ -182,18 +177,18 @@ function InstitutionFields({
             <DownshiftInput
               items={[...defaultRoles]}
               inputValue={role}
+              placeholder={t('role')}
               label={t('role')}
               setValue={setRole}
-              showLabel
             />
           </OLFormGroup>
           <OLFormGroup className="mb-0">
             <DownshiftInput
               items={departments}
               inputValue={department}
+              placeholder={t('department')}
               label={t('department')}
               setValue={setDepartment}
-              showLabel
             />
           </OLFormGroup>
         </>

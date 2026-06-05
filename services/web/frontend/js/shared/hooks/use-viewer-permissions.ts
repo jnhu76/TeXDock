@@ -1,7 +1,7 @@
-import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
+import { useEditorContext } from '../context/editor-context'
 
 function useViewerPermissions() {
-  const { permissionsLevel } = useIdeReactContext()
+  const { permissionsLevel } = useEditorContext()
   return permissionsLevel === 'readOnly'
 }
 

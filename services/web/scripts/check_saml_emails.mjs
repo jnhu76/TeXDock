@@ -1,7 +1,6 @@
 import SAMLEmailBatchCheck from '../modules/saas-authentication/app/src/SAML/SAMLEmailBatchCheck.mjs'
 import { ensureRunningOnMongoSecondaryWithTimeout } from './helpers/env_variable_helper.mjs'
 
-// ScriptRunner can not be used when using this assertion
 ensureRunningOnMongoSecondaryWithTimeout(300000)
 
 const startInstitutionId = parseInt(process.argv[2])

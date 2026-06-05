@@ -22,8 +22,8 @@ import { useTranslation } from 'react-i18next'
 import { waitForFileTreeUpdate } from '../../../extensions/figure-modal'
 import { useCodeMirrorViewContext } from '../../codemirror-context'
 import getMeta from '@/utils/meta'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
 
 function suggestName(path: string) {
   const parts = path.split('/')
@@ -34,7 +34,7 @@ export const FigureModalOtherProjectSource: FC = () => {
   const { t } = useTranslation()
   const view = useCodeMirrorViewContext()
   const { dispatch } = useFigureModalContext()
-  const { projectId } = useProjectContext()
+  const { _id: projectId } = useProjectContext()
   const { loading: projectsLoading, data: projects, error } = useUserProjects()
   const [selectedProject, setSelectedProject] = useState<null | Project>(null)
   const { hasLinkedProjectFileFeature, hasLinkedProjectOutputFileFeature } =

@@ -18,12 +18,11 @@ export type NotificationProps = {
   className?: string
   content: React.ReactNode
   customIcon?: React.ReactElement | null
-  iconPlacement?: 'top' | 'center'
   disclaimer?: React.ReactElement | string
   isDismissible?: boolean
   isActionBelowContent?: boolean
   onDismiss?: () => void
-  title?: React.ReactNode
+  title?: string
   type: NotificationType
   id?: string
 }
@@ -31,11 +30,9 @@ export type NotificationProps = {
 export function NotificationIcon({
   notificationType,
   customIcon,
-  iconPlacement,
 }: {
   notificationType: NotificationType
   customIcon?: ReactElement
-  iconPlacement?: 'top' | 'center'
 }) {
   let icon = <MaterialIcon type="info" />
 
@@ -50,16 +47,7 @@ export function NotificationIcon({
   } else if (notificationType === 'offer') {
     icon = <MaterialIcon type="campaign" />
   }
-  return (
-    <div
-      className={classNames(
-        'notification-icon',
-        iconPlacement ? `notification-icon-${iconPlacement}` : ''
-      )}
-    >
-      {icon}
-    </div>
-  )
+  return <div className="notification-icon">{icon}</div>
 }
 
 function Notification({
@@ -68,7 +56,6 @@ function Notification({
   className = '',
   content,
   customIcon,
-  iconPlacement = 'top',
   disclaimer,
   isActionBelowContent,
   isDismissible,
@@ -93,6 +80,8 @@ function Notification({
     if (onDismiss) onDismiss()
   }
 
+  // return null
+
   if (!show) {
     return null
   }
@@ -105,23 +94,16 @@ function Notification({
       id={id}
     >
       {customIcon !== null && (
-        <NotificationIcon
-          notificationType={type}
-          customIcon={customIcon}
-          iconPlacement={iconPlacement}
-        />
+        <NotificationIcon notificationType={type} customIcon={customIcon} />
       )}
 
       <div className="notification-content-and-cta">
         <div className="notification-content">
-          {title &&
-            (typeof title === 'string' ? (
-              <p>
-                <b>{title}</b>
-              </p>
-            ) : (
-              title
-            ))}
+          {title && (
+            <p>
+              <b>{title}</b>
+            </p>
+          )}
           {content}
         </div>
         {action && <div className="notification-cta">{action}</div>}

@@ -1,147 +1,129 @@
-import { OnlineUser } from '@/features/ide-react/context/online-users-context'
+import React from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Dropdown,
   DropdownHeader,
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
-} from '@/shared/components/dropdown/dropdown-menu'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
-import {
-  getBackgroundColorForUserId,
-  hslStringToLuminance,
-} from '@/shared/utils/colors'
-import classNames from 'classnames'
-import { useCallback, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Doc } from '@ol-types/doc'
-import firstCharacter from '@/shared/utils/first-character'
+} from '@/features/ui/components/bootstrap-5/dropdown-menu'
+import { getBackgroundColorForUserId } from '@/shared/utils/colors'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
+import MaterialIcon from '@/shared/components/material-icon'
+import { OnlineUser } from '@/features/ide-react/context/online-users-context'
 
-// Should be kept in sync with $max-user-circles-displayed CSS constant
-const MAX_USER_CIRCLES_DISPLAYED = 5
-
-// We don't want a +1 circle since we could just show the user instead
-const MAX_USERS_WITH_OVERFLOW_VISIBLE = MAX_USER_CIRCLES_DISPLAYED - 1
-
-export const OnlineUsersWidget = ({
+function OnlineUsersWidget({
   onlineUsers,
   goToUser,
 }: {
   onlineUsers: OnlineUser[]
-  goToUser: (user: OnlineUser) => Promise<Doc | undefined>
-}) => {
-  const hasOverflow = onlineUsers.length > MAX_USER_CIRCLES_DISPLAYED
-  const usersBeforeOverflow = useMemo(
-    () =>
-      hasOverflow
-        ? onlineUsers.slice(0, MAX_USERS_WITH_OVERFLOW_VISIBLE)
-        : onlineUsers,
-    [onlineUsers, hasOverflow]
-  )
-  const usersInOverflow = useMemo(
-    () =>
-      hasOverflow ? onlineUsers.slice(MAX_USERS_WITH_OVERFLOW_VISIBLE) : [],
-    [onlineUsers, hasOverflow]
-  )
+  goToUser: (user: OnlineUser) => void
+}) {
+  const { t } = useTranslation()
 
-  return (
-    <div className="online-users-row">
-      {usersBeforeOverflow.map((user, index) => (
-        <OnlineUserWidget
-          key={`${user.user_id}_${index}`}
-          user={user}
-          goToUser={goToUser}
-          id={`online-user-${user.user_id}_${index}`}
+  const shouldDisplayDropdown = onlineUsers.length >= 4
+
+  if (shouldDisplayDropdown) {
+    return (
+      <Dropdown className="online-users" align="end">
+        <DropdownToggle
+          id="online-users"
+          as={DropDownToggleButton}
+          // @ts-ignore: fix type of DropdownToggle with "as" prop so that it can accept
+          // custom props for that component
+          onlineUserCount={onlineUsers.length}
         />
-      ))}
-      {hasOverflow && (
-        <OnlineUserOverflow goToUser={goToUser} users={usersInOverflow} />
-      )}
-    </div>
-  )
+        <DropdownMenu>
+          <DropdownHeader aria-hidden="true">
+            {t('connected_users')}
+          </DropdownHeader>
+          {onlineUsers.map((user, index) => (
+            <li role="none" key={`${user.user_id}_${index}`}>
+              <DropdownItem
+                as="button"
+                tabIndex={-1}
+                onClick={() => goToUser(user)}
+              >
+                <UserIcon user={user} showName />
+              </DropdownItem>
+            </li>
+          ))}
+        </DropdownMenu>
+      </Dropdown>
+    )
+  } else {
+    return (
+      <div className="online-users">
+        {onlineUsers.map((user, index) => (
+          <OLTooltip
+            key={`${user.user_id}_${index}`}
+            id="online-user"
+            description={user.name}
+            overlayProps={{ placement: 'bottom', trigger: ['hover', 'focus'] }}
+          >
+            <span>
+              {/* OverlayTrigger won't fire unless UserIcon is wrapped in a span */}
+              <UserIcon user={user} onClick={goToUser} />
+            </span>
+          </OLTooltip>
+        ))}
+      </div>
+    )
+  }
 }
 
-const OnlineUserWidget = ({
+function UserIcon({
   user,
-  goToUser,
-  id,
+  showName,
+  onClick,
 }: {
   user: OnlineUser
-  goToUser: (user: OnlineUser) => void
-  id: string
-}) => {
-  const onClick = useCallback(() => {
-    goToUser(user)
-  }, [goToUser, user])
-  return (
-    <OLTooltip
-      id={id}
-      description={user.name}
-      overlayProps={{
-        placement: 'bottom',
-        trigger: ['hover', 'focus'],
-        delay: 0,
-      }}
-    >
-      <button className="online-users-row-button" onClick={onClick}>
-        <OnlineUserCircle user={user} />
-      </button>
-    </OLTooltip>
-  )
-}
-
-const OnlineUserCircle = ({ user }: { user: OnlineUser }) => {
+  showName?: boolean
+  onClick?: (user: OnlineUser) => void
+}) {
   const backgroundColor = getBackgroundColorForUserId(user.user_id)
-  const luminance = hslStringToLuminance(backgroundColor)
-  const character = firstCharacter(user.name)
+
+  function handleOnClick() {
+    onClick?.(user)
+  }
+
+  const [character] = [...user.name]
+
   return (
-    <span
-      className={classNames('online-user-circle', {
-        'online-user-circle-light-font': luminance < 0.5,
-        'online-user-circle-dark-font': luminance >= 0.5,
-      })}
-      style={{ backgroundColor }}
-    >
-      {character}
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+    <span onClick={handleOnClick}>
+      <span className="online-user" style={{ backgroundColor }}>
+        {character}
+      </span>
+      {showName && user.name}
     </span>
   )
 }
 
-const OnlineUserOverflow = ({
-  goToUser,
-  users,
-}: {
-  goToUser: (user: OnlineUser) => void
-  users: OnlineUser[]
-}) => {
+const DropDownToggleButton = React.forwardRef<
+  HTMLButtonElement,
+  { onlineUserCount: number; onClick: React.MouseEventHandler }
+>((props, ref) => {
   const { t } = useTranslation()
   return (
-    <Dropdown align="end">
-      <DropdownToggle className="online-users-row-button online-user-overflow-toggle">
-        <OLTooltip
-          id="connected-users"
-          description={t('n_more_collaborators', { count: users.length })}
-          overlayProps={{ placement: 'bottom' }}
-        >
-          <span className="online-user-circle">+{users.length}</span>
-        </OLTooltip>
-      </DropdownToggle>
-      <DropdownMenu className="online-user-overflow-dropdown">
-        <DropdownHeader aria-hidden="true">
-          {t('connected_users')}
-        </DropdownHeader>
-        {users.map((user, index) => (
-          <li role="none" key={`${user.user_id}_${index}`}>
-            <DropdownItem
-              as="button"
-              tabIndex={-1}
-              onClick={() => goToUser(user)}
-            >
-              <OnlineUserCircle user={user} /> {user.name}
-            </DropdownItem>
-          </li>
-        ))}
-      </DropdownMenu>
-    </Dropdown>
+    <OLTooltip
+      id="connected-users"
+      description={t('connected_users')}
+      overlayProps={{ placement: 'left' }}
+    >
+      <button
+        type="button"
+        className="online-user online-user-multi"
+        onClick={props.onClick} // required by Bootstrap Dropdown to trigger an opening
+        ref={ref}
+      >
+        <strong>{props.onlineUserCount}</strong>&nbsp;
+        <MaterialIcon type="groups" />
+      </button>
+    </OLTooltip>
   )
-}
+})
+
+DropDownToggleButton.displayName = 'DropDownToggleButton'
+
+export default OnlineUsersWidget

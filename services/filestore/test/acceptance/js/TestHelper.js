@@ -1,9 +1,10 @@
-import streamifier from 'streamifier'
-import fetch from 'node-fetch'
-import ObjectPersistor from '@overleaf/object-persistor'
-import { expect } from 'chai'
+const streamifier = require('streamifier')
+const fetch = require('node-fetch')
+const ObjectPersistor = require('@overleaf/object-persistor')
 
-export default {
+const { expect } = require('chai')
+
+module.exports = {
   uploadStringToPersistor,
   getStringFromPersistor,
   expectPersistorToHaveFile,

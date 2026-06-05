@@ -1,9 +1,9 @@
-import UserMembershipMiddleware from './UserMembershipMiddleware.mjs'
+import UserMembershipMiddleware from './UserMembershipMiddleware.js'
 import UserMembershipController from './UserMembershipController.mjs'
 import SubscriptionGroupController from '../Subscription/SubscriptionGroupController.mjs'
 import TeamInvitesController from '../Subscription/TeamInvitesController.mjs'
-import { RateLimiter } from '../../infrastructure/RateLimiter.mjs'
-import RateLimiterMiddleware from '../Security/RateLimiterMiddleware.mjs'
+import { RateLimiter } from '../../infrastructure/RateLimiter.js'
+import RateLimiterMiddleware from '../Security/RateLimiterMiddleware.js'
 
 const rateLimiters = {
   createTeamInvite: new RateLimiter('create-team-invite', {
@@ -21,83 +21,69 @@ export default {
     // group members routes
     webRouter.get(
       '/manage/groups/:id/members',
-      UserMembershipMiddleware.requireEntityAccessOrAdminAccess('group'),
+      UserMembershipMiddleware.requireGroupManagementAccess,
       UserMembershipController.manageGroupMembers
     )
     webRouter.post(
       '/manage/groups/:id/invites',
-      UserMembershipMiddleware.requireGroupMemberManagement('group'),
+      UserMembershipMiddleware.requireGroupManagementAccess,
       RateLimiterMiddleware.rateLimit(rateLimiters.createTeamInvite),
       TeamInvitesController.createInvite
     )
     webRouter.post(
       '/manage/groups/:id/resendInvite',
-      UserMembershipMiddleware.requireGroupMemberManagement('group'),
+      UserMembershipMiddleware.requireGroupManagementAccess,
       RateLimiterMiddleware.rateLimit(rateLimiters.createTeamInvite),
       TeamInvitesController.resendInvite
     )
     webRouter.delete(
       '/manage/groups/:id/user/:user_id',
-      UserMembershipMiddleware.requireGroupMemberManagement('group'),
+      UserMembershipMiddleware.requireGroupManagementAccess,
       SubscriptionGroupController.removeUserFromGroup
     )
     webRouter.delete(
       '/manage/groups/:id/invites/:email',
-      UserMembershipMiddleware.requireGroupMemberManagement('group'),
+      UserMembershipMiddleware.requireGroupManagementAccess,
       TeamInvitesController.revokeInvite
     )
     webRouter.get(
       '/manage/groups/:id/members/export',
-      UserMembershipMiddleware.requireEntityAccessOrAdminAccess('group'),
+      UserMembershipMiddleware.requireGroupManagementAccess,
       RateLimiterMiddleware.rateLimit(rateLimiters.exportTeamCsv),
       UserMembershipController.exportCsv
-    )
-    webRouter.get(
-      '/manage/groups/:id/users',
-      UserMembershipMiddleware.requireEntityAccessOrAdminAccess('groupUsers'),
-      UserMembershipController.manageGroupUsers
     )
 
     // group managers routes
     webRouter.get(
       '/manage/groups/:id/managers',
-      UserMembershipMiddleware.requireEntityAccess({
-        entityName: 'groupManagers',
-        adminCapability: 'view-group-manager',
-      }),
+      UserMembershipMiddleware.requireGroupManagersManagementAccess,
       UserMembershipController.manageGroupManagers
     )
     webRouter.post(
       '/manage/groups/:id/managers',
-      UserMembershipMiddleware.requireEntityAccess({
-        entityName: 'groupManagers',
-        adminCapability: 'modify-group-manager',
-      }),
+      UserMembershipMiddleware.requireGroupManagersManagementAccess,
       UserMembershipController.add
     )
     webRouter.delete(
       '/manage/groups/:id/managers/:userId',
-      UserMembershipMiddleware.requireEntityAccess({
-        entityName: 'groupManagers',
-        adminCapability: 'modify-group-manager',
-      }),
+      UserMembershipMiddleware.requireGroupManagersManagementAccess,
       UserMembershipController.remove
     )
 
     // institution members routes
     webRouter.get(
       '/manage/institutions/:id/managers',
-      UserMembershipMiddleware.requireInstitutionManagerAccess,
+      UserMembershipMiddleware.requireInstitutionManagementAccess,
       UserMembershipController.manageInstitutionManagers
     )
     webRouter.post(
       '/manage/institutions/:id/managers',
-      UserMembershipMiddleware.requireInstitutionManagerManagement,
+      UserMembershipMiddleware.requireInstitutionManagementAccess,
       UserMembershipController.add
     )
     webRouter.delete(
       '/manage/institutions/:id/managers/:userId',
-      UserMembershipMiddleware.requireInstitutionManagerManagement,
+      UserMembershipMiddleware.requireInstitutionManagementAccess,
       UserMembershipController.remove
     )
 

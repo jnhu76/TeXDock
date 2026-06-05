@@ -1,8 +1,16 @@
 import { useTranslation } from 'react-i18next'
+import Icon from '../../../../shared/components/icon'
 import { useCallback, useEffect, useState } from 'react'
 import * as eventTracking from '../../../../infrastructure/event-tracking'
 import StartFreeTrialButton from '../../../../shared/components/start-free-trial-button'
-import UpgradeBenefits from '@/shared/components/upgrade-benefits'
+
+function FeatureItem({ text }: { text: string }) {
+  return (
+    <li>
+      <Icon type="check" /> {text}
+    </li>
+  )
+}
 
 export function OwnerPaywallPrompt() {
   const { t } = useTranslation()
@@ -10,6 +18,7 @@ export function OwnerPaywallPrompt() {
 
   useEffect(() => {
     eventTracking.send('subscription-funnel', 'editor-click-feature', 'history')
+    eventTracking.sendMB('paywall-prompt', { 'paywall-type': 'history' })
   }, [])
 
   const handleFreeTrialClick = useCallback(() => {
@@ -18,16 +27,23 @@ export function OwnerPaywallPrompt() {
 
   return (
     <div className="history-paywall-prompt">
-      <h2 className="history-paywall-heading">
-        {t('get_full_project_history')}
-      </h2>
+      <h2 className="history-paywall-heading">{t('premium_feature')}</h2>
       <p>{t('currently_seeing_only_24_hrs_history')}</p>
       <p>
         <strong>
           {t('upgrade_to_get_feature', { feature: 'full project history' })}
         </strong>
       </p>
-      <UpgradeBenefits className="history-feature-list" />
+      <ul className="history-feature-list">
+        <FeatureItem text={t('unlimited_projects')} />
+        <FeatureItem
+          text={t('collabs_per_proj', { collabcount: 'Multiple' })}
+        />
+        <FeatureItem text={t('full_doc_history')} />
+        <FeatureItem text={t('sync_to_dropbox')} />
+        <FeatureItem text={t('sync_to_github')} />
+        <FeatureItem text={t('compile_larger_projects')} />
+      </ul>
       <p>
         <StartFreeTrialButton
           source="history"

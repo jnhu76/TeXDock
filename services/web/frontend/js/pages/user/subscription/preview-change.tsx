@@ -1,9 +1,14 @@
-import { renderInReactLayout } from '@/react'
+import '@/marketing'
+import { createRoot } from 'react-dom/client'
 import PreviewSubscriptionChange from '@/features/subscription/components/preview-subscription-change/root'
 import { SplitTestProvider } from '@/shared/context/split-test-context'
 
-renderInReactLayout('subscription-preview-change', () => (
-  <SplitTestProvider>
-    <PreviewSubscriptionChange />
-  </SplitTestProvider>
-))
+const element = document.getElementById('subscription-preview-change')
+if (element) {
+  const root = createRoot(element)
+  root.render(
+    <SplitTestProvider>
+      <PreviewSubscriptionChange />
+    </SplitTestProvider>
+  )
+}

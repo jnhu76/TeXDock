@@ -6,7 +6,7 @@ import { useProjectContext } from '@/shared/context/project-context'
 import {
   DropdownDivider,
   DropdownItem,
-} from '@/shared/components/dropdown/dropdown-menu'
+} from '@/features/ui/components/bootstrap-5/dropdown-menu'
 import { useFileTreeActionable } from '../../contexts/file-tree-actionable'
 
 function FileTreeItemMenuItems() {
@@ -23,19 +23,16 @@ function FileTreeItemMenuItems() {
     startUploadingDocOrFile,
     downloadPath,
     selectedFileName,
-    canSetRootDocId,
-    setRootDocId,
   } = useFileTreeActionable()
 
-  const { project } = useProjectContext()
-  const projectOwner = project?.owner?._id
+  const { owner } = useProjectContext()
 
   const downloadWithAnalytics = useCallback(() => {
     // we are only interested in downloads of bib files WRT analytics, for the purposes of promoting the tpr integrations
     if (selectedFileName?.endsWith('.bib')) {
-      eventTracking.sendMB('download-bib-file', { projectOwner })
+      eventTracking.sendMB('download-bib-file', { projectOwner: owner._id })
     }
-  }, [selectedFileName, projectOwner])
+  }, [selectedFileName, owner])
 
   const createWithAnalytics = useCallback(() => {
     eventTracking.sendMB('new-file-click', { location: 'file-menu' })
@@ -65,23 +62,10 @@ function FileTreeItemMenuItems() {
           </DropdownItem>
         </li>
       ) : null}
-      {canSetRootDocId ? (
-        <>
-          <DropdownDivider />
-          <li role="none">
-            <DropdownItem onClick={setRootDocId}>
-              {t('set_as_main_document')}
-            </DropdownItem>
-          </li>
-        </>
-      ) : null}
       {canDelete ? (
-        <>
-          <DropdownDivider />
-          <li role="none">
-            <DropdownItem onClick={startDeleting}>{t('delete')}</DropdownItem>
-          </li>
-        </>
+        <li role="none">
+          <DropdownItem onClick={startDeleting}>{t('delete')}</DropdownItem>
+        </li>
       ) : null}
       {canCreate ? (
         <>

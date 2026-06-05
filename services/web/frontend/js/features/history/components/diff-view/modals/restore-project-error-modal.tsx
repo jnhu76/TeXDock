@@ -1,11 +1,10 @@
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+} from '@/features/ui/components/ol/ol-modal'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import { useTranslation } from 'react-i18next'
 
 export function RestoreProjectErrorModal({
@@ -17,7 +16,7 @@ export function RestoreProjectErrorModal({
 
   return (
     <OLModal show onHide={resetErrorBoundary}>
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>
           {t('an_error_occured_while_restoring_project')}
         </OLModalTitle>

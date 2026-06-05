@@ -34,7 +34,7 @@ const users = {
   },
 }
 
-export const copyableProject = {
+export const copyableProject = <Project>{
   id: '62f17f594641b405ca2b3264',
   name: 'Starfleet Report (owner)',
   lastUpdated: moment().subtract(1, 'day').toISOString(),
@@ -44,9 +44,9 @@ export const copyableProject = {
   archived: false,
   trashed: false,
   owner: users.riker,
-} as Project
+}
 
-export const archiveableProject = {
+export const archiveableProject = <Project>{
   id: '62d6d3721357e20a682110d5',
   name: "Captain's logs (Invite & Read Only)",
   lastUpdated: moment().subtract(1, 'week').toISOString(),
@@ -56,9 +56,9 @@ export const archiveableProject = {
   archived: false,
   trashed: false,
   owner: users.picard,
-} as Project
+}
 
-export const trashedProject = {
+export const trashedProject = <Project>{
   id: '42f17f594641b405ca2b3265',
   name: 'Starfleet Report draft (owner & trashed)',
   lastUpdated: moment().subtract(2, 'year').toISOString(),
@@ -68,9 +68,9 @@ export const trashedProject = {
   archived: false,
   trashed: true,
   owner: users.riker,
-} as Project
+}
 
-export const archivedProject = {
+export const archivedProject = <Project>{
   id: '52f17f594641b405ca2b3266',
   name: 'Starfleet Report old (owner & archive)',
   lastUpdated: moment().subtract(1, 'year').toISOString(),
@@ -80,9 +80,9 @@ export const archivedProject = {
   archived: true,
   trashed: false,
   owner: users.riker,
-} as Project
+}
 
-export const trashedAndNotOwnedProject = {
+export const trashedAndNotOwnedProject = <Project>{
   id: '63d6d3721357e20a682110d5',
   name: "Captain's logs very old (Trashed & Read Only & Not Owned)",
   lastUpdated: moment().subtract(11, 'year').toISOString(),
@@ -92,11 +92,11 @@ export const trashedAndNotOwnedProject = {
   archived: false,
   trashed: true,
   owner: users.picard,
-} as Project
+}
 
-export const sharedProject = { ...archiveableProject }
+export const sharedProject = archiveableProject
 
-export const ownedProject = { ...copyableProject }
+export const ownedProject = copyableProject
 
 export const projectsData: Array<Project> = [
   copyableProject,

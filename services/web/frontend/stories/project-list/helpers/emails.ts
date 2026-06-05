@@ -62,6 +62,9 @@ export function errorsMocks(fetchMock: FetchMock) {
     500,
     { delay: MOCK_DELAY }
   )
+  fetchMock.post(/\/user\/emails\/send-reconfirmation/, 500, {
+    delay: MOCK_DELAY,
+  })
 }
 
 export function setInstitutionMeta(institutionData: Partial<Institution>) {
@@ -97,6 +100,9 @@ export function setReconfirmationMeta() {
 
 export function reconfirmationSetupMocks(fetchMock: FetchMock) {
   defaultSetupMocks(fetchMock)
+  fetchMock.post(/\/user\/emails\/resend_confirmation/, 200, {
+    delay: MOCK_DELAY,
+  })
 }
 
 export function setReconfirmAffiliationMeta() {
@@ -115,5 +121,8 @@ export function reconfirmAffiliationSetupMocks(fetchMock: FetchMock) {
       projects: [{}],
       totalSize: 0,
     },
+  })
+  fetchMock.post(/\/user\/emails\/send-reconfirmation/, 200, {
+    delay: MOCK_DELAY,
   })
 }

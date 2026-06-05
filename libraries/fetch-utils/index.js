@@ -5,12 +5,6 @@ const fetch = require('node-fetch')
 const http = require('node:http')
 const https = require('node:https')
 
-let logger
-
-function setLogger(loggerInstance) {
-  logger = loggerInstance
-}
-
 /**
  * @import { Response } from 'node-fetch'
  */
@@ -29,7 +23,7 @@ async function fetchJson(url, opts = {}) {
 }
 
 async function fetchJsonWithResponse(url, opts = {}) {
-  const { fetchOpts, detachSignal } = parseOpts(opts, url)
+  const { fetchOpts, detachSignal } = parseOpts(opts)
   fetchOpts.headers = fetchOpts.headers ?? {}
   fetchOpts.headers.Accept = fetchOpts.headers.Accept ?? 'application/json'
 
@@ -59,7 +53,7 @@ async function fetchStream(url, opts = {}) {
 }
 
 async function fetchStreamWithResponse(url, opts = {}) {
-  const { fetchOpts, abortController, detachSignal } = parseOpts(opts, url)
+  const { fetchOpts, abortController, detachSignal } = parseOpts(opts)
   const response = await performRequest(url, fetchOpts, detachSignal)
 
   if (!response.ok) {
@@ -82,7 +76,7 @@ async function fetchStreamWithResponse(url, opts = {}) {
  * @throws {RequestFailedError} if the response has a failure status code
  */
 async function fetchNothing(url, opts = {}) {
-  const { fetchOpts, detachSignal } = parseOpts(opts, url)
+  const { fetchOpts, detachSignal } = parseOpts(opts)
   const response = await performRequest(url, fetchOpts, detachSignal)
   if (!response.ok) {
     const body = await maybeGetResponseBody(response)
@@ -114,7 +108,7 @@ async function fetchRedirect(url, opts = {}) {
  * @throws {RequestFailedError} if the response has a non redirect status code or missing Location header
  */
 async function fetchRedirectWithResponse(url, opts = {}) {
-  const { fetchOpts, detachSignal } = parseOpts(opts, url)
+  const { fetchOpts, detachSignal } = parseOpts(opts)
   fetchOpts.redirect = 'manual'
   const response = await performRequest(url, fetchOpts, detachSignal)
   if (response.status < 300 || response.status >= 400) {
@@ -148,7 +142,7 @@ async function fetchString(url, opts = {}) {
 }
 
 async function fetchStringWithResponse(url, opts = {}) {
-  const { fetchOpts, detachSignal } = parseOpts(opts, url)
+  const { fetchOpts, detachSignal } = parseOpts(opts)
   const response = await performRequest(url, fetchOpts, detachSignal)
   if (!response.ok) {
     const body = await maybeGetResponseBody(response)
@@ -173,7 +167,7 @@ class RequestFailedError extends OError {
   }
 }
 
-function parseOpts(opts, url) {
+function parseOpts(opts) {
   const fetchOpts = _.omit(opts, ['json', 'signal', 'basicAuth'])
   if (opts.json) {
     setupJsonBody(fetchOpts, opts.json)
@@ -184,30 +178,9 @@ function parseOpts(opts, url) {
 
   const abortController = new AbortController()
   fetchOpts.signal = abortController.signal
-  let detachSignal
+  let detachSignal = () => {}
   if (opts.signal) {
     detachSignal = abortOnSignal(abortController, opts.signal)
-  } else {
-    let overTimeoutStart
-    const stack = new Error().stack
-    const timeout = setTimeout(() => {
-      overTimeoutStart = process.hrtime.bigint()
-    }, 120000)
-    detachSignal = () => {
-      clearTimeout(timeout)
-      if (overTimeoutStart && logger) {
-        logger.warn(
-          {
-            url,
-            method: opts.method ?? 'GET',
-            overTimeoutMs:
-              Number(process.hrtime.bigint() - overTimeoutStart) / 1e6,
-            stack,
-          },
-          'Fetch request did not complete within 120 seconds'
-        )
-      }
-    }
   }
   if (opts.body instanceof Readable) {
     abortOnDestroyedRequest(abortController, fetchOpts.body)
@@ -350,5 +323,4 @@ module.exports = {
   ConnectTimeoutError,
   CustomHttpAgent,
   CustomHttpsAgent,
-  setLogger,
 }

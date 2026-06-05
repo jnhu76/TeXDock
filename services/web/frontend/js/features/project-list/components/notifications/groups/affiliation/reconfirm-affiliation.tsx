@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import getMeta from '../../../../../../utils/meta'
+import useAsync from '../../../../../../shared/hooks/use-async'
+import {
+  FetchError,
+  postJSON,
+} from '../../../../../../infrastructure/fetch-json'
 import { UserEmailData } from '../../../../../../../../types/user-email'
 import { Institution } from '../../../../../../../../types/institution'
 import { useLocation } from '../../../../../../shared/hooks/use-location'
-import OLButton from '@/shared/components/ol/ol-button'
+import { debugConsole } from '@/utils/debugging'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import Notification from '@/features/project-list/components/notifications/notification'
-import ResendConfirmationCodeModal from '@/features/settings/components/emails/resend-confirmation-code-modal'
 
 type ReconfirmAffiliationProps = {
   email: UserEmailData['email']
@@ -19,13 +24,78 @@ function ReconfirmAffiliation({
 }: ReconfirmAffiliationProps) {
   const { t } = useTranslation()
   const { samlInitPath } = getMeta('ol-ExposedSettings')
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const { error, isLoading, isError, isSuccess, runAsync } = useAsync()
+  const [hasSent, setHasSent] = useState(false)
   const [isPending, setIsPending] = useState(false)
   const ssoEnabled = institution.ssoEnabled
   const location = useLocation()
 
-  if (isSuccess) return null
+  useEffect(() => {
+    if (isSuccess) {
+      setHasSent(true)
+    }
+  }, [isSuccess])
+
+  const handleRequestReconfirmation = () => {
+    if (ssoEnabled) {
+      setIsPending(true)
+      location.assign(
+        `${samlInitPath}?university_id=${institution.id}&reconfirm=/project`
+      )
+    } else {
+      runAsync(
+        postJSON('/user/emails/send-reconfirmation', {
+          body: { email },
+        })
+      ).catch(debugConsole.error)
+    }
+  }
+
+  const rateLimited =
+    error && error instanceof FetchError && error.response?.status === 429
+
+  if (hasSent) {
+    return (
+      <Notification
+        type="info"
+        content={
+          <>
+            <Trans
+              i18nKey="please_check_your_inbox_to_confirm"
+              components={[<b />]} // eslint-disable-line react/jsx-key
+              values={{ institutionName: institution.name }}
+              shouldUnescape
+              tOptions={{ interpolation: { escapeValue: true } }}
+            />
+            &nbsp;
+            {isError && (
+              <>
+                <br />
+                <div>
+                  {rateLimited
+                    ? t('too_many_requests')
+                    : t('generic_something_went_wrong')}
+                </div>
+              </>
+            )}
+          </>
+        }
+        action={
+          <OLButton
+            variant="link"
+            onClick={handleRequestReconfirmation}
+            className="btn-inline-link"
+            disabled={isLoading}
+            isLoading={isLoading}
+            loadingLabel={t('sending') + '…'}
+          >
+            {t('resend_confirmation_email')}
+          </OLButton>
+        }
+      />
+    )
+  }
+
   return (
     <Notification
       type="info"
@@ -49,35 +119,29 @@ function ReconfirmAffiliation({
             href="/learn/how-to/Institutional_Email_Reconfirmation"
             target="_blank"
           >
-            {t('learn_more_about_email_reconfirmation')}
+            {t('learn_more')}
           </a>
+          {isError && (
+            <>
+              <br />
+              <div>
+                {rateLimited
+                  ? t('too_many_requests')
+                  : t('generic_something_went_wrong')}
+              </div>
+            </>
+          )}
         </>
       }
       action={
-        ssoEnabled ? (
-          <OLButton
-            variant="secondary"
-            isLoading={isPending}
-            loadingLabel={t('reconfirming')}
-            disabled={isPending}
-            onClick={() => {
-              setIsPending(true)
-              location.assign(
-                `${samlInitPath}?university_id=${institution.id}&reconfirm=/project`
-              )
-            }}
-          >
-            {t('confirm_affiliation')}
-          </OLButton>
-        ) : (
-          <ResendConfirmationCodeModal
-            email={email}
-            setGroupLoading={setIsLoading}
-            groupLoading={isLoading}
-            onSuccess={() => setIsSuccess(true)}
-            triggerVariant="secondary"
-          />
-        )
+        <OLButton
+          variant="secondary"
+          isLoading={isLoading || isPending}
+          disabled={isLoading || isPending}
+          onClick={handleRequestReconfirmation}
+        >
+          {t('confirm_affiliation')}
+        </OLButton>
       }
     />
   )

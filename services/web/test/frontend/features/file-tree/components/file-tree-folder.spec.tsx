@@ -1,7 +1,7 @@
 import FileTreeFolder from '../../../../../frontend/js/features/file-tree/components/file-tree-folder'
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { FileTreeProvider } from '../helpers/file-tree-provider'
-import { getContainerEl } from 'cypress/react'
+import { getContainerEl } from 'cypress/react18'
 import ReactDom from 'react-dom'
 
 describe('<FileTreeFolder/>', function () {
@@ -19,11 +19,12 @@ describe('<FileTreeFolder/>', function () {
         </FileTreeProvider>
       </EditorProviders>
     )
+
     cy.findByRole('treeitem', { selected: false })
     cy.findByRole('tree').should('not.exist')
   })
 
-  it('expands when selected', function () {
+  it('renders selected', function () {
     const rootFolder = [
       {
         _id: 'root-folder-id',
@@ -50,7 +51,7 @@ describe('<FileTreeFolder/>', function () {
 
     cy.findByRole('treeitem', { selected: false }).click()
     cy.findByRole('treeitem', { selected: true })
-    cy.findByRole('tree').should('exist')
+    cy.findByRole('tree').should('not.exist')
   })
 
   it('expands', function () {
@@ -79,7 +80,7 @@ describe('<FileTreeFolder/>', function () {
     )
 
     cy.findByRole('treeitem')
-    cy.findByLabelText('Expand').click()
+    cy.findByRole('button', { name: 'Expand' }).click()
     cy.findByRole('tree')
   })
 
@@ -109,7 +110,7 @@ describe('<FileTreeFolder/>', function () {
     )
 
     cy.findByRole('tree').should('not.exist')
-    cy.findByLabelText('Expand').click()
+    cy.findByRole('button', { name: 'Expand' }).click()
     cy.findByRole('tree')
 
     cy.then(() => ReactDom.unmountComponentAtNode(getContainerEl()))

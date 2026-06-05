@@ -7,7 +7,7 @@ const Change = require('./change')
 const Snapshot = require('./snapshot')
 
 /**
- * @import { BlobStore, ReadonlyBlobStore } from "./types"
+ * @import { BlobStore } from "./types"
  */
 
 class History {
@@ -85,7 +85,7 @@ class History {
    * If this History contains any File objects, load them.
    *
    * @param {string} kind see {File#load}
-   * @param {ReadonlyBlobStore} blobStore
+   * @param {BlobStore} blobStore
    * @return {Promise<void>}
    */
   async loadFiles(kind, blobStore) {

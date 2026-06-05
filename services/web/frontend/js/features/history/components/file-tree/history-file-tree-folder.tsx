@@ -52,6 +52,10 @@ function HistoryFileTreeFolder({
           className="file-tree-expand-icon"
         />
       </button>
+      <MaterialIcon
+        type={expanded ? 'folder_open' : 'folder'}
+        className="file-tree-folder-icon"
+      />
     </>
   )
 
@@ -71,16 +75,11 @@ function HistoryFileTreeFolder({
             setExpanded(!expanded)
           }
         }}
-        translate="no"
       >
         <HistoryFileTreeItem name={name} icons={icons} />
       </li>
       {expanded ? (
-        <HistoryFileTreeFolderList
-          folders={folders}
-          docs={docs}
-          rootClassName="history-file-tree-list-inner"
-        />
+        <HistoryFileTreeFolderList folders={folders} docs={docs} />
       ) : null}
     </>
   )

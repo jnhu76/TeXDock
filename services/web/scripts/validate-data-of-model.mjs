@@ -1,10 +1,11 @@
 import { batchedUpdateWithResultHandling } from '@overleaf/mongo-utils/batchedUpdate.js'
-import { db } from '../app/src/infrastructure/mongodb.mjs'
+import { db } from '../app/src/infrastructure/mongodb.js'
 
 const MODEL_NAME = process.argv.pop()
 
+// Todo: handle mjs file once models have been converted to ES module
 const { [MODEL_NAME]: Model } = await import(
-  `../app/src/models/${MODEL_NAME}.mjs`
+  `../app/src/models/${MODEL_NAME}.js`
 )
 
 function processBatch(batch) {

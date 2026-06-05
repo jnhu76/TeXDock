@@ -5,39 +5,17 @@ import Institution from './helpers/Institution.mjs'
 import Subscription from './helpers/Subscription.mjs'
 import Publisher from './helpers/Publisher.mjs'
 import sinon from 'sinon'
-import RecurlyClient from '../../../app/src/Features/Subscription/RecurlyClient.mjs'
-import Settings from '@overleaf/settings'
-import Features from '../../../app/src/infrastructure/Features.mjs'
+import RecurlyClient from '../../../app/src/Features/Subscription/RecurlyClient.js'
 
 describe('UserMembershipAuthorization', function () {
   beforeEach(function (done) {
-    if (!Features.hasFeature('saas')) {
-      this.skip()
-    }
-
     this.user = new User()
     sinon.stub(RecurlyClient.promises, 'getSubscription').resolves({})
-
-    this.adminRolesEnabledStub = sinon.stub(Settings, 'adminRolesEnabled')
-    this.adminRolesEnabledStub.value(true)
-
-    this.adminPrivilegeAvailableStub = sinon.stub(
-      Settings,
-      'adminPrivilegeAvailable'
-    )
-    this.adminPrivilegeAvailableStub.value(true)
-
     async.series([this.user.ensureUserExists.bind(this.user)], done)
   })
 
   afterEach(function () {
-    if (!Features.hasFeature('saas')) {
-      return
-    }
-
     RecurlyClient.promises.getSubscription.restore()
-    this.adminRolesEnabledStub.restore()
-    this.adminPrivilegeAvailableStub.restore()
   })
 
   describe('group', function () {
@@ -90,7 +68,7 @@ describe('UserMembershipAuthorization', function () {
     })
 
     describe('users management', function () {
-      it('should allow managers', function (done) {
+      it('should allow managers only', function (done) {
         const url = `/manage/institutions/${this.institution.v1Id}/managers`
         async.series(
           [
@@ -102,65 +80,16 @@ describe('UserMembershipAuthorization', function () {
           done
         )
       })
-
-      it('should allow admin users', function (done) {
-        const url = `/manage/institutions/${this.institution.v1Id}/managers`
-        async.series(
-          [
-            this.user.login.bind(this.user),
-            expectAccess(this.user, url, 403),
-            cb => this.user.ensureAdmin(cb),
-            cb => this.user.ensureAdminRole('sales', cb),
-            this.user.login.bind(this.user),
-            expectAccess(this.user, url, 200),
-          ],
-          done
-        )
-      })
-
-      it('should not allow "sales" admin to add managers', function (done) {
-        const url = `/manage/institutions/${this.institution.v1Id}/managers`
-        async.series(
-          [
-            this.user.login.bind(this.user),
-            expectPost(this.user, url, { email: this.user.email }, 403),
-            cb => this.user.ensureAdmin(cb),
-            cb => this.user.ensureAdminRole('sales', cb),
-            this.user.login.bind(this.user),
-            expectPost(this.user, url, { email: this.user.email }, 403),
-          ],
-          done
-        )
-      })
-
-      it('should allow "engineering" admin to add managers', function (done) {
-        const user = new User()
-        const url = `/manage/institutions/${this.institution.v1Id}/managers`
-        async.series(
-          [
-            user.ensureUserExists.bind(user),
-            this.user.login.bind(this.user),
-            expectPost(this.user, url, { email: user.email }, 403),
-            cb => this.user.ensureAdmin(cb),
-            cb => this.user.ensureAdminRole('engineering', cb),
-            this.user.login.bind(this.user),
-            expectPost(this.user, url, { email: user.email }, 200),
-            cb => this.institution.setManagerIds([], cb),
-          ],
-          done
-        )
-      })
     })
 
     describe('creation', function () {
-      it('should allow admin only', function (done) {
+      it('should allow staff only', function (done) {
         const url = `/entities/institution/create/foo`
         async.series(
           [
             this.user.login.bind(this.user),
             expectAccess(this.user, url, 403),
-            cb => this.user.ensureAdmin(cb),
-            cb => this.user.ensureAdminRole('engineering', cb),
+            cb => this.user.ensureStaffAccess('institutionManagement', cb),
             this.user.login.bind(this.user),
             expectAccess(this.user, url, 200),
           ],
@@ -197,14 +126,13 @@ describe('UserMembershipAuthorization', function () {
     })
 
     describe('creation', function () {
-      it('should redirect admin only', function (done) {
+      it('should redirect staff only', function (done) {
         const url = `/manage/publishers/foo/managers`
         async.series(
           [
             this.user.login.bind(this.user),
             expectAccess(this.user, url, 404),
-            cb => this.user.ensureAdmin(cb),
-            cb => this.user.ensureAdminRole('engineering', cb),
+            cb => this.user.ensureStaffAccess('publisherManagement', cb),
             this.user.login.bind(this.user),
             expectAccess(this.user, url, 302, /\/create/),
           ],
@@ -212,13 +140,12 @@ describe('UserMembershipAuthorization', function () {
         )
       })
 
-      it('should allow admin only', function (done) {
+      it('should allow staff only', function (done) {
         const url = `/entities/publisher/create/foo`
         async.series(
           [
             expectAccess(this.user, url, 403),
-            cb => this.user.ensureAdmin(cb),
-            cb => this.user.ensureAdminRole('engineering', cb),
+            cb => this.user.ensureStaffAccess('publisherManagement', cb),
             this.user.login.bind(this.user),
             expectAccess(this.user, url, 200),
           ],
@@ -232,21 +159,6 @@ describe('UserMembershipAuthorization', function () {
 function expectAccess(user, url, status, pattern) {
   return callback => {
     user.request.get({ url }, (error, response, body) => {
-      if (error) {
-        return callback(error)
-      }
-      expect(response.statusCode).to.equal(status)
-      if (pattern) {
-        expect(body).to.match(pattern)
-      }
-      callback()
-    })
-  }
-}
-
-function expectPost(user, url, body, status, pattern) {
-  return callback => {
-    user.request.post({ url, json: body }, (error, response, body) => {
       if (error) {
         return callback(error)
       }

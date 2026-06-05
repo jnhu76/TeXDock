@@ -19,6 +19,4 @@ export type User = {
   last_active_at: Date
   enrollment?: UserEnrollment
   isEntityAdmin?: boolean
-  isEntityManager?: boolean
-  isEntityMember?: boolean
 }

@@ -1,14 +1,13 @@
 import { Trans, useTranslation } from 'react-i18next'
 import { memo, useState } from 'react'
 import { useLocation } from '@/shared/hooks/use-location'
-import OLButton from '@/shared/components/ol/ol-button'
-import {
-  OLModal,
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
+} from '@/features/ui/components/ol/ol-modal'
 
 export type OutOfSyncModalProps = {
   editorContent: string
@@ -37,7 +36,7 @@ function OutOfSyncModal({ editorContent, show, onHide }: OutOfSyncModalProps) {
       backdrop={false}
       keyboard={false}
     >
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{t('out_of_sync')}</OLModalTitle>
       </OLModalHeader>
       <OLModalBody className="modal-body-share">

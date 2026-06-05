@@ -13,22 +13,13 @@ export default function useUserWideSettings() {
     autoComplete,
     autoPairDelimiters,
     syntaxValidation,
-    previewTabs,
     editorTheme,
-    editorLightTheme,
-    editorDarkTheme,
     mode,
     fontSize,
     fontFamily,
     lineHeight,
     pdfViewer,
     mathPreview,
-    breadcrumbs,
-    nonBlinkingCursor,
-    darkModePdf,
-    zotero,
-    mendeley,
-    papers,
   } = userSettings
 
   const setOverallTheme = useSetOverallTheme()
@@ -53,30 +44,9 @@ export default function useUserWideSettings() {
     [saveUserSettings]
   )
 
-  const setPreviewTabs = useCallback(
-    (previewTabs: UserSettings['previewTabs']) => {
-      saveUserSettings('previewTabs', previewTabs)
-    },
-    [saveUserSettings]
-  )
-
   const setEditorTheme = useCallback(
     (editorTheme: UserSettings['editorTheme']) => {
       saveUserSettings('editorTheme', editorTheme)
-    },
-    [saveUserSettings]
-  )
-
-  const setEditorLightTheme = useCallback(
-    (editorLightTheme: UserSettings['editorLightTheme']) => {
-      saveUserSettings('editorLightTheme', editorLightTheme)
-    },
-    [saveUserSettings]
-  )
-
-  const setEditorDarkTheme = useCallback(
-    (editorDarkTheme: UserSettings['editorDarkTheme']) => {
-      saveUserSettings('editorDarkTheme', editorDarkTheme)
     },
     [saveUserSettings]
   )
@@ -123,48 +93,6 @@ export default function useUserWideSettings() {
     [saveUserSettings]
   )
 
-  const setBreadcrumbs = useCallback(
-    (breadcrumbs: UserSettings['breadcrumbs']) => {
-      saveUserSettings('breadcrumbs', breadcrumbs)
-    },
-    [saveUserSettings]
-  )
-
-  const setNonBlinkingCursor = useCallback(
-    (nonBlinkingCursor: UserSettings['nonBlinkingCursor']) => {
-      saveUserSettings('nonBlinkingCursor', nonBlinkingCursor)
-    },
-    [saveUserSettings]
-  )
-
-  const setDarkModePdf = useCallback(
-    (darkModePdf: UserSettings['darkModePdf']) => {
-      saveUserSettings('darkModePdf', darkModePdf)
-    },
-    [saveUserSettings]
-  )
-
-  const setZotero = useCallback(
-    (zotero: UserSettings['zotero']) => {
-      saveUserSettings('zotero', { ...zotero, migrated: true })
-    },
-    [saveUserSettings]
-  )
-
-  const setMendeley = useCallback(
-    (mendeley: UserSettings['mendeley']) => {
-      saveUserSettings('mendeley', { ...mendeley, migrated: true })
-    },
-    [saveUserSettings]
-  )
-
-  const setPapers = useCallback(
-    (papers: UserSettings['papers']) => {
-      saveUserSettings('papers', { ...papers, migrated: true })
-    },
-    [saveUserSettings]
-  )
-
   return {
     autoComplete,
     setAutoComplete,
@@ -172,14 +100,8 @@ export default function useUserWideSettings() {
     setAutoPairDelimiters,
     syntaxValidation,
     setSyntaxValidation,
-    previewTabs,
-    setPreviewTabs,
     editorTheme,
     setEditorTheme,
-    editorLightTheme,
-    setEditorLightTheme,
-    editorDarkTheme,
-    setEditorDarkTheme,
     overallTheme,
     setOverallTheme,
     mode,
@@ -194,17 +116,5 @@ export default function useUserWideSettings() {
     setPdfViewer,
     mathPreview,
     setMathPreview,
-    breadcrumbs,
-    setBreadcrumbs,
-    nonBlinkingCursor,
-    setNonBlinkingCursor,
-    darkModePdf,
-    setDarkModePdf,
-    zotero,
-    setZotero,
-    mendeley,
-    setMendeley,
-    papers,
-    setPapers,
   }
 }

@@ -8,7 +8,7 @@ const CommentList = require('./comment_list')
 const TrackedChangeList = require('./tracked_change_list')
 
 /**
- * @import { StringFileRawData, RawHashFileData, BlobStore, CommentRawData } from "../types"
+ * @import { StringFileRawData, RawFileData, BlobStore, CommentRawData } from "../types"
  * @import { TrackedChangeRawData, RangesBlob } from "../types"
  * @import EditOperation from "../operation/edit_operation"
  */
@@ -56,27 +56,6 @@ class StringFileData extends FileData {
     }
 
     return raw
-  }
-
-  /**
-   * @returns {Record<string, number>}
-   */
-  toStats() {
-    // Note: Buffer does not exist in frontend. Use string length instead.
-    return {
-      nContent: 1,
-      contentSize: this.content.length,
-      nComments: this.comments.length,
-      commentsSize:
-        this.comments.length > 0
-          ? JSON.stringify(this.comments.toRaw()).length
-          : 0,
-      nTrackedChanges: this.trackedChanges.length,
-      trackedChangesSize:
-        this.trackedChanges.length > 0
-          ? JSON.stringify(this.trackedChanges.toRaw()).length
-          : 0,
-    }
   }
 
   /** @inheritdoc */
@@ -160,7 +139,7 @@ class StringFileData extends FileData {
   /**
    * @inheritdoc
    * @param {BlobStore} blobStore
-   * @return {Promise<RawHashFileData>}
+   * @return {Promise<RawFileData>}
    */
   async store(blobStore) {
     const blob = await blobStore.putString(this.content)

@@ -13,7 +13,7 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
-} from '@/shared/components/dropdown/dropdown-menu'
+} from '@/features/ui/components/bootstrap-5/dropdown-menu'
 import { Tag } from '../../../../../../../../app/src/Features/Tags/types'
 
 function TagsDropdown() {
@@ -91,7 +91,7 @@ function TagsDropdown() {
           data-testid="project-tools-more-dropdown-menu"
         >
           <DropdownHeader>{t('add_to_tag')}</DropdownHeader>
-          {sortBy(tags, tag => tag.name?.toLowerCase()).map(tag => (
+          {sortBy(tags, tag => tag.name?.toLowerCase()).map((tag, index) => (
             <li role="none" key={tag._id}>
               <DropdownItem
                 onClick={e =>
@@ -111,7 +111,6 @@ function TagsDropdown() {
                     <DropdownItem.EmptyLeadingIcon />
                   )
                 }
-                translate="no"
               >
                 <div className="badge-tag-content">
                   <span className="badge-prepend">

@@ -9,7 +9,7 @@ const path = require('node:path')
  * after.
  *
  * @param {string} prefix - prefix for the temporary directory name
- * @param {(tmpDir: string) => Promise<void>} fn - async function to call
+ * @param {Function} fn - async function to call
  */
 async function withTmpDir(prefix, fn) {
   const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), prefix))

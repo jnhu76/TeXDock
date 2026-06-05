@@ -45,16 +45,16 @@ const themeGenerators: Record<BorderTheme, ThemeGenerator> = {
       left: true,
       right: number === numColumns - 1,
     }),
-    row: () => '\\hline',
+    row: (number: number, numRows: number) => '\\hline',
     multicolumn: () => ({ left: true, right: true }),
     lastRow: () => '\\hline',
   },
   [BorderTheme.BOOKTABS]: {
-    column: () => ({
+    column: (number: number, numColumns: number) => ({
       left: false,
       right: false,
     }),
-    row: (number: number) => {
+    row: (number: number, numRows: number) => {
       if (number === 0) {
         return '\\toprule'
       }

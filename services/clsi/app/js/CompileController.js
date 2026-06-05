@@ -1,15 +1,12 @@
-import OError from '@overleaf/o-error'
-import Path from 'node:path'
-import RequestParser from './RequestParser.js'
-import CompileManager from './CompileManager.js'
-import Settings from '@overleaf/settings'
-import Metrics from '@overleaf/metrics'
-import ProjectPersistenceManager from './ProjectPersistenceManager.js'
-import logger from '@overleaf/logger'
-import Errors from './Errors.js'
-import CLSICacheHandler from './CLSICacheHandler.js'
-
-const { notifyCLSICacheAboutBuild } = CLSICacheHandler
+const Path = require('node:path')
+const RequestParser = require('./RequestParser')
+const CompileManager = require('./CompileManager')
+const Settings = require('@overleaf/settings')
+const Metrics = require('./Metrics')
+const ProjectPersistenceManager = require('./ProjectPersistenceManager')
+const logger = require('@overleaf/logger')
+const Errors = require('./Errors')
+const { notifyCLSICacheAboutBuild } = require('./CLSICacheHandler')
 
 let lastSuccessfulCompileTimestamp = 0
 
@@ -41,7 +38,7 @@ function compile(req, res, next) {
           stats,
           timings,
           (error, result) => {
-            let { buildId, outputFiles, baseHistoryVersion } = result || {}
+            let { buildId, outputFiles } = result || {}
             let code, status
             if (outputFiles == null) {
               outputFiles = []
@@ -51,7 +48,7 @@ function compile(req, res, next) {
               status = 'compile-in-progress'
             } else if (error instanceof Errors.FilesOutOfSyncError) {
               code = 409 // Http 409 Conflict
-              status = 'conflict'
+              status = 'retry'
               logger.warn(
                 {
                   projectId: request.project_id,
@@ -59,10 +56,6 @@ function compile(req, res, next) {
                 },
                 'files out of sync, please retry'
               )
-            } else if (error instanceof Errors.MissingUpdatesError) {
-              code = 409
-              status = 'missing-updates'
-              baseHistoryVersion = error.info.baseHistoryVersion
             } else if (
               error?.code === 'EPIPE' ||
               error instanceof Errors.TooManyCompileRequestsError
@@ -132,8 +125,6 @@ function compile(req, res, next) {
                 editorId: request.editorId,
                 outputFiles,
                 compileGroup: request.compileGroup,
-                stats,
-                timings,
                 options: {
                   compiler: request.compiler,
                   draft: request.draft,
@@ -143,7 +134,6 @@ function compile(req, res, next) {
                   rootResourcePath: request.rootResourcePath,
                   stopOnFirstError: request.stopOnFirstError,
                 },
-                metricsOpts: request.metricsOpts,
               })
             }
 
@@ -152,7 +142,6 @@ function compile(req, res, next) {
               compile: {
                 status,
                 error: error?.message || error,
-                baseHistoryVersion,
                 stats,
                 timings,
                 buildId,
@@ -160,7 +149,7 @@ function compile(req, res, next) {
                 outputUrlPrefix: Settings.apis.clsi.outputUrlPrefix,
                 outputFiles: outputFiles.map(file => ({
                   url:
-                    `${Settings.apis.clsi.downloadHost}/project/${request.project_id}` +
+                    `${Settings.apis.clsi.url}/project/${request.project_id}` +
                     (request.user_id != null
                       ? `/user/${request.user_id}`
                       : '') +
@@ -187,14 +176,17 @@ function stopCompile(req, res, next) {
 }
 
 function clearCache(req, res, next) {
-  const { project_id: projectId, user_id: userId } = req.params
-  CompileManager.stopCompile(projectId, userId, error => {
-    if (error) return next(OError.tag(error, 'stop compile'))
-    ProjectPersistenceManager.clearProject(projectId, userId, error => {
-      if (error) return next(OError.tag(error, 'clear project'))
+  ProjectPersistenceManager.clearProject(
+    req.params.project_id,
+    req.params.user_id,
+    function (error) {
+      if (error) {
+        return next(error)
+      }
+      // No content
       res.sendStatus(204)
-    })
-  })
+    }
+  )
 }
 
 function syncFromCode(req, res, next) {
@@ -278,7 +270,7 @@ function status(req, res, next) {
   res.send('OK')
 }
 
-export default {
+module.exports = {
   compile,
   stopCompile,
   clearCache,

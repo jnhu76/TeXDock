@@ -28,7 +28,6 @@ export default function useUserSelection(initialUsers: User[]) {
     users,
     setUsers,
     selectedUsers,
-    setSelectedUsers,
     selectUser,
     unselectUser,
     selectAllUsers,

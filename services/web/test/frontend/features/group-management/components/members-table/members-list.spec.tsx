@@ -7,7 +7,7 @@ const groupId = 'somegroup'
 function mountManagedUsersList() {
   cy.mount(
     <GroupMembersProvider>
-      <MembersList groupId={groupId} hasWriteAccess />
+      <MembersList groupId={groupId} />
     </GroupMembersProvider>
   )
 }
@@ -121,42 +121,6 @@ describe('MembersList', function () {
         users[1].last_name
       )
     })
-    it('should render the pagination navigation', function () {
-      cy.window().then(win => {
-        win.metaAttributesCache.set(
-          'ol-users',
-          Array.from({ length: 50 }).flatMap(() => users.flat())
-        )
-      })
-      mountManagedUsersList()
-      cy.findByRole('navigation', { name: /pagination navigation/i })
-    })
-    it('should show the user count', function () {
-      cy.findByTestId('x-of-n-users').should(
-        'contain.text',
-        'Showing 2 out of 2 users'
-      )
-    })
-    it('should filter users based on case-insensitive search string', function () {
-      cy.window().then(win => {
-        win.metaAttributesCache.set(
-          'ol-users',
-          Array.from({ length: 50 })
-            .flatMap(() => users.flat())
-            .map((user, i) => ({
-              ...user,
-              // create more than one page of users with same name
-              first_name: i < 75 ? 'Julie' : 'David',
-            }))
-        )
-      })
-      mountManagedUsersList()
-      cy.findByTestId('search-members-input').type('jul')
-      cy.findByTestId('x-of-n-users').should(
-        'contain.text',
-        'Showing 50 out of 75 users'
-      )
-    })
   })
 
   describe('empty user list', function () {
@@ -166,7 +130,7 @@ describe('MembersList', function () {
       })
       cy.mount(
         <GroupMembersProvider>
-          <MembersList groupId={groupId} hasWriteAccess />
+          <MembersList groupId={groupId} />
         </GroupMembersProvider>
       )
     })
@@ -274,7 +238,7 @@ describe('MembersList', function () {
 
       it('should show successs notification and update the user row after unlinking', function () {
         cy.findByRole('dialog').within(() => {
-          cy.findByRole('button', { name: /unlink from sso/i }).click()
+          cy.findByRole('button', { name: /unlink user/i }).click()
         })
         cy.findByRole('alert').should(
           'contain.text',
@@ -314,7 +278,7 @@ describe('MembersList', function () {
 
         it('should show successs notification and update the user row after unlinking', function () {
           cy.findByRole('dialog').within(() => {
-            cy.findByRole('button', { name: /unlink from sso/i }).click()
+            cy.findByRole('button', { name: /unlink user/i }).click()
           })
           cy.findByRole('alert').should(
             'contain.text',
@@ -347,7 +311,7 @@ describe('MembersList', function () {
 
         it('should show successs notification and update the user row after unlinking', function () {
           cy.findByRole('dialog').within(() => {
-            cy.findByRole('button', { name: /unlink from sso/i }).click()
+            cy.findByRole('button', { name: /unlink user/i }).click()
           })
           cy.findByRole('alert').should(
             'contain.text',

@@ -2,57 +2,34 @@
 # Instead run bin/update_build_scripts from
 # https://github.com/overleaf/internal/
 
+version: "2.3"
+
 services:
   test_unit:
-    build:
-      context: ../..
-      dockerfile: services/notifications/Dockerfile
-      target: base
+    image: node:22.15.1
     volumes:
       - .:/overleaf/services/notifications
       - ../../node_modules:/overleaf/node_modules
       - ../../libraries:/overleaf/libraries
-      - ../../package.json:/overleaf/package.json
-      - ../../.yarnrc.yml:/overleaf/.yarnrc.yml
-      - ../../yarn.lock:/overleaf/yarn.lock
-      - ../../.yarn:/overleaf/.yarn
-      - ../../bin/shared/wait_for_it:/overleaf/bin/shared/wait_for_it
-      - ../../tools/migrations:/overleaf/tools/migrations
-      - ../../tsconfig.backend.json:/overleaf/tsconfig.backend.json
     working_dir: /overleaf/services/notifications
     environment:
       MOCHA_GREP: ${MOCHA_GREP}
       LOG_LEVEL: ${LOG_LEVEL:-}
-      MONGO_CONNECTION_STRING: mongodb://mongo/test-overleaf
       NODE_ENV: test
       NODE_OPTIONS: "--unhandled-rejections=strict"
-    entrypoint: /overleaf/bin/shared/wait_for_it mongo:27017 --timeout=60 --
-    command: yarn run --silent test:unit
+    command: npm run --silent test:unit
     user: node
-    depends_on:
-      mongo:
-        condition: service_started
 
   test_acceptance:
-    build:
-      context: ../..
-      dockerfile: services/notifications/Dockerfile
-      target: base
+    image: node:22.15.1
     volumes:
       - .:/overleaf/services/notifications
       - ../../node_modules:/overleaf/node_modules
       - ../../libraries:/overleaf/libraries
-      - ../../package.json:/overleaf/package.json
-      - ../../.yarnrc.yml:/overleaf/.yarnrc.yml
-      - ../../yarn.lock:/overleaf/yarn.lock
-      - ../../.yarn:/overleaf/.yarn
-      - ../../bin/shared/wait_for_it:/overleaf/bin/shared/wait_for_it
-      - ../../tools/migrations:/overleaf/tools/migrations
-      - ../../tsconfig.backend.json:/overleaf/tsconfig.backend.json
     working_dir: /overleaf/services/notifications
     environment:
-      RETRIES:
-      MONGO_CONNECTION_STRING: mongodb://mongo/test-overleaf
+      ELASTIC_SEARCH_DSN: es:9200
+      MONGO_HOST: mongo
       POSTGRES_HOST: postgres
       MOCHA_GREP: ${MOCHA_GREP}
       LOG_LEVEL: ${LOG_LEVEL:-}
@@ -62,16 +39,13 @@ services:
     depends_on:
       mongo:
         condition: service_started
-    entrypoint: /overleaf/bin/shared/wait_for_it mongo:27017 --timeout=60 --
-    command: yarn run --silent test:acceptance
+    command: npm run --silent test:acceptance
 
   mongo:
-    image: mongo:8.0.11
-    command: --replSet overleaf --notablescan
+    image: mongo:7.0.20
+    command: --replSet overleaf
     volumes:
       - ../../bin/shared/mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js
-      - ../../bin/shared/mongodb-docker-entrypoint-wait.sh:/mongodb-docker-entrypoint-wait.sh
-    entrypoint: /mongodb-docker-entrypoint-wait.sh
     environment:
       MONGO_INITDB_DATABASE: sharelatex
     extra_hosts:
@@ -79,3 +53,4 @@ services:
       # replica set. This override is not needed when running the setup after
       # starting up mongo.
       - mongo:127.0.0.1
+

@@ -1,16 +1,17 @@
-import UserGetter from './UserGetter.mjs'
+import UserGetter from './UserGetter.js'
 import OError from '@overleaf/o-error'
-import UserSessionsManager from './UserSessionsManager.mjs'
+import UserSessionsManager from './UserSessionsManager.js'
 import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
-import AuthenticationController from '../Authentication/AuthenticationController.mjs'
-import SessionManager from '../Authentication/SessionManager.mjs'
-import SubscriptionLocator from '../Subscription/SubscriptionLocator.mjs'
+import AuthenticationController from '../Authentication/AuthenticationController.js'
+import SessionManager from '../Authentication/SessionManager.js'
+import NewsletterManager from '../Newsletter/NewsletterManager.js'
+import SubscriptionLocator from '../Subscription/SubscriptionLocator.js'
 import _ from 'lodash'
 import { expressify } from '@overleaf/promise-utils'
-import Features from '../../infrastructure/Features.mjs'
-import Modules from '../../infrastructure/Modules.mjs'
-import SplitTestHandler from '../SplitTests/SplitTestHandler.mjs'
+import Features from '../../infrastructure/Features.js'
+import SplitTestHandler from '../SplitTests/SplitTestHandler.js'
+import Modules from '../../infrastructure/Modules.js'
 
 async function settingsPage(req, res) {
   const userId = SessionManager.getLoggedInUserId(req.session)
@@ -116,12 +117,6 @@ async function settingsPage(req, res) {
     )
   }
 
-  await SplitTestHandler.promises.getAssignment(req, res, 'email-notifications')
-  await SplitTestHandler.promises.getAssignment(
-    req,
-    res,
-    'domain-captured-by-group'
-  )
   res.render('user/settings', {
     title: 'account_settings',
     user: {
@@ -147,8 +142,13 @@ async function settingsPage(req, res) {
         zotero: Boolean(user.refProviders?.zotero),
         papers: Boolean(user.refProviders?.papers),
       },
+      writefull: {
+        enabled: Boolean(user.writefull?.enabled),
+      },
+      aiErrorAssistant: {
+        enabled: Boolean(user.aiErrorAssistant?.enabled),
+      },
     },
-    showAiFeatures: Boolean(user.aiFeatures?.enabled),
     labsExperiments: user.labsExperiments ?? [],
     hasPassword: !!user.hashedPassword,
     shouldAllowEditingDetails,
@@ -176,7 +176,6 @@ async function settingsPage(req, res) {
     gitBridgeEnabled: Settings.enableGitBridge,
     isSaas: Features.hasFeature('saas'),
     memberOfSSOEnabledGroups,
-    capabilities: [...req.capabilitySet],
   })
 }
 
@@ -189,59 +188,24 @@ async function accountSuspended(req, res) {
   })
 }
 
-async function logout(req, res) {
-  const isLoggedIn = SessionManager.isUserLoggedIn(req.session)
-  if (!isLoggedIn) {
-    return res.redirect('/')
-  }
-  res.render('user/logout')
-}
-
 async function reconfirmAccountPage(req, res) {
   const pageData = {
     reconfirm_email: req.session.reconfirm_email,
   }
+  const { variant } = await SplitTestHandler.promises.getAssignment(
+    req,
+    res,
+    'bs5-auth-pages'
+  )
 
-  res.render('user/reconfirm', pageData)
-}
+  const template =
+    variant === 'enabled' ? 'user/reconfirm-bs5' : 'user/reconfirm'
 
-async function emailPreferencesPage(req, res) {
-  const userId = SessionManager.getLoggedInUserId(req.session)
-  const user = await UserGetter.promises.getUser(userId, {
-    _id: 1,
-    email: 1,
-    first_name: 1,
-    last_name: 1,
-  })
-
-  if (!user) {
-    throw new Error('User not found')
-  }
-
-  let subscribed = false
-
-  try {
-    const [preferences] = await Modules.promises.hooks.fire(
-      'getSubscriptionPreferences',
-      userId
-    )
-
-    subscribed = Boolean(preferences?.newsletter)
-  } catch (err) {
-    logger.error({ err, userId }, 'Error fetching newsletter subscription')
-  }
-
-  res.render('user/email-preferences', {
-    title: 'newsletter_info_title',
-    customerIoEnabled: true,
-    subscribed,
-    user,
-  })
+  res.render(template, pageData)
 }
 
 const UserPagesController = {
   accountSuspended: expressify(accountSuspended),
-  logout: expressify(logout),
 
   registerPage(req, res) {
     const sharedProjectData = req.session.sharedProjectData || {}
@@ -268,15 +232,10 @@ const UserPagesController = {
     ) {
       AuthenticationController.setRedirectInSession(req, req.query.redir)
     }
-    const metadata = { robotsNoindexNofollow: false }
-    if (Object.keys(req.query).length !== 0) {
-      metadata.robotsNoindexNofollow = true
-    }
     res.render('user/login', {
       title: Settings.nav?.login_support_title || 'login',
       login_support_title: Settings.nav?.login_support_title,
       login_support_text: Settings.nav?.login_support_text,
-      metadata,
     })
   },
 
@@ -320,7 +279,28 @@ const UserPagesController = {
     )
   },
 
-  emailPreferencesPage: expressify(emailPreferencesPage),
+  emailPreferencesPage(req, res, next) {
+    const userId = SessionManager.getLoggedInUserId(req.session)
+    UserGetter.getUser(
+      userId,
+      { _id: 1, email: 1, first_name: 1, last_name: 1 },
+      (err, user) => {
+        if (err != null) {
+          return next(err)
+        }
+        NewsletterManager.subscribed(user, (err, subscribed) => {
+          if (err != null) {
+            OError.tag(err, 'error getting newsletter subscription status')
+            return next(err)
+          }
+          res.render('user/email-preferences', {
+            title: 'newsletter_info_title',
+            subscribed,
+          })
+        })
+      }
+    )
+  },
 
   async compromisedPasswordPage(req, res) {
     res.render('user/compromised_password')

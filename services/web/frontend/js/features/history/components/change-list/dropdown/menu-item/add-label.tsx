@@ -1,15 +1,21 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import OLDropdownMenuItem from '@/shared/components/ol/ol-dropdown-menu-item'
-import OLTagIcon from '@/shared/components/ol/ol-tag-icon'
+import OLDropdownMenuItem from '@/features/ui/components/ol/ol-dropdown-menu-item'
+import OLTagIcon from '@/features/ui/components/ol/icons/ol-tag-icon'
 import AddLabelModal from '../../add-label-modal'
 
-type AddLabelProps = {
+type DownloadProps = {
+  projectId: string
   version: number
   closeDropdown: () => void
 }
 
-function AddLabel({ version, closeDropdown, ...props }: AddLabelProps) {
+function AddLabel({
+  version,
+  projectId,
+  closeDropdown,
+  ...props
+}: DownloadProps) {
   const { t } = useTranslation()
   const [showModal, setShowModal] = useState(false)
 

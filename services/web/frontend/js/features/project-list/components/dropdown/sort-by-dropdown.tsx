@@ -10,9 +10,9 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
-} from '@/shared/components/dropdown/dropdown-menu'
+} from '@/features/ui/components/bootstrap-5/dropdown-menu'
 
-function Item({ onClick, text, iconType }: SortBtnProps) {
+function Item({ onClick, text, iconType, screenReaderText }: SortBtnProps) {
   return (
     <DropdownItem
       as="button"

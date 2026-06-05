@@ -1,4 +1,3 @@
-const path = require('path')
 const webpack = require('webpack')
 const { merge } = require('webpack-merge')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
@@ -23,17 +22,6 @@ module.exports = merge(base, {
   // Enable accurate source maps for dev
   devtool:
     process.env.CSP_ENABLED === 'true' ? 'source-map' : 'eval-source-map',
-
-  cache: {
-    type: 'filesystem',
-    buildDependencies: {
-      config: [
-        __filename,
-        path.resolve(__dirname, 'webpack.config.js'),
-        path.resolve(__dirname, 'config/settings.webpack.js'),
-      ],
-    },
-  },
 
   // Load entrypoints without contenthash in filename
   output: {
@@ -105,9 +93,4 @@ module.exports = merge(base, {
     preset: 'minimal',
     colors: true,
   },
-
-  ignoreWarnings: [
-    // ignore some "Can't resolve '*'" warnings for dynamically-imported optional peer dependencies
-    /@ai-sdk\/provider-utils\/dist/,
-  ],
 })

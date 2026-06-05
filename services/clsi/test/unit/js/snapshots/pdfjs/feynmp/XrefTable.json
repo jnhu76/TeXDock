@@ -1,87 +1,110 @@
 {
   "xRefEntries": [
     {
-      "offset": 0
+      "offset": 0,
+      "gen": 65535,
+      "free": true
     },
     {
-      "offset": 4966,
+      "offset": 4964,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 5025,
+      "offset": 5023,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 5259,
+      "offset": 5234,
+      "gen": 0,
       "uncompressed": true
     },
     {
       "offset": 15,
+      "gen": 0,
       "uncompressed": true
     },
     {
       "offset": 734,
+      "gen": 0,
       "uncompressed": true
     },
     {
       "offset": 799,
+      "gen": 0,
       "uncompressed": true
     },
     {
       "offset": 933,
+      "gen": 0,
       "uncompressed": true
     },
     {
       "offset": 1104,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 1946,
+      "offset": 1947,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 1994,
+      "offset": 1992,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 2184,
+      "offset": 2182,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 2429,
+      "offset": 2427,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 2599,
+      "offset": 2597,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 2824,
+      "offset": 2822,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 2991,
+      "offset": 2989,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 3241,
+      "offset": 3239,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 3273,
+      "offset": 3271,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 3330,
+      "offset": 3328,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 3742,
+      "offset": 3740,
+      "gen": 0,
       "uncompressed": true
     },
     {
-      "offset": 4272,
+      "offset": 4270,
+      "gen": 0,
       "uncompressed": true
     }
-  ]
+  ],
+  "startXRefTable": 6682
 }

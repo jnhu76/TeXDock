@@ -1,10 +1,10 @@
-import Path from 'node:path'
-import fs from 'node:fs'
-import logger from '@overleaf/logger'
-import Errors from './Errors.js'
-import SafeReader from './SafeReader.js'
+const Path = require('node:path')
+const fs = require('node:fs')
+const logger = require('@overleaf/logger')
+const Errors = require('./Errors')
+const SafeReader = require('./SafeReader')
 
-export default {
+module.exports = {
   // The sync state is an identifier which must match for an
   // incremental update to be allowed.
   //

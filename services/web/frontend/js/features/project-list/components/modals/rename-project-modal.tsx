@@ -16,18 +16,17 @@ import { getUserFacingMessage } from '../../../../infrastructure/fetch-json'
 import { debugConsole } from '@/utils/debugging'
 import { isSmallDevice } from '../../../../infrastructure/event-tracking'
 import Notification from '@/shared/components/notification'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLForm from '@/shared/components/ol/ol-form'
-import OLFormGroup from '@/shared/components/ol/ol-form-group'
-import OLFormLabel from '@/shared/components/ol/ol-form-label'
-import OLFormControl from '@/shared/components/ol/ol-form-control'
+} from '@/features/ui/components/ol/ol-modal'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLForm from '@/features/ui/components/ol/ol-form'
+import OLFormGroup from '@/features/ui/components/ol/ol-form-group'
+import OLFormLabel from '@/features/ui/components/ol/ol-form-label'
+import OLFormControl from '@/features/ui/components/ol/ol-form-control'
 
 type RenameProjectModalProps = {
   handleCloseModal: () => void
@@ -105,7 +104,7 @@ function RenameProjectModal({
       id="rename-project-modal"
       backdrop="static"
     >
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{t('rename_project')}</OLModalTitle>
       </OLModalHeader>
       <OLModalBody>
@@ -122,6 +121,7 @@ function RenameProjectModal({
             <OLFormLabel>{t('new_name')}</OLFormLabel>
             <OLFormControl
               type="text"
+              placeholder={t('project_name')}
               required
               value={newProjectName}
               onChange={handleOnChange}

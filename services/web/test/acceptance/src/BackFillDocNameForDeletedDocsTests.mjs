@@ -2,7 +2,7 @@ import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { expect } from 'chai'
 import logger from '@overleaf/logger'
-import { db, ObjectId } from '../../../app/src/infrastructure/mongodb.mjs'
+import { db, ObjectId } from '../../../app/src/infrastructure/mongodb.js'
 import UserHelper from './helpers/User.mjs'
 import { renderObjectId } from '@overleaf/mongo-utils/batchedUpdate.js'
 
@@ -63,11 +63,14 @@ describe('BackFillDocNameForDeletedDocs', function () {
     await setDeletedDocs(projectId2, deletedDocs2)
   })
 
-  async function runScript() {
+  async function runScript(args = []) {
     let result
     try {
       result = await promisify(exec)(
-        'cd ../../tools/migrations && yarn run migrations migrate -t saas --force 20210727150530_ce_sp_backfill_deleted_docs'
+        ['LET_USER_DOUBLE_CHECK_INPUTS_FOR=1']
+          .concat(['node', 'scripts/back_fill_doc_name_for_deleted_docs.mjs'])
+          .concat(args)
+          .join(' ')
       )
     } catch (error) {
       // dump details like exit code, stdErr and stdOut
@@ -92,9 +95,20 @@ describe('BackFillDocNameForDeletedDocs', function () {
     })
   }
 
+  describe('back fill only', function () {
+    beforeEach('run script', runScript)
+
+    checkDocsBackFilled()
+
+    it('should leave the deletedDocs as is', async function () {
+      expect(await getDeletedDocs(projectId1)).to.deep.equal(deletedDocs1)
+      expect(await getDeletedDocs(projectId2)).to.deep.equal(deletedDocs2)
+    })
+  })
+
   describe('back fill and cleanup', function () {
     beforeEach('run script with cleanup flag', async function () {
-      await runScript()
+      await runScript(['--perform-cleanup'])
     })
 
     checkDocsBackFilled()

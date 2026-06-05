@@ -1,8 +1,8 @@
-import { ObjectId } from '../../../app/src/infrastructure/mongodb.mjs'
+import { ObjectId } from '../../../app/src/infrastructure/mongodb.js'
 import minimist from 'minimist'
-import OwnershipTransferHandler from '../../../app/src/Features/Collaborators/OwnershipTransferHandler.mjs'
-import UserGetter from '../../../app/src/Features/User/UserGetter.mjs'
-import EmailHelper from '../../../app/src/Features/Helpers/EmailHelper.mjs'
+import OwnershipTransferHandler from '../../../app/src/Features/Collaborators/OwnershipTransferHandler.js'
+import UserGetter from '../../../app/src/Features/User/UserGetter.js'
+import EmailHelper from '../../../app/src/Features/Helpers/EmailHelper.js'
 
 const args = minimist(process.argv.slice(2), {
   string: ['from-user', 'to-user'],

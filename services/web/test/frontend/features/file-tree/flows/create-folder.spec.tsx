@@ -1,12 +1,11 @@
 import FileTreeRoot from '../../../../../frontend/js/features/file-tree/components/file-tree-root'
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { SocketIOMock } from '@/ide/connection/SocketIoShim'
-import type { Socket } from '@/features/ide-react/connection/types/socket'
 
 describe('FileTree Create Folder Flow', function () {
-  let socket: SocketIOMock & Socket
+  let socket: SocketIOMock
   beforeEach(function () {
-    socket = new SocketIOMock() as any
+    socket = new SocketIOMock()
     cy.window().then(win => {
       win.metaAttributesCache.set('ol-user', { id: 'user1' })
     })
@@ -109,7 +108,7 @@ describe('FileTree Create Folder Flow', function () {
       </EditorProviders>
     )
 
-    cy.findByLabelText('Expand').click()
+    cy.findByRole('button', { name: 'Expand' }).click()
 
     const name = 'Foo Bar In thefolder'
 
@@ -144,7 +143,7 @@ describe('FileTree Create Folder Flow', function () {
     cy.findByRole('treeitem', { name })
 
     // collapse the parent folder; created folder should not be rendered anymore
-    cy.findByLabelText('Collapse').click()
+    cy.findByRole('button', { name: 'Collapse' }).click()
     cy.findByRole('treeitem', { name }).should('not.exist')
   })
 
@@ -218,7 +217,7 @@ describe('FileTree Create Folder Flow', function () {
     cy.findByRole('treeitem', { name })
 
     // collapse the parent folder; created folder should not be rendered anymore
-    cy.findByLabelText('Collapse').click()
+    cy.findByRole('button', { name: 'Collapse' }).click()
     cy.findByRole('treeitem', { name }).should('not.exist')
   })
 

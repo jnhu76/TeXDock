@@ -1,4 +1,10 @@
-import { EditorView, showTooltip, Tooltip, ViewPlugin } from '@codemirror/view'
+import {
+  EditorView,
+  repositionTooltips,
+  showTooltip,
+  Tooltip,
+  ViewPlugin,
+} from '@codemirror/view'
 import {
   Compartment,
   EditorState,
@@ -18,9 +24,8 @@ import { documentCommands } from '../languages/latex/document-commands'
 import { debugConsole } from '@/utils/debugging'
 import { nodeHasError } from '../utils/tree-operations/common'
 import { documentEnvironments } from '../languages/latex/document-environments'
-import { repositionAllTooltips } from './tooltips-reposition'
-import { closeAllContextMenusEffect } from '../utils/close-all-context-menus-effect'
 
+const REPOSITION_EVENT = 'editor:repositionMathTooltips'
 const HIDE_TOOLTIP_EVENT = 'editor:hideMathTooltip'
 
 export const mathPreview = (enabled: boolean): Extension => {
@@ -39,6 +44,7 @@ export const setMathPreview = (enabled: boolean): TransactionSpec => ({
 
 export const mathPreviewStateField = StateField.define<{
   tooltip: Tooltip | null
+  mathContent: HTMLDivElement | null
   hide: boolean
 }>({
   create: buildInitialState,
@@ -46,10 +52,7 @@ export const mathPreviewStateField = StateField.define<{
   update(state, tr) {
     for (const effect of tr.effects) {
       if (effect.is(hideTooltipEffect)) {
-        return { tooltip: null, hide: true }
-      }
-      if (effect.is(closeAllContextMenusEffect)) {
-        return { tooltip: null, hide: state.hide }
+        return { tooltip: null, hide: true, mathContent: null }
       }
     }
 
@@ -58,18 +61,19 @@ export const mathPreviewStateField = StateField.define<{
 
       if (mathContainer) {
         if (state.hide) {
-          return { tooltip: null, hide: true }
+          return { tooltip: null, hide: true, mathContent: null }
         } else {
           const mathContent = buildTooltipContent(tr.state, mathContainer)
 
           return {
             tooltip: buildTooltip(mathContainer, mathContent),
+            mathContent,
             hide: false,
           }
         }
       }
 
-      return { tooltip: null, hide: false }
+      return { tooltip: null, hide: false, mathContent: null }
     }
 
     return state
@@ -79,16 +83,19 @@ export const mathPreviewStateField = StateField.define<{
     showTooltip.compute([field], state => state.field(field).tooltip),
 
     ViewPlugin.define(view => {
+      const listener = () => repositionTooltips(view)
       const hideTooltip = () => {
         view.dispatch({
           effects: hideTooltipEffect.of(null),
         })
       }
 
+      window.addEventListener(REPOSITION_EVENT, listener)
       window.addEventListener(HIDE_TOOLTIP_EVENT, hideTooltip)
 
       return {
         destroy() {
+          window.removeEventListener(REPOSITION_EVENT, listener)
           window.removeEventListener(HIDE_TOOLTIP_EVENT, hideTooltip)
         },
       }
@@ -152,11 +159,6 @@ function buildTooltip(
     create() {
       const dom = document.createElement('div')
       dom.classList.add('ol-cm-math-tooltip-container')
-      const innerElt = document.createElement('div')
-      innerElt.classList.add('ol-cm-math-tooltip')
-      innerElt.id = 'ol-cm-math-tooltip'
-      innerElt.appendChild(mathContent)
-      dom.appendChild(innerElt)
 
       return { dom, overlap: true, offset: { x: 0, y: 8 } }
     },
@@ -215,7 +217,7 @@ const buildTooltipContent = (
   renderMath(math.content, math.displayMode, element, definitions)
     .then(() => {
       element.style.opacity = '1'
-      repositionAllTooltips()
+      window.dispatchEvent(new Event(REPOSITION_EVENT))
     })
     .catch(error => {
       debugConsole.error(error)

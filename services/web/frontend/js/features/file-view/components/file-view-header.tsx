@@ -2,6 +2,7 @@ import { useState, type ElementType } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 
 import { formatTime, relativeDate } from '../../utils/format-date'
+import { fileUrl } from '../../utils/fileUrl'
 import { useFileTreeData } from '@/shared/context/file-tree-data-context'
 import { useProjectContext } from '@/shared/context/project-context'
 
@@ -12,7 +13,7 @@ import { BinaryFile, hasProvider, LinkedFile } from '../types/binary-file'
 import FileViewRefreshButton from './file-view-refresh-button'
 import FileViewRefreshError from './file-view-refresh-error'
 import MaterialIcon from '@/shared/components/material-icon'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
 
 const tprFileViewInfo = importOverleafModules('tprFileViewInfo') as {
   import: { TPRFileViewInfo: ElementType }
@@ -48,7 +49,7 @@ type FileViewHeaderProps = {
 }
 
 export default function FileViewHeader({ file }: FileViewHeaderProps) {
-  const { projectId } = useProjectContext()
+  const { _id: projectId } = useProjectContext()
   const { fileTreeReadOnly } = useFileTreeData()
   const { t } = useTranslation()
 
@@ -82,7 +83,7 @@ export default function FileViewHeader({ file }: FileViewHeaderProps) {
         <OLButton
           variant="secondary"
           download={file.name}
-          href={`/project/${projectId}/blob/${file.hash}`}
+          href={fileUrl(projectId, file.id, file.hash)}
         >
           <MaterialIcon type="download" className="align-middle" />{' '}
           <span>{t('download')}</span>

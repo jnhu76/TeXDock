@@ -8,21 +8,19 @@ import {
   useState,
   useEffect,
 } from 'react'
-import { UserSettings } from '../../../../types/user-settings'
-import getMeta from '@/utils/meta'
-import customLocalStorage from '@/infrastructure/local-storage'
-import { getLegacyWriteAndCiteMigration } from '../utils/write-and-cite-settings-migration'
-import { saveUserSettings } from '@/features/editor-left-menu/utils/api'
 
-export const defaultSettings: UserSettings = {
+import { UserSettings, Keybindings } from '../../../../types/user-settings'
+import getMeta from '@/utils/meta'
+import useScopeValue from '@/shared/hooks/use-scope-value'
+import { userStyles } from '../utils/styles'
+import { canUseNewEditor } from '@/features/ide-redesign/utils/new-editor-utils'
+
+const defaultSettings: UserSettings = {
   pdfViewer: 'pdfjs',
   autoComplete: true,
   autoPairDelimiters: true,
   syntaxValidation: false,
-  previewTabs: false,
   editorTheme: 'textmate',
-  editorDarkTheme: 'overleaf_dark',
-  editorLightTheme: 'textmate',
   overallTheme: '',
   mode: 'default',
   fontSize: 12,
@@ -30,24 +28,7 @@ export const defaultSettings: UserSettings = {
   lineHeight: 'normal',
   mathPreview: true,
   referencesSearchMode: 'advanced',
-  breadcrumbs: true,
-  nonBlinkingCursor: false,
-  darkModePdf: false,
-  zotero: {
-    enabled: true,
-    groups: [],
-    disablePersonalLibrary: false,
-  },
-  mendeley: {
-    enabled: true,
-    groups: [],
-    disablePersonalLibrary: false,
-  },
-  papers: {
-    enabled: true,
-    groups: [],
-    disablePersonalLibrary: false,
-  },
+  enableNewEditor: true,
 }
 
 type UserSettingsContextValue = {
@@ -55,6 +36,15 @@ type UserSettingsContextValue = {
   setUserSettings: Dispatch<
     SetStateAction<UserSettingsContextValue['userSettings']>
   >
+}
+
+type ScopeSettings = {
+  overallTheme: 'light' | 'dark'
+  keybindings: Keybindings
+  fontSize: number
+  fontFamily: string
+  lineHeight: number
+  isNewEditor: boolean
 }
 
 export const UserSettingsContext = createContext<
@@ -68,30 +58,19 @@ export const UserSettingsProvider: FC<React.PropsWithChildren> = ({
     () => getMeta('ol-userSettings') || defaultSettings
   )
 
+  // update the global scope 'settings' value, for extensions
+  const [, setScopeSettings] = useScopeValue<ScopeSettings>('settings')
   useEffect(() => {
-    const { patch, keysToRemove } = getLegacyWriteAndCiteMigration(userSettings)
-    if (Object.keys(patch).length === 0) {
-      keysToRemove.forEach(customLocalStorage.removeItem)
-      return
-    }
-
-    Promise.all(
-      Object.entries(patch).map(([key, value]) =>
-        saveUserSettings(
-          key as keyof Pick<UserSettings, 'mendeley' | 'zotero' | 'papers'>,
-          value
-        )
-      )
-    ).then(() => {
-      setUserSettings(currentSettings => ({
-        ...currentSettings,
-        ...patch,
-      }))
-      keysToRemove.forEach(customLocalStorage.removeItem)
+    const { fontFamily, lineHeight } = userStyles(userSettings)
+    setScopeSettings({
+      overallTheme: userSettings.overallTheme === 'light-' ? 'light' : 'dark',
+      keybindings: userSettings.mode === 'none' ? 'default' : userSettings.mode,
+      fontFamily,
+      lineHeight,
+      fontSize: userSettings.fontSize,
+      isNewEditor: canUseNewEditor() && userSettings.enableNewEditor,
     })
-    // Only run once when the provider mounts
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [setScopeSettings, userSettings])
 
   const value = useMemo<UserSettingsContextValue>(
     () => ({

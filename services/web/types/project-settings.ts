@@ -1,11 +1,9 @@
 import { Brand } from './helpers/brand'
 import { OverallTheme } from '@/shared/utils/styles'
 
-export type ImageName = {
+export type AllowedImageName = {
   imageDesc: string
   imageName: string
-  allowed: boolean
-  rolling?: boolean
 }
 
 export type DocId = Brand<string, 'DocId'>
@@ -21,6 +19,7 @@ export type ProjectCompiler = 'pdflatex' | 'latex' | 'xelatex' | 'lualatex'
 
 export type OverallThemeMeta = {
   name: string
+  path: string
   val: OverallTheme
 }
 

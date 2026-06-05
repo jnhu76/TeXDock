@@ -71,6 +71,35 @@ async function getChunkForVersion(projectId, version, opts = {}) {
 }
 
 /**
+ * Get the metadata for the chunk that contains the given version before the endTime.
+ */
+async function getFirstChunkBeforeTimestamp(projectId, timestamp) {
+  assert.mongoId(projectId, 'bad projectId')
+  assert.date(timestamp, 'bad timestamp')
+
+  const recordActive = await getChunkForVersion(projectId, 0)
+  if (recordActive && recordActive.endTimestamp <= timestamp) {
+    return recordActive
+  }
+
+  // fallback to deleted chunk
+  const recordDeleted = await mongodb.chunks.findOne(
+    {
+      projectId: new ObjectId(projectId),
+      state: 'deleted',
+      startVersion: 0,
+      updatedAt: { $lte: timestamp }, // indexed for state=deleted
+      endTimestamp: { $lte: timestamp },
+    },
+    { sort: { updatedAt: -1 } }
+  )
+  if (recordDeleted) {
+    return chunkFromRecord(recordDeleted)
+  }
+  throw new Chunk.BeforeTimestampNotFoundError(projectId, timestamp)
+}
+
+/**
  * Get the metadata for the chunk that contains the version that was current at
  * the given timestamp.
  */
@@ -99,6 +128,39 @@ async function getChunkForTimestamp(projectId, timestamp) {
     return chunk
   }
 
+  return chunkFromRecord(record)
+}
+
+/**
+ * Get the metadata for the chunk that contains the version that was current before
+ * the given timestamp.
+ */
+async function getLastActiveChunkBeforeTimestamp(projectId, timestamp) {
+  assert.mongoId(projectId, 'bad projectId')
+  assert.date(timestamp, 'bad timestamp')
+
+  const record = await mongodb.chunks.findOne(
+    {
+      projectId: new ObjectId(projectId),
+      state: { $in: ['active', 'closed'] },
+      $or: [
+        {
+          endTimestamp: {
+            $lte: timestamp,
+          },
+        },
+        {
+          endTimestamp: null,
+        },
+      ],
+    },
+    // We use the index on the startVersion for sorting records. This assumes
+    // that timestamps go up with each version.
+    { sort: { startVersion: -1 } }
+  )
+  if (record == null) {
+    throw new Chunk.BeforeTimestampNotFoundError(projectId, timestamp)
+  }
   return chunkFromRecord(record)
 }
 
@@ -134,43 +196,6 @@ async function getProjectChunks(projectId) {
     )
     .sort({ startVersion: 1 })
   return await cursor.map(chunkFromRecord).toArray()
-}
-
-/**
- * Copy the data structures for a given project.
- * @param {string} sourceProjectId
- * @param {string} targetProjectId
- */
-async function clone(sourceProjectId, targetProjectId) {
-  assert.mongoId(targetProjectId, 'bad target projectId')
-  assert.mongoId(sourceProjectId, 'bad source projectId')
-
-  const cursor = mongodb.chunks.find(
-    {
-      projectId: new ObjectId(sourceProjectId),
-      state: { $in: ['active', 'closed'] },
-    },
-    { projection: { projectId: 0 } }
-  )
-
-  const chunkIds = new Map()
-  const batch = []
-  async function flushBatch() {
-    await mongodb.chunks.insertMany(batch)
-    batch.length = 0
-  }
-  for await (const chunk of cursor) {
-    const newChunkId = new ObjectId()
-    chunkIds.set(chunk._id.toString(), newChunkId.toString())
-    batch.push({
-      ...chunk,
-      _id: newChunkId,
-      projectId: new ObjectId(targetProjectId),
-    })
-    if (batch.length > 100) await flushBatch()
-  }
-  if (batch.length > 0) await flushBatch()
-  return chunkIds
 }
 
 /**
@@ -259,27 +284,6 @@ async function updateProjectRecord(
     },
     mongoOpts
   )
-}
-
-/**
- * @param {number} historyId
- * @return {Promise<string>}
- */
-async function lookupMongoProjectIdFromHistoryId(historyId) {
-  const project = await mongodb.projects.findOne(
-    // string for Object ids, number for postgres ids
-    { 'overleaf.history.id': historyId },
-    { projection: { _id: 1 } }
-  )
-  if (!project) {
-    // should not happen: We flush before allowing a project to be soft-deleted.
-    throw new OError('mongo project not found by history id', { historyId })
-  }
-  return project._id.toString()
-}
-
-async function resolveHistoryIdToMongoProjectId(projectId) {
-  return projectId
 }
 
 /**
@@ -514,8 +518,9 @@ function chunkFromRecord(record) {
 }
 
 module.exports = {
-  clone,
   getLatestChunk,
+  getFirstChunkBeforeTimestamp,
+  getLastActiveChunkBeforeTimestamp,
   getChunkForVersion,
   getChunkForTimestamp,
   getProjectChunkIds,
@@ -528,6 +533,4 @@ module.exports = {
   deleteProjectChunks,
   getOldChunksBatch,
   deleteOldChunks,
-  lookupMongoProjectIdFromHistoryId,
-  resolveHistoryIdToMongoProjectId,
 }

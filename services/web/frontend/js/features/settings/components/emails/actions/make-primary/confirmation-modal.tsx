@@ -1,13 +1,12 @@
 import { useTranslation, Trans } from 'react-i18next'
 import { MergeAndOverride } from '../../../../../../../../types/utils'
-import OLButton from '@/shared/components/ol/ol-button'
-import {
-  OLModal,
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
+} from '@/features/ui/components/ol/ol-modal'
 import { type UserEmailData } from '../../../../../../../../types/user-email'
 
 type ConfirmationModalProps = MergeAndOverride<
@@ -33,7 +32,7 @@ function ConfirmationModal({
 
   return (
     <OLModal show={show} onHide={onHide}>
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{t('confirm_primary_email_change')}</OLModalTitle>
       </OLModalHeader>
       <OLModalBody className="pb-0">

@@ -11,8 +11,7 @@ import Notification from '@/shared/components/notification'
 import { sendMB } from '@/infrastructure/event-tracking'
 
 import LeaveProjectModal from './leave-project-modal'
-import OLButton from '@/shared/components/ol/ol-button'
-import { useLocation } from '@/shared/hooks/use-location'
+import OLButton from '@/features/ui/components/ol/ol-button'
 
 function SharingUpdatesRoot() {
   const [showModal, setShowModal] = useState(false)
@@ -21,7 +20,6 @@ function SharingUpdatesRoot() {
   const { isLoading, isSuccess, isError, runAsync } = useAsync()
   const projectId = getMeta('ol-project_id')
 
-  const location = useLocation()
   const joinProject = useCallback(() => {
     sendMB('notification-click', {
       name: 'link-sharing-collaborator',
@@ -32,7 +30,7 @@ function SharingUpdatesRoot() {
         location.assign(`/project/${projectId}`)
       })
       .catch(debugConsole.error)
-  }, [runAsync, projectId, location])
+  }, [runAsync, projectId])
 
   const viewProject = useCallback(() => {
     sendMB('notification-click', {
@@ -44,7 +42,7 @@ function SharingUpdatesRoot() {
         location.assign(`/project/${projectId}`)
       })
       .catch(debugConsole.error)
-  }, [runAsync, projectId, location])
+  }, [runAsync, projectId])
 
   const leaveProject = useCallback(() => {
     sendMB('notification-click', {
@@ -56,7 +54,7 @@ function SharingUpdatesRoot() {
         location.assign('/project')
       })
       .catch(debugConsole.error)
-  }, [runAsync, projectId, location])
+  }, [runAsync, projectId])
 
   if (!isReady) {
     return null

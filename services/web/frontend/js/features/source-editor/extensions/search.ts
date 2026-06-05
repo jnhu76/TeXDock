@@ -15,7 +15,6 @@ import {
   KeyBinding,
   keymap,
   ViewPlugin,
-  ViewUpdate,
 } from '@codemirror/view'
 import {
   Annotation,
@@ -30,7 +29,6 @@ import {
 } from '@codemirror/state'
 import { sendSearchEvent } from '@/features/event-tracking/search-events'
 import { isVisual } from '@/features/source-editor/extensions/visual/visual'
-import { beforeChangeDocEffect } from '@/features/source-editor/extensions/before-change-doc'
 
 const restoreSearchQueryAnnotation = Annotation.define<boolean>()
 
@@ -112,6 +110,10 @@ const highlightSelectionMatchesExtension = highlightSelectionMatches({
   wholeWords: true,
 })
 
+// store the search query for use when switching between files
+// TODO: move this into EditorContext?
+let searchQuery: SearchQuery | null
+
 const scrollToMatch = (range: SelectionRange, view: EditorView) => {
   const coords = {
     from: view.coordsAtPos(range.from),
@@ -151,7 +153,7 @@ const searchEventKeymap: KeyBinding[] = [
 /**
  * A collection of extensions related to the search feature.
  */
-export const search = (initialSearchQuery: SearchQuery | null) => {
+export const search = () => {
   let open = false
 
   return [
@@ -193,7 +195,9 @@ export const search = (initialSearchQuery: SearchQuery | null) => {
             }
           },
           destroy() {
-            open = false
+            window.setTimeout(() => {
+              open = false // in a timeout, so the view plugin below can run its destroy method first
+            }, 0)
           },
         }
       },
@@ -201,8 +205,8 @@ export const search = (initialSearchQuery: SearchQuery | null) => {
 
     // restore a stored search and re-open the search panel
     ViewPlugin.define(view => {
-      if (initialSearchQuery) {
-        const _searchQuery = initialSearchQuery
+      if (searchQuery) {
+        const _searchQuery = searchQuery
         window.setTimeout(() => {
           openSearchPanel(view)
           view.dispatch({
@@ -213,21 +217,9 @@ export const search = (initialSearchQuery: SearchQuery | null) => {
       }
 
       return {
-        // Fire an event containing the search query before a document change
-        // so that it can be persisted for the next document
-        update(update: ViewUpdate) {
-          for (const tr of update.transactions) {
-            for (const effect of tr.effects) {
-              if (effect.is(beforeChangeDocEffect)) {
-                const searchQuery = open ? getSearchQuery(view.state) : null
-                window.dispatchEvent(
-                  new CustomEvent('search-panel-before-doc-change', {
-                    detail: searchQuery,
-                  })
-                )
-              }
-            }
-          }
+        destroy() {
+          // persist the current search query if the panel is open
+          searchQuery = open ? getSearchQuery(view.state) : null
         },
       }
     }),
@@ -249,11 +241,6 @@ export const search = (initialSearchQuery: SearchQuery | null) => {
           if (effect.is(setSearchQuery)) {
             const query = effect.value
             if (!query) return
-
-            const currentQuery = getSearchQuery(tr.startState)
-            if (currentQuery === query) {
-              return // avoiding selecting the next match when opening the search form with no selected text
-            }
 
             // The rest of this messes up searching in Vim, which is handled by
             // the Vim extension, so bail out here in Vim mode. Happily, the
@@ -301,13 +288,12 @@ export const search = (initialSearchQuery: SearchQuery | null) => {
 
 const searchFormTheme = EditorView.theme({
   '.ol-cm-search-form': {
-    '--ol-cm-search-form-gap': 'var(--spacing-05)',
-    '--ol-cm-search-form-button-margin': 'var(--spacing-02)',
-    '--input-border': 'var(--border-primary)',
-    '--input-border-focus': 'var(--border-active)',
+    '--ol-cm-search-form-gap': '10px',
+    '--ol-cm-search-form-button-margin': '3px',
     padding: 'var(--ol-cm-search-form-gap)',
     display: 'flex',
     gap: 'var(--ol-cm-search-form-gap)',
+    background: 'var(--neutral-20)',
     '--ol-cm-search-form-focus-shadow':
       'inset 0 1px 1px rgb(0 0 0 / 8%), 0 0 8px rgb(102 175 233 / 60%)',
     '--ol-cm-search-form-error-shadow':
@@ -316,6 +302,12 @@ const searchFormTheme = EditorView.theme({
     '& .form-control-sm, & .btn-sm': {
       padding: 'var(--spacing-03) var(--spacing-05)',
     },
+  },
+  '&.ol-cm-search-form': {
+    '--ol-cm-search-form-gap': 'var(--spacing-05)',
+    '--ol-cm-search-form-button-margin': 'var(--spacing-02)',
+    '--input-border': 'var(--border-primary)',
+    '--input-border-focus': 'var(--border-active)',
   },
   '.ol-cm-search-controls': {
     display: 'grid',
@@ -340,30 +332,24 @@ const searchFormTheme = EditorView.theme({
     alignItems: 'center',
   },
   '.ol-cm-search-input-group': {
-    backgroundColor: 'var(--bg-primary-themed)',
-    border: '1px solid var(--border-primary-themed)',
-    borderRadius: 'var(--border-radius-base)',
+    border: '1px solid var(--input-border)',
+    borderRadius: '20px',
+    background: 'white',
     width: '100%',
     maxWidth: '50em',
     display: 'inline-flex',
     alignItems: 'center',
-    '--input-field-color': 'var(--content-primary-themed)',
-    '--input-field-bg': 'var(--bg-primary-themed)',
-    '--input-placeholder-content': 'var(--content-placeholder-themed)',
-    '--input-field-content-disabled': 'var(--content-disabled-themed)',
     '& input[type="text"]': {
       background: 'none',
       boxShadow: 'none',
-      borderRadius: 'var(--border-radius-base)',
     },
     '& input[type="text"]:focus': {
       outline: 'none',
-      background: 'none',
       boxShadow: 'none',
     },
     '& .btn.btn': {
-      background: 'var(--bg-secondary-themed)',
-      color: 'var(--content-secondary-themed)',
+      background: 'var(--neutral-10)',
+      color: 'var(--neutral-60)',
       borderRadius: '50%',
       height: '2em',
       display: 'inline-flex',
@@ -380,10 +366,8 @@ const searchFormTheme = EditorView.theme({
       },
     },
     '&:focus-within': {
+      borderColor: 'var(--input-border-focus)',
       boxShadow: 'var(--ol-cm-search-form-focus-shadow)',
-    },
-    '& .form-control': {
-      color: 'var(--content-primary-themed)',
     },
   },
   '.ol-cm-search-input-group.ol-cm-search-input-error': {
@@ -409,8 +393,7 @@ const searchFormTheme = EditorView.theme({
   },
   '.ol-cm-search-form-position': {
     flexShrink: 0,
-    color: 'var(--content-secondary-themed)',
-    minWidth: '5em',
+    color: 'var(--content-secondary)',
   },
   '.ol-cm-search-hidden-inputs': {
     position: 'absolute',

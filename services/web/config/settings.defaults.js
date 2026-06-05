@@ -54,17 +54,12 @@ const defaultTextExtensions = [
   'clo',
   'ldf',
   'rmd',
-  'qmd',
   'lua',
-  'py',
   'gv',
   'mf',
   'yml',
   'yaml',
   'lhs',
-  'lean',
-  'lean4',
-  'hs',
   'mk',
   'xmpdata',
   'cfg',
@@ -97,6 +92,7 @@ const httpPermissionsPolicy = {
     'idle-detection',
     'local-fonts',
     'magnetometer',
+    'microphone',
     'midi',
     'otp-credentials',
     'payment',
@@ -111,11 +107,8 @@ const httpPermissionsPolicy = {
   allowed: {
     autoplay: 'self "https://videos.ctfassets.net"',
     fullscreen: 'self',
-    'on-device-speech-recognition': 'self',
   },
 }
-
-const safeCompilers = ['xelatex', 'pdflatex', 'latex', 'lualatex']
 
 module.exports = {
   env: 'server-ce',
@@ -244,13 +237,10 @@ module.exports = {
     },
     clsi: {
       url: `http://${process.env.CLSI_HOST || '127.0.0.1'}:3013`,
-      downloadHost:
-        process.env.CLSI_LB_IP || process.env.CLSI_LB_HOST
-          ? `http://${process.env.CLSI_LB_IP || process.env.CLSI_LB_HOST}:80`
-          : `http://${process.env.DOWNLOAD_HOST || '127.0.0.1'}:8080`,
+      // url: "http://#{process.env['CLSI_LB_HOST']}:3014"
       backendGroupName: undefined,
       submissionBackendClass:
-        process.env.CLSI_SUBMISSION_BACKEND_CLASS || 'c3d',
+        process.env.CLSI_SUBMISSION_BACKEND_CLASS || 'n2d',
     },
     clsiCache: {
       instances: JSON.parse(process.env.CLSI_CACHE_INSTANCES || '[]'),
@@ -268,6 +258,9 @@ module.exports = {
     realTime: {
       url: `http://${process.env.REALTIME_HOST || '127.0.0.1'}:3026`,
     },
+    contacts: {
+      url: `http://${process.env.CONTACTS_HOST || '127.0.0.1'}:3036`,
+    },
     notifications: {
       url: `http://${process.env.NOTIFICATIONS_HOST || '127.0.0.1'}:3042`,
     },
@@ -275,7 +268,7 @@ module.exports = {
       url: `http://${process.env.WEBPACK_HOST || '127.0.0.1'}:3808`,
     },
     wiki: {
-      url: process.env.WIKI_URL || 'https://learnwiki.overleaf.com',
+      url: process.env.WIKI_URL || 'https://learn.sharelatex.com',
       maxCacheAge: parseInt(process.env.WIKI_MAX_CACHE_AGE || 5 * minutes, 10),
     },
 
@@ -329,10 +322,6 @@ module.exports = {
   // that are sent out, generated links, etc.
   siteUrl: (siteUrl = process.env.PUBLIC_URL || 'http://127.0.0.1:3000'),
 
-  isCodeSpace: process.env.IS_CODE_SPACE === 'true',
-  isDevEnv: process.env.NODE_ENV === 'development',
-  isCI: process.env.NODE_ENV === 'test',
-
   lockManager: {
     lockTestInterval: intFromEnv('LOCK_MANAGER_LOCK_TEST_INTERVAL', 50),
     maxTestInterval: intFromEnv('LOCK_MANAGER_MAX_TEST_INTERVAL', 1000),
@@ -381,9 +370,6 @@ module.exports = {
     preservePath: process.env.MULTER_PRESERVE_PATH,
   },
 
-  notifyOnSystemMessageChanges:
-    process.env.NOTIFY_ON_SYSTEM_MESSAGE_CHANGES === 'true',
-
   // start failing the health check if active handles exceeds this limit
   maxActiveHandles: process.env.MAX_ACTIVE_HANDLES
     ? parseInt(process.env.MAX_ACTIVE_HANDLES, 10)
@@ -401,7 +387,6 @@ module.exports = {
   adminUrl: process.env.ADMIN_URL,
   adminOnlyLogin: process.env.ADMIN_ONLY_LOGIN === 'true',
   adminPrivilegeAvailable: process.env.ADMIN_PRIVILEGE_AVAILABLE === 'true',
-  adminRolesEnabled: false,
   blockCrossOriginRequests: process.env.BLOCK_CROSS_ORIGIN_REQUESTS === 'true',
   allowedOrigins: (process.env.ALLOWED_ORIGINS || siteUrl).split(','),
 
@@ -426,33 +411,8 @@ module.exports = {
 
   // featuresEpoch: 'YYYY-MM-DD',
 
-  personalAccessTokens: {
-    expiry: {
-      warningWindowDays: intFromEnv(
-        'PERSONAL_ACCESS_TOKEN_WARNING_WINDOW_DAYS',
-        2
-      ),
-    },
-  },
-
   features: {
     personal: defaultFeatures,
-  },
-
-  aiFeatures: {
-    freeQuota: 'free',
-    standardQuota: 'standard',
-    basicQuota: 'basic',
-    unlimitedQuota: 'unlimited',
-  },
-
-  quotaGrants: {
-    ai: {
-      free: 0,
-      basic: 0,
-      standard: 0,
-      unlimited: 0,
-    },
   },
 
   groupPlanModalOptions: {
@@ -471,13 +431,6 @@ module.exports = {
   ],
 
   disableChat: process.env.OVERLEAF_DISABLE_CHAT === 'true',
-  disableLinkSharing: process.env.OVERLEAF_DISABLE_LINK_SHARING === 'true',
-  safeCompilers,
-  defaultLatexCompiler: safeCompilers.includes(
-    process.env.DEFAULT_LATEX_COMPILER
-  )
-    ? process.env.DEFAULT_LATEX_COMPILER
-    : 'pdflatex',
   enableSubscriptions: false,
   restrictedCountries: [],
   enableOnboardingEmails: process.env.ENABLE_ONBOARDING_EMAILS === 'true',
@@ -485,6 +438,9 @@ module.exports = {
   enabledLinkedFileTypes: (process.env.ENABLED_LINKED_FILE_TYPES || '').split(
     ','
   ),
+
+  filestoreMigrationLevel:
+    parseInt(process.env.OVERLEAF_FILESTORE_MIGRATION_LEVEL, 10) || 0,
 
   // i18n
   // ------
@@ -704,8 +660,7 @@ module.exports = {
   // If you are running Overleaf behind a proxy (like Apache, Nginx, etc)
   // then set this to true to allow it to correctly detect the forwarded IP
   // address and http/https protocol information.
-  behindProxy: true,
-  trustedProxyIps: process.env.TRUSTED_PROXY_IPS || 'loopback',
+  behindProxy: false,
 
   // Delay before closing the http server upon receiving a SIGTERM process signal.
   gracefulShutdownDelayInMs:
@@ -753,33 +708,17 @@ module.exports = {
 
   primary_email_check_expiration: 1000 * 60 * 60 * 24 * 90, // 90 days
 
-  userHardDeletionDelay:
-    parseInt(process.env.OVERLEAF_USER_HARD_DELETION_DELAY, 10) ||
-    1000 * 60 * 60 * 24 * 90, // 90 days
-  projectHardDeletionDelay:
-    parseInt(process.env.OVERLEAF_PROJECT_HARD_DELETION_DELAY, 10) ||
-    1000 * 60 * 60 * 24 * 90, // 90 days
-
-  // Maximum Delay before sending comment mention notifications
-  notificationMaxDelay:
-    parseInt(process.env.COMMENT_MENTION_DELAY_MS) || 30 * 60 * 1000, // 30 minutes
-
-  // Comment mention notifications will wait at least this long before being sent
-  notificationMinDelay:
-    parseInt(process.env.COMMENT_MENTION_DELAY_MS) || 10 * 60 * 1000, // 10 minutes
-
   // Maximum JSON size in HTTP requests
   // We should be able to process twice the max doc length, to allow for
   //   - the doc content
   //   - text ranges spanning the whole doc
   //
-  // There's also overhead required for the JSON encoding and the UTF-8
-  // encoding, theoretically up to 6 times the max doc length (e.g. a document
-  // entirely filled with "\u0011" characters). On the other hand, we don't want
-  // to block the event loop with JSON parsing, so we try to find a practical
-  // compromise.
+  // There's also overhead required for the JSON encoding and the UTF-8 encoding,
+  // theoretically up to 3 times the max doc length. On the other hand, we don't
+  // want to block the event loop with JSON parsing, so we try to find a
+  // practical compromise.
   max_json_request_size:
-    parseInt(process.env.MAX_JSON_REQUEST_SIZE) || 12 * 1024 * 1024, // 12 MB
+    parseInt(process.env.MAX_JSON_REQUEST_SIZE) || 6 * 1024 * 1024, // 6 MB
 
   // Internal configs
   // ----------------
@@ -808,7 +747,12 @@ module.exports = {
   // some basic smoke tests to check the core functionality.
   //
   smokeTest: {
+    user: process.env.SMOKE_TEST_USER,
     userId: process.env.SMOKE_TEST_USER_ID,
+    password: process.env.SMOKE_TEST_PASSWORD,
+    projectId: process.env.SMOKE_TEST_PROJECT_ID,
+    rateLimitSubject: process.env.SMOKE_TEST_RATE_LIMIT_SUBJECT || '127.0.0.1',
+    stepTimeout: parseInt(process.env.SMOKE_TEST_STEP_TIMEOUT || '10000', 10),
   },
 
   appName: process.env.APP_NAME || 'Overleaf (Community Edition)',
@@ -826,7 +770,8 @@ module.exports = {
 
     right_footer: [
       {
-        text: '<a href="https://github.com/overleaf/overleaf">Fork on GitHub!</a>',
+        text: "<i class='fa fa-github-square'></i> Fork on GitHub!",
+        url: 'https://github.com/overleaf/overleaf',
       },
     ],
 
@@ -864,10 +809,7 @@ module.exports = {
     '/templates/index': '/templates/',
   },
 
-  enablePugCache: process.env.ENABLE_PUG_CACHE === 'true',
-  reloadModuleViewsOnEachRequest:
-    process.env.ENABLE_PUG_CACHE !== 'true' &&
-    process.env.NODE_ENV === 'development',
+  reloadModuleViewsOnEachRequest: process.env.NODE_ENV === 'development',
 
   rateLimit: {
     subnetRateLimiterDisabled:
@@ -954,7 +896,6 @@ module.exports = {
           'figcaption',
           'span',
           'source',
-          'track',
           'video',
           'del',
         ],
@@ -980,7 +921,7 @@ module.exports = {
           col: ['width'],
           figure: ['class', 'id', 'style'],
           figcaption: ['class', 'id', 'style'],
-          i: ['aria-hidden', 'aria-label', 'class', 'id', 'translate'],
+          i: ['aria-hidden', 'aria-label', 'class', 'id'],
           iframe: [
             'allowfullscreen',
             'frameborder',
@@ -1005,7 +946,6 @@ module.exports = {
             'style',
           ],
           tr: ['class'],
-          track: ['src', 'kind', 'srcLang', 'label'],
           video: ['alt', 'class', 'controls', 'height', 'width'],
         },
       },
@@ -1026,10 +966,9 @@ module.exports = {
     tprFileViewRefreshButton: [],
     tprFileViewNotOriginalImporter: [],
     contactUsModal: [],
+    editorToolbarButtons: [],
     sourceEditorExtensions: [],
-    sourceEditorMarkdownExtensions: [],
     sourceEditorComponents: [],
-    pdfLogEntryHeaderActionComponents: [],
     pdfLogEntryComponents: [],
     pdfLogEntriesComponents: [],
     pdfPreviewPromotions: [],
@@ -1037,10 +976,7 @@ module.exports = {
     sourceEditorCompletionSources: [],
     sourceEditorSymbolPalette: [],
     sourceEditorToolbarComponents: [],
-    sourceEditorToolbarEndButtons: [],
-    rootContextProviders: [],
     mainEditorLayoutModals: [],
-    mainEditorLayoutPanels: [],
     langFeedbackLinkingWidgets: [],
     labsExperiments: [],
     integrationLinkingWidgets: [],
@@ -1049,54 +985,22 @@ module.exports = {
     importProjectFromGithubMenu: [],
     editorLeftMenuSync: [],
     editorLeftMenuManageTemplate: [],
-    menubarExtraComponents: [],
     oauth2Server: [],
     managedGroupSubscriptionEnrollmentNotification: [],
     managedGroupEnrollmentInvite: [],
     ssoCertificateInfo: [],
     v1ImportDataScreen: [],
     snapshotUtils: [],
-    visualEditorProviders: [],
     usGovBanner: [],
-    rollingBuildsUpdatedAlert: [],
     offlineModeToolbarButtons: [],
     settingsEntries: [],
     autoCompleteExtensions: [],
     sectionTitleGenerators: [],
-    toastGenerators: [
-      Path.resolve(
-        __dirname,
-        '../frontend/js/features/pdf-preview/components/synctex-toasts'
-      ),
-    ],
-    editorSidebarComponents: [
-      Path.resolve(
-        __dirname,
-        '../modules/full-project-search/frontend/js/components/full-project-search.tsx'
-      ),
-    ],
-    fileTreeToolbarComponents: [
-      Path.resolve(
-        __dirname,
-        '../modules/full-project-search/frontend/js/components/full-project-search-button.tsx'
-      ),
-    ],
-    fullProjectSearchPanel: [
-      Path.resolve(
-        __dirname,
-        '../modules/full-project-search/frontend/js/components/full-project-search.tsx'
-      ),
-    ],
+    toastGenerators: [],
+    editorSidebarComponents: [],
+    fileTreeToolbarComponents: [],
     integrationPanelComponents: [],
     referenceSearchSetting: [],
-    settingsModalEditorTabSections: [],
-    settingsModalSpellcheckSections: [],
-    errorLogsComponents: [],
-    referenceIndices: [],
-    railEntries: [],
-    railPopovers: [],
-    railActions: [],
-    railModals: [],
   },
 
   moduleImportSequence: [
@@ -1130,8 +1034,6 @@ module.exports = {
   managedUsers: {
     enabled: false,
   },
-
-  enablePandocConversions: process.env.ENABLE_PANDOC_CONVERSIONS === 'true',
 }
 
 module.exports.mergeWith = function (overrides) {

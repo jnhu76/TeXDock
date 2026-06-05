@@ -5,23 +5,14 @@ const rclient = require('@overleaf/redis-wrapper').createClient(
   Settings.redis.documentupdater
 )
 const keys = Settings.redis.documentupdater.key_schema
-const { fetchJson, fetchNothing } = require('@overleaf/fetch-utils')
-const { setTimeout } = require('node:timers/promises')
+const request = require('request').defaults({ jar: false })
+const async = require('async')
 
 const rclientSub = require('@overleaf/redis-wrapper').createClient(
   Settings.redis.pubsub
 )
 rclientSub.subscribe('applied-ops')
 rclientSub.setMaxListeners(0)
-
-function getPendingUpdateListKey() {
-  const shard = _.random(0, Settings.dispatcherCount - 1)
-  if (shard === 0) {
-    return 'pending-updates-list'
-  } else {
-    return `pending-updates-list-${shard}`
-  }
-}
 
 module.exports = DocUpdaterClient = {
   randomId() {
@@ -32,177 +23,224 @@ module.exports = DocUpdaterClient = {
     return str
   },
 
-  subscribeToAppliedOps(messageHandler) {
-    rclientSub.on('message', messageHandler)
+  subscribeToAppliedOps(callback) {
+    rclientSub.on('message', callback)
   },
 
-  async sendUpdate(projectId, docId, update) {
-    const docKey = `${projectId}:${docId}`
-    await rclient.rpush(
+  _getPendingUpdateListKey() {
+    const shard = _.random(0, Settings.dispatcherCount - 1)
+    if (shard === 0) {
+      return 'pending-updates-list'
+    } else {
+      return `pending-updates-list-${shard}`
+    }
+  },
+
+  sendUpdate(projectId, docId, update, callback) {
+    rclient.rpush(
       keys.pendingUpdates({ doc_id: docId }),
-      JSON.stringify(update)
-    )
-    await rclient.sadd('DocsWithPendingUpdates', docKey)
-    await rclient.rpush(getPendingUpdateListKey(), docKey)
-  },
+      JSON.stringify(update),
+      error => {
+        if (error) {
+          return callback(error)
+        }
+        const docKey = `${projectId}:${docId}`
+        rclient.sadd('DocsWithPendingUpdates', docKey, error => {
+          if (error) {
+            return callback(error)
+          }
 
-  async sendUpdates(projectId, docId, updates) {
-    await DocUpdaterClient.preloadDoc(projectId, docId)
-    for (const update of updates) {
-      await DocUpdaterClient.sendUpdate(projectId, docId, update)
-    }
-    await DocUpdaterClient.waitForPendingUpdates(docId)
-  },
-
-  async waitForPendingUpdates(docId) {
-    const maxRetries = 30
-    const retryInterval = 100
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const length = await rclient.llen(keys.pendingUpdates({ doc_id: docId }))
-
-      if (length === 0) {
-        return // Success - no pending updates
+          rclient.rpush(
+            DocUpdaterClient._getPendingUpdateListKey(),
+            docKey,
+            callback
+          )
+        })
       }
+    )
+  },
 
-      if (attempt < maxRetries - 1) {
-        await setTimeout(retryInterval)
+  sendUpdates(projectId, docId, updates, callback) {
+    DocUpdaterClient.preloadDoc(projectId, docId, error => {
+      if (error) {
+        return callback(error)
       }
-    }
-    throw new Error('updates still pending after maximum retries')
+      const jobs = updates.map(update => callback => {
+        DocUpdaterClient.sendUpdate(projectId, docId, update, callback)
+      })
+      async.series(jobs, err => {
+        if (err) {
+          return callback(err)
+        }
+        DocUpdaterClient.waitForPendingUpdates(projectId, docId, callback)
+      })
+    })
   },
 
-  async getDoc(projectId, docId) {
-    return await fetchJson(
-      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}`
+  waitForPendingUpdates(projectId, docId, callback) {
+    async.retry(
+      { times: 30, interval: 100 },
+      cb =>
+        rclient.llen(keys.pendingUpdates({ doc_id: docId }), (err, length) => {
+          if (err) {
+            return cb(err)
+          }
+          if (length > 0) {
+            cb(new Error('updates still pending'))
+          } else {
+            cb()
+          }
+        }),
+      callback
     )
   },
 
-  async getDocAndRecentOps(projectId, docId, fromVersion) {
-    return await fetchJson(
-      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}?fromVersion=${fromVersion}`
-    )
-  },
-
-  async getProjectLastUpdatedAt(projectId) {
-    return await fetchJson(
-      `http://127.0.0.1:3003/project/${projectId}/last_updated_at`
-    )
-  },
-
-  async preloadDoc(projectId, docId) {
-    await DocUpdaterClient.getDoc(projectId, docId)
-  },
-
-  async peekDoc(projectId, docId) {
-    return await fetchJson(
-      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/peek`
-    )
-  },
-
-  async flushDoc(projectId, docId) {
-    return await fetchNothing(
-      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/flush`,
-      { method: 'POST' }
-    )
-  },
-
-  async setDocLines(projectId, docId, lines, source, userId, undoing) {
-    return await fetchJson(
+  getDoc(projectId, docId, callback) {
+    request.get(
       `http://127.0.0.1:3003/project/${projectId}/doc/${docId}`,
+      (error, res, body) => {
+        if (body != null && res.statusCode >= 200 && res.statusCode < 300) {
+          body = JSON.parse(body)
+        }
+        callback(error, res, body)
+      }
+    )
+  },
+
+  getDocAndRecentOps(projectId, docId, fromVersion, callback) {
+    request.get(
+      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}?fromVersion=${fromVersion}`,
+      (error, res, body) => {
+        if (body != null && res.statusCode >= 200 && res.statusCode < 300) {
+          body = JSON.parse(body)
+        }
+        callback(error, res, body)
+      }
+    )
+  },
+
+  getProjectLastUpdatedAt(projectId, callback) {
+    request.get(
+      `http://127.0.0.1:3003/project/${projectId}/last_updated_at`,
+      (error, res, body) => {
+        if (body != null && res.statusCode >= 200 && res.statusCode < 300) {
+          body = JSON.parse(body)
+        }
+        callback(error, res, body)
+      }
+    )
+  },
+
+  preloadDoc(projectId, docId, callback) {
+    DocUpdaterClient.getDoc(projectId, docId, callback)
+  },
+
+  peekDoc(projectId, docId, callback) {
+    request.get(
+      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/peek`,
+      (error, res, body) => {
+        if (body != null && res.statusCode >= 200 && res.statusCode < 300) {
+          body = JSON.parse(body)
+        }
+        callback(error, res, body)
+      }
+    )
+  },
+
+  flushDoc(projectId, docId, callback) {
+    request.post(
+      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/flush`,
+      (error, res, body) => callback(error, res, body)
+    )
+  },
+
+  setDocLines(projectId, docId, lines, source, userId, undoing, callback) {
+    request.post(
       {
-        method: 'POST',
+        url: `http://127.0.0.1:3003/project/${projectId}/doc/${docId}`,
         json: {
           lines,
           source,
           user_id: userId,
           undoing,
         },
-      }
+      },
+      (error, res, body) => callback(error, res, body)
     )
   },
 
-  async deleteDoc(projectId, docId) {
-    return await fetchNothing(
+  deleteDoc(projectId, docId, callback) {
+    request.del(
       `http://127.0.0.1:3003/project/${projectId}/doc/${docId}`,
-      { method: 'DELETE' }
+      (error, res, body) => callback(error, res, body)
     )
   },
 
-  async flushProject(projectId) {
-    return await fetchNothing(
-      `http://127.0.0.1:3003/project/${projectId}/flush`,
-      {
-        method: 'POST',
-      }
-    )
+  flushProject(projectId, callback) {
+    request.post(`http://127.0.0.1:3003/project/${projectId}/flush`, callback)
   },
 
-  async deleteProject(projectId) {
-    return await fetchNothing(`http://127.0.0.1:3003/project/${projectId}`, {
-      method: 'DELETE',
-    })
+  deleteProject(projectId, callback) {
+    request.del(`http://127.0.0.1:3003/project/${projectId}`, callback)
   },
 
-  async deleteProjectOnShutdown(projectId) {
-    return await fetchNothing(
+  deleteProjectOnShutdown(projectId, callback) {
+    request.del(
       `http://127.0.0.1:3003/project/${projectId}?background=true&shutdown=true`,
-      {
-        method: 'DELETE',
-      }
+      callback
     )
   },
 
-  async flushOldProjects() {
-    await fetchNothing(
-      'http://127.0.0.1:3003/flush_queued_projects?min_delete_age=1'
+  flushOldProjects(callback) {
+    request.get(
+      'http://127.0.0.1:3003/flush_queued_projects?min_delete_age=1',
+      callback
     )
   },
 
-  async acceptChange(projectId, docId, changeId) {
-    await fetchNothing(
+  acceptChange(projectId, docId, changeId, callback) {
+    request.post(
       `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/change/${changeId}/accept`,
-      { method: 'POST' }
+      callback
     )
   },
 
-  async acceptChanges(projectId, docId, changeIds) {
-    await fetchNothing(
-      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/change/accept`,
+  acceptChanges(projectId, docId, changeIds, callback) {
+    request.post(
       {
-        method: 'POST',
+        url: `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/change/accept`,
         json: { change_ids: changeIds },
-      }
+      },
+      callback
     )
   },
 
-  async rejectChanges(projectId, docId, changeIds, userId) {
-    return await fetchJson(
-      `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/change/reject`,
-      {
-        method: 'POST',
-        json: { change_ids: changeIds, user_id: userId },
-      }
-    )
-  },
-
-  async removeComment(projectId, docId, comment) {
-    await fetchNothing(
+  removeComment(projectId, docId, comment, callback) {
+    request.del(
       `http://127.0.0.1:3003/project/${projectId}/doc/${docId}/comment/${comment}`,
-      { method: 'DELETE' }
+      callback
     )
   },
 
-  async getProjectDocs(projectId, projectStateHash) {
-    return await fetchJson(
-      `http://127.0.0.1:3003/project/${projectId}/doc?state=${projectStateHash}`
+  getProjectDocs(projectId, projectStateHash, callback) {
+    request.get(
+      `http://127.0.0.1:3003/project/${projectId}/doc?state=${projectStateHash}`,
+      (error, res, body) => {
+        if (body != null && res.statusCode >= 200 && res.statusCode < 300) {
+          body = JSON.parse(body)
+        }
+        callback(error, res, body)
+      }
     )
   },
 
-  async sendProjectUpdate(projectId, userId, updates, version) {
-    await fetchNothing(`http://127.0.0.1:3003/project/${projectId}`, {
-      method: 'POST',
-      json: { userId, updates, version },
-    })
+  sendProjectUpdate(projectId, userId, updates, version, callback) {
+    request.post(
+      {
+        url: `http://127.0.0.1:3003/project/${projectId}`,
+        json: { userId, updates, version },
+      },
+      (error, res, body) => callback(error, res, body)
+    )
   },
 }

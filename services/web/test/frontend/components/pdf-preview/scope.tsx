@@ -6,6 +6,7 @@ export const mockScope = () => ({
     pdfViewer: 'pdfjs',
   },
   editor: {
+    open_doc_name: 'main.tex',
     sharejs_doc: {
       doc_id: 'test-doc',
       getSnapshot: () => 'some doc content',
@@ -14,5 +15,10 @@ export const mockScope = () => ({
     view: new EditorView({
       doc: '\\documentclass{article}',
     }),
+  },
+  hasLintingError: false,
+  ui: {
+    view: 'editor',
+    pdfLayout: 'sideBySide',
   },
 })

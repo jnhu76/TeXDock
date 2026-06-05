@@ -11,17 +11,17 @@
  * @license MIT
  */
 
-import { URL } from 'node:url'
-import http from 'node:http'
-import https from 'node:https'
-import { spawn } from 'node:child_process'
-import fs from 'node:fs'
+const { URL } = require('node:url')
+const spawn = require('node:child_process').spawn
+const fs = require('node:fs')
 
-export const XMLHttpRequest = function () {
+exports.XMLHttpRequest = function () {
   /**
    * Private variables
    */
   const self = this
+  const http = require('node:http')
+  const https = require('node:https')
 
   // Holds http.js objects
   let request

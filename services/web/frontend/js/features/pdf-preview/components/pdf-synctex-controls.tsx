@@ -3,15 +3,13 @@ import { memo, useCallback, useMemo } from 'react'
 import { useDetachCompileContext as useCompileContext } from '../../../shared/context/detach-compile-context'
 import { useLayoutContext } from '../../../shared/context/layout-context'
 import { useTranslation } from 'react-i18next'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
-import OLButton from '@/shared/components/ol/ol-button'
+import * as eventTracking from '../../../infrastructure/event-tracking'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import MaterialIcon from '@/shared/components/material-icon'
+import { Spinner } from 'react-bootstrap'
 import { Placement } from 'react-bootstrap/types'
 import useSynctex from '../hooks/use-synctex'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
-import OLSpinner from '@/shared/components/ol/ol-spinner'
-import { sendMB } from '@/infrastructure/event-tracking'
-import { useCommandProvider } from '@/features/ide-react/hooks/use-command-provider'
 
 const GoToCodeButton = memo(function GoToCodeButton({
   syncToCode,
@@ -23,31 +21,15 @@ const GoToCodeButton = memo(function GoToCodeButton({
   isDetachLayout?: boolean
 }) {
   const { t } = useTranslation()
-  useCommandProvider(
-    () => [
-      {
-        id: 'synctex-sync-to-code',
-        handler: () => {
-          sendMB('jump-to-location', {
-            method: 'command',
-            direction: 'pdf-location-in-code',
-          })
-          syncToCode({ visualOffset: 72 })
-        },
-        disabled: syncToCodeInFlight,
-        label: t('go_to_pdf_location_in_code_action'),
-      },
-    ],
-    [t, syncToCode, syncToCodeInFlight]
-  )
-
   const buttonClasses = classNames('synctex-control', {
     'detach-synctex-control': !!isDetachLayout,
   })
 
   let buttonIcon = null
   if (syncToCodeInFlight) {
-    buttonIcon = <OLSpinner size="sm" />
+    buttonIcon = (
+      <Spinner animation="border" aria-hidden="true" size="sm" role="status" />
+    )
   } else if (!isDetachLayout) {
     buttonIcon = (
       <MaterialIcon type="arrow_left_alt" className="synctex-control-icon" />
@@ -55,9 +37,9 @@ const GoToCodeButton = memo(function GoToCodeButton({
   }
 
   const syncToCodeWithButton = useCallback(() => {
-    sendMB('jump-to-location', {
-      method: 'arrow',
+    eventTracking.sendMB('jump-to-location', {
       direction: 'pdf-location-in-code',
+      method: 'arrow',
     })
     syncToCode({ visualOffset: 72 })
   }, [syncToCode])
@@ -109,35 +91,11 @@ const GoToPdfButton = memo(function GoToPdfButton({
     'detach-synctex-control': !!isDetachLayout,
   })
 
-  const handleSyncToPdf = useCallback(() => {
-    sendMB('jump-to-location', {
-      method: 'arrow',
-      direction: 'code-location-in-pdf',
-    })
-    syncToPdf()
-  }, [syncToPdf])
-
-  useCommandProvider(
-    () => [
-      {
-        id: 'synctex-sync-to-pdf',
-        handler: () => {
-          sendMB('jump-to-location', {
-            method: 'command',
-            direction: 'code-location-in-pdf',
-          })
-          syncToPdf()
-        },
-        label: t('go_to_code_location_in_pdf'),
-        disabled: syncToPdfInFlight || !canSyncToPdf,
-      },
-    ],
-    [t, syncToPdf, syncToPdfInFlight, canSyncToPdf]
-  )
-
   let buttonIcon = null
   if (syncToPdfInFlight) {
-    buttonIcon = <OLSpinner size="sm" />
+    buttonIcon = (
+      <Spinner animation="border" aria-hidden="true" size="sm" role="status" />
+    )
   } else if (!isDetachLayout) {
     buttonIcon = (
       <MaterialIcon type="arrow_right_alt" className="synctex-control-icon" />
@@ -154,7 +112,7 @@ const GoToPdfButton = memo(function GoToPdfButton({
         <OLButton
           variant="secondary"
           size="sm"
-          onClick={handleSyncToPdf}
+          onClick={syncToPdf}
           disabled={syncToPdfInFlight || !canSyncToPdf}
           className={buttonClasses}
           aria-label={t('go_to_code_location_in_pdf')}
@@ -177,11 +135,6 @@ function PdfSynctexControls() {
     syncToPdfInFlight,
     canSyncToPdf,
   } = useSynctex()
-  const visualPreviewEnabled = useFeatureFlag('visual-preview')
-
-  if (visualPreviewEnabled) {
-    return null
-  }
 
   if (!position) {
     return null

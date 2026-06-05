@@ -1,6 +1,5 @@
 import { syntaxTree } from '@codemirror/language'
 import {
-  ChangeSet,
   EditorSelection,
   Prec,
   StateEffect,
@@ -14,16 +13,9 @@ import {
   ViewPlugin,
   WidgetType,
 } from '@codemirror/view'
-import {
-  undo,
-  redo,
-  invertedEffects,
-  isolateHistory,
-} from '@codemirror/commands'
 import { CodeMirror, Vim, getCM } from '@replit/codemirror-vim'
 
 export default {
-  ChangeSet,
   Decoration,
   EditorSelection,
   EditorView,
@@ -35,10 +27,6 @@ export default {
   hoverTooltip,
   keymap,
   syntaxTree,
-  undo,
-  redo,
-  invertedEffects,
-  isolateHistory,
 }
 
 export const CodeMirrorVim = {

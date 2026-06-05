@@ -1,8 +1,8 @@
-function PapersLogo({ size = 40 }: { size?: number }) {
+function PapersLogo() {
   return (
     <svg
-      width={size * (47 / 48)}
-      height={size}
+      width="39"
+      height="40"
       viewBox="0 0 47 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"

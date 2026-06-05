@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { PaidSubscription } from '../../../../../../../types/subscription/dashboard/subscription'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
 
 export function ExpiredSubscription({
   subscription,
@@ -22,12 +22,7 @@ export function ExpiredSubscription({
         >
           {t('view_your_invoices')}
         </OLButton>
-        <OLButton
-          // We need to send users to the public plans page because the
-          // choose-your-plan still redirects them away in this expired state
-          href="/user/subscription/plans"
-          variant="primary"
-        >
+        <OLButton href="/user/subscription/plans" variant="primary">
           {t('create_new_subscription')}
         </OLButton>
       </p>

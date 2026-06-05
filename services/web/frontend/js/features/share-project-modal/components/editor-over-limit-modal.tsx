@@ -3,17 +3,14 @@ import EditorOverLimitModalContent from './editor-over-limit-modal-content'
 import customLocalStorage from '@/infrastructure/local-storage'
 import { useProjectContext } from '@/shared/context/project-context'
 import { useEditorContext } from '@/shared/context/editor-context'
-import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
 import { sendMB } from '@/infrastructure/event-tracking'
-import { OLModal } from '@/shared/components/ol/ol-modal'
+import OLModal from '@/features/ui/components/ol/ol-modal'
 
 const EditorOverLimitModal = () => {
   const [show, setShow] = useState(false)
 
-  const { isProjectOwner } = useEditorContext()
-  const { permissionsLevel } = useIdeReactContext()
-  const { project, features, projectId } = useProjectContext()
-  const members = project?.members
+  const { isProjectOwner, permissionsLevel } = useEditorContext()
+  const { members, features, _id: projectId } = useProjectContext()
 
   const handleHide = () => {
     setShow(false)
@@ -25,12 +22,7 @@ const EditorOverLimitModal = () => {
   useEffect(() => {
     const showModalCooldownHours = 24
     const hasExceededCollaboratorLimit = () => {
-      if (
-        isProjectOwner ||
-        !features ||
-        !members ||
-        permissionsLevel === 'readOnly'
-      ) {
+      if (isProjectOwner || !features || permissionsLevel === 'readOnly') {
         return false
       }
 

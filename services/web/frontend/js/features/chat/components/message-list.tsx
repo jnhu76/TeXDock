@@ -1,11 +1,10 @@
 import moment from 'moment'
+import Message from './message'
 import type { Message as MessageType } from '@/features/chat/context/chat-context'
+import MessageRedesign from '@/features/ide-redesign/components/chat/message'
 import { useUserContext } from '@/shared/context/user-context'
-import { User } from '../../../../../types/user'
-import MessageGroup from '@/features/chat/components/message-group'
 
 const FIVE_MINUTES = 5 * 60 * 1000
-const TIMESTAMP_GROUP_SIZE = FIVE_MINUTES
 
 function formatTimestamp(date: moment.MomentInput) {
   if (!date) {
@@ -18,52 +17,16 @@ function formatTimestamp(date: moment.MomentInput) {
 interface MessageListProps {
   messages: MessageType[]
   resetUnreadMessages(...args: unknown[]): unknown
+  newDesign?: boolean
 }
 
-type MessageGroupType = {
-  messages: MessageType[]
-  id: string
-  user?: User
-}
-
-// Group messages by the same author that were sent within 5 minutes of each
-// other
-function groupMessages(messages: MessageType[]) {
-  const groups: MessageGroupType[] = []
-  let currentGroup: MessageGroupType | null = null
-  let previousMessage: MessageType | null = null
-
-  for (const message of messages) {
-    if (message.deleted) {
-      continue
-    }
-    if (
-      currentGroup &&
-      previousMessage &&
-      !message.pending &&
-      message.user &&
-      message.user.id &&
-      message.user.id === previousMessage.user?.id &&
-      message.timestamp - previousMessage.timestamp < TIMESTAMP_GROUP_SIZE
-    ) {
-      currentGroup.messages.push(message)
-    } else {
-      currentGroup = {
-        messages: [message],
-        id: String(message.timestamp),
-        user: message.user,
-      }
-      groups.push(currentGroup)
-    }
-    previousMessage = message
-  }
-
-  return groups
-}
-
-function MessageList({ messages, resetUnreadMessages }: MessageListProps) {
+function MessageList({
+  messages,
+  resetUnreadMessages,
+  newDesign,
+}: MessageListProps) {
   const user = useUserContext()
-
+  const MessageComponent = newDesign ? MessageRedesign : Message
   function shouldRenderDate(messageIndex: number) {
     if (messageIndex === 0) {
       return true
@@ -78,8 +41,6 @@ function MessageList({ messages, resetUnreadMessages }: MessageListProps) {
     }
   }
 
-  const messageGroups = groupMessages(messages)
-
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <ul
@@ -87,25 +48,25 @@ function MessageList({ messages, resetUnreadMessages }: MessageListProps) {
       onClick={resetUnreadMessages}
       onKeyDown={resetUnreadMessages}
     >
-      {messageGroups.map((group, index) => (
-        <li key={group.id} className="message">
+      {messages.map((message, index) => (
+        // new messages are added to the beginning of the list, so we use a reversed index
+        <li key={message.id} className="message">
           {shouldRenderDate(index) && (
             <div className="date">
               <time
                 dateTime={
-                  group.messages[0].timestamp
-                    ? moment(group.messages[0].timestamp).format()
+                  message.timestamp
+                    ? moment(message.timestamp).format()
                     : undefined
                 }
               >
-                {formatTimestamp(group.messages[0].timestamp)}
+                {formatTimestamp(message.timestamp)}
               </time>
             </div>
           )}
-          <MessageGroup
-            messages={group.messages}
-            user={group.user}
-            fromSelf={user ? group.user?.id === user.id : false}
+          <MessageComponent
+            message={message}
+            fromSelf={message.user ? message.user.id === user.id : false}
           />
         </li>
       ))}

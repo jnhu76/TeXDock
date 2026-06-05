@@ -1,8 +1,4 @@
-extends ../layout-website-redesign
-include ../_mixins/material_symbol
-
-block vars
-	- isWebsiteRedesign = true
+extends ../layout-marketing
 
 block content
 	main.content#main-content
@@ -10,8 +6,8 @@ block content
 			.row
 				.col-md-8.offset-md-2.text-center
 					.page-header
-						h1 #{translate("restricted_no_permission")}
+						h2 #{translate("restricted_no_permission")}
 					p
-						a.inline-material-symbols(href="/")
-							+material-symbol("arrow_left_alt")
-							| #{translate("take_me_home")}
+						span.inline-material-symbols
+							a.material-symbols(href="/", aria-hidden="true") arrow_left_alt
+							a(href="/") #{translate("take_me_home")}

@@ -1,16 +1,16 @@
-import Crypto from 'node:crypto'
 import OError from '@overleaf/o-error'
 import request from './request.js'
 import settings from '@overleaf/settings'
-import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
-import { User as UserModel } from '../../../../app/src/models/User.mjs'
-import UserUpdater from '../../../../app/src/Features/User/UserUpdater.mjs'
-import AuthenticationManager from '../../../../app/src/Features/Authentication/AuthenticationManager.mjs'
+import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.js'
+import { User as UserModel } from '../../../../app/src/models/User.js'
+import UserUpdater from '../../../../app/src/Features/User/UserUpdater.js'
+import AuthenticationManager from '../../../../app/src/Features/Authentication/AuthenticationManager.js'
 import { promisifyClass } from '@overleaf/promise-utils'
 import fs from 'node:fs'
 import Path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Cookie } from 'tough-cookie'
-
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const COOKIE_DOMAIN = settings.cookieDomain
 // The cookie domain has a leading '.' but the cookie jar stores it without.
 const DEFAULT_COOKIE_URL = `https://${COOKIE_DOMAIN.replace(/^\./, '')}/`
@@ -37,8 +37,6 @@ class User {
       jar: this.jar,
     })
     this.signUpDate = options.signUpDate ?? new Date()
-    this.labsProgram = options.labsProgram || false
-    this.analyticsId = options.analyticsId || Crypto.randomUUID()
   }
 
   getSession(options, callback) {
@@ -98,6 +96,37 @@ class User {
         }
       )
     })
+  }
+
+  getSplitTestAssignment(splitTestName, query, callback) {
+    if (!callback) {
+      callback = query
+    }
+    const params = new URLSearchParams({
+      splitTestName,
+      ...query,
+    }).toString()
+    this.request.get(
+      {
+        url: `/dev/split_test/get_assignment?${params}`,
+      },
+      (err, response, body) => {
+        if (err != null) {
+          return callback(err)
+        }
+        if (response.statusCode !== 200) {
+          return callback(
+            new Error(
+              `get split test assignment failed: status=${
+                response.statusCode
+              } body=${JSON.stringify(body)}`
+            )
+          )
+        }
+        const assignment = JSON.parse(response.body)
+        callback(null, assignment)
+      }
+    )
   }
 
   doSessionMaintenance(callback) {
@@ -220,7 +249,6 @@ class User {
     this.first_name = user.first_name
     this.referal_id = user.referal_id
     this.enrollment = user.enrollment
-    this.analyticsId = user.analyticsId
   }
 
   get(callback) {
@@ -229,21 +257,13 @@ class User {
 
   getAuditLog(callback) {
     this.get((error, user) => {
-      if (error) {
-        return callback(error)
-      }
-      if (!user) {
-        return callback(new Error('User not found'))
-      }
+      if (error) return callback(error)
+      if (!user) return callback(new Error('User not found'))
 
       db.userAuditLogEntries
         .find({ userId: new ObjectId(this._id) })
-        // Explicitly sort in ascending chronological order
-        .sort({ timestamp: 1 })
         .toArray((error, auditLog) => {
-          if (error) {
-            return callback(error)
-          }
+          if (error) return callback(error)
           callback(null, auditLog || [])
         })
     })
@@ -251,9 +271,7 @@ class User {
 
   getAuditLogWithoutNoise(callback) {
     this.getAuditLog((error, auditLog) => {
-      if (error) {
-        return callback(error)
-      }
+      if (error) return callback(error)
       callback(
         null,
         auditLog.filter(entry => {
@@ -395,9 +413,7 @@ class User {
   }
 
   ensureUserExists(callback) {
-    if (this._id) {
-      return callback()
-    } // already exists
+    if (this._id) return callback() // already exists
     const filter = { email: this.email }
     const options = { upsert: true, new: true, setDefaultsOnInsert: true }
 
@@ -415,8 +431,6 @@ class User {
               hashedPassword,
               emails: this.emails,
               signUpDate: this.signUpDate,
-              labsProgram: this.labsProgram,
-              analyticsId: this.analyticsId,
             },
           },
           options
@@ -433,9 +447,7 @@ class User {
   // Update and persist feature upgrade. Downgrades will be flaky!
   upgradeFeatures(features, callback) {
     this.setFeatures(features, err => {
-      if (err) {
-        return callback(err)
-      }
+      if (err) return callback(err)
       // Persist the feature update, otherwise the next feature refresh will reset them.
       this.setFeaturesOverride(
         {
@@ -552,8 +564,10 @@ class User {
     this.mongoUpdate({ $set: { isAdmin: true } }, callback)
   }
 
-  ensureAdminRole(role, callback) {
-    this.mongoUpdate({ $addToSet: { adminRoles: role } }, callback)
+  ensureStaffAccess(flag, callback) {
+    const update = { $set: {} }
+    update.$set[`staffAccess.${flag}`] = true
+    this.mongoUpdate(update, callback)
   }
 
   upgradeSomeFeatures(callback) {
@@ -820,7 +834,7 @@ class User {
     callback
   ) {
     const fileStream = fs.createReadStream(
-      Path.resolve(Path.join(import.meta.dirname, '..', '..', 'files', file))
+      Path.resolve(Path.join(__dirname, '..', '..', 'files', file))
     )
 
     this.request.post(
@@ -1181,9 +1195,7 @@ class User {
           json: newSettings,
         },
         (err, response, body) => {
-          if (err) {
-            return callback(err)
-          }
+          if (err) return callback(err)
           if (response.statusCode !== 200) {
             return callback(
               new Error(
@@ -1317,31 +1329,6 @@ User.promises.prototype.doRequest = async function (method, params) {
       }
     })
   })
-}
-
-User.promises.prototype.getSplitTestAssignment = async function (
-  splitTestName,
-  query,
-  referer,
-  includeReferer
-) {
-  const params = new URLSearchParams({
-    splitTestName,
-    includeReferer,
-    ...query,
-  }).toString()
-  const { response, body } = await this.doRequest('GET', {
-    url: `/dev/split_test/get_assignment?${params}`,
-    headers: { referer },
-  })
-  if (response.statusCode !== 200) {
-    throw new Error(
-      `get split test assignment failed: status=${
-        response.statusCode
-      } body=${JSON.stringify(body)}`
-    )
-  }
-  return JSON.parse(response.body)
 }
 
 export default User

@@ -84,14 +84,15 @@ describe('<SubscriptionDashboard />', function () {
   })
 
   it('Show a warning when coming from plans page', function () {
-    window.history.pushState({}, '', '?hasSubscription=true')
+    renderWithSubscriptionDashContext(<SubscriptionDashboard />, {
+      metaTags: [
+        {
+          name: 'ol-fromPlansPage',
+          value: true,
+        },
+      ],
+    })
 
-    try {
-      renderWithSubscriptionDashContext(<SubscriptionDashboard />)
-
-      screen.getByText('You already have a subscription')
-    } finally {
-      window.history.replaceState({}, '', window.location.pathname)
-    }
+    screen.getByText('You already have a subscription')
   })
 })

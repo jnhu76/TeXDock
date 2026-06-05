@@ -1,5 +1,3 @@
-// @ts-check
-
 const config = require('config')
 const redis = require('@overleaf/redis-wrapper')
 
@@ -13,14 +11,9 @@ async function disconnect() {
   await Promise.all([rclientHistory.disconnect(), rclientLock.disconnect()])
 }
 
-async function cleanupTestRedis() {
-  await redis.cleanupTestRedis(rclientHistory)
-}
-
 module.exports = {
   rclientHistory,
   rclientLock,
   redis,
   disconnect,
-  cleanupTestRedis,
 }

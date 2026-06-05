@@ -8,7 +8,7 @@ describe('<NewsletterSection />', function () {
     render(<NewsletterSection />)
 
     const link = screen.getByRole('link', {
-      name: 'Manage newsletter preferences',
+      name: 'Manage Your Newsletter Preferences',
     })
 
     expect(link.getAttribute('href')).to.equal('/user/email-preferences')

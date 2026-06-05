@@ -1,12 +1,22 @@
-import mongodb from 'mongodb-legacy'
-import { expect } from 'chai'
-import DocstoreApp from './helpers/DocstoreApp.js'
-import DocstoreClient from './helpers/DocstoreClient.js'
+/* eslint-disable
+    no-unused-vars,
+*/
+// TODO: This file was created by bulk-decaffeinate.
+// Fix any style issues and re-enable lint.
+/*
+ * decaffeinate suggestions:
+ * DS102: Remove unnecessary code created because of implicit returns
+ * DS207: Consider shorter variations of null checks
+ * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
+ */
+const sinon = require('sinon')
+const { ObjectId } = require('mongodb-legacy')
+const DocstoreApp = require('./helpers/DocstoreApp')
 
-const { ObjectId } = mongodb
+const DocstoreClient = require('./helpers/DocstoreClient')
 
 describe('Getting a doc', function () {
-  beforeEach(async function () {
+  beforeEach(function (done) {
     this.project_id = new ObjectId()
     this.doc_id = new ObjectId()
     this.lines = ['original', 'lines']
@@ -18,84 +28,110 @@ describe('Getting a doc', function () {
           op: { i: 'foo', p: 3 },
           meta: {
             user_id: new ObjectId().toString(),
-            ts: new Date().toJSON(),
-          },
-        },
-      ],
-      comments: [
-        {
-          id: new ObjectId().toString(),
-          op: { c: 'comment', p: 1, t: new ObjectId().toString() },
-          metadata: {
-            user_id: new ObjectId().toString(),
-            ts: new Date().toJSON(),
+            ts: new Date().toString(),
           },
         },
       ],
     }
-    this.fixedRanges = {
-      ...this.ranges,
-      comments: [
-        { ...this.ranges.comments[0], id: this.ranges.comments[0].op.t },
-      ],
-    }
-    await DocstoreApp.ensureRunning()
-    await DocstoreClient.createDoc(
-      this.project_id,
-      this.doc_id,
-      this.lines,
-      this.version,
-      this.ranges
-    )
+    return DocstoreApp.ensureRunning(() => {
+      return DocstoreClient.createDoc(
+        this.project_id,
+        this.doc_id,
+        this.lines,
+        this.version,
+        this.ranges,
+        error => {
+          if (error != null) {
+            throw error
+          }
+          return done()
+        }
+      )
+    })
   })
 
   describe('when the doc exists', function () {
-    it('should get the doc lines and version', async function () {
-      const doc = await DocstoreClient.getDoc(this.project_id, this.doc_id)
-      doc.lines.should.deep.equal(this.lines)
-      doc.version.should.equal(this.version)
-      doc.ranges.should.deep.equal(this.fixedRanges)
+    return it('should get the doc lines and version', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.lines)
+          doc.version.should.equal(this.version)
+          doc.ranges.should.deep.equal(this.ranges)
+          return done()
+        }
+      )
     })
   })
 
   describe('when the doc does not exist', function () {
-    it('should return a 404', async function () {
+    return it('should return a 404', function (done) {
       const missingDocId = new ObjectId()
-      await expect(DocstoreClient.getDoc(this.project_id, missingDocId))
-        .to.eventually.be.rejected.and.have.property('info')
-        .to.contain({ status: 404 })
+      return DocstoreClient.getDoc(
+        this.project_id,
+        missingDocId,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          res.statusCode.should.equal(404)
+          return done()
+        }
+      )
     })
   })
 
-  describe('when the doc is a deleted doc', function () {
-    beforeEach(async function () {
+  return describe('when the doc is a deleted doc', function () {
+    beforeEach(function (done) {
       this.deleted_doc_id = new ObjectId()
-      await DocstoreClient.createDoc(
+      return DocstoreClient.createDoc(
         this.project_id,
         this.deleted_doc_id,
         this.lines,
         this.version,
-        this.ranges
+        this.ranges,
+        error => {
+          if (error != null) {
+            throw error
+          }
+          return DocstoreClient.deleteDoc(
+            this.project_id,
+            this.deleted_doc_id,
+            done
+          )
+        }
       )
-      await DocstoreClient.deleteDoc(this.project_id, this.deleted_doc_id)
     })
 
-    it('should return the doc', async function () {
-      const doc = await DocstoreClient.getDoc(
+    it('should return the doc', function (done) {
+      return DocstoreClient.getDoc(
         this.project_id,
         this.deleted_doc_id,
-        { include_deleted: true }
+        { include_deleted: true },
+        (error, res, doc) => {
+          if (error) return done(error)
+          doc.lines.should.deep.equal(this.lines)
+          doc.version.should.equal(this.version)
+          doc.ranges.should.deep.equal(this.ranges)
+          doc.deleted.should.equal(true)
+          return done()
+        }
       )
-      doc.lines.should.deep.equal(this.lines)
-      doc.version.should.equal(this.version)
-      doc.ranges.should.deep.equal(this.fixedRanges)
-      doc.deleted.should.equal(true)
     })
 
-    it('should return a 404 when the query string is not set', async function () {
-      await expect(DocstoreClient.getDoc(this.project_id, this.deleted_doc_id))
-        .to.eventually.be.rejected.and.have.property('info')
-        .to.contain({ status: 404 })
+    return it('should return a 404 when the query string is not set', function (done) {
+      return DocstoreClient.getDoc(
+        this.project_id,
+        this.deleted_doc_id,
+        {},
+        (error, res, doc) => {
+          if (error) return done(error)
+          res.statusCode.should.equal(404)
+          return done()
+        }
+      )
     })
   })
 })

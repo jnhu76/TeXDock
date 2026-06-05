@@ -1,6 +1,7 @@
-import metrics from '@overleaf/metrics'
-import logger from '@overleaf/logger'
-import os from 'node:os'
+const metrics = require('@overleaf/metrics')
+const logger = require('@overleaf/logger')
+
+const os = require('node:os')
 const HOST = os.hostname()
 const PID = process.pid
 let COUNT = 0
@@ -8,7 +9,7 @@ let COUNT = 0
 const CHANNEL_MANAGER = {} // hash of event checkers by channel name
 const CHANNEL_ERROR = {} // error status by channel name
 
-export default class HealthCheckManager {
+module.exports = class HealthCheckManager {
   // create an instance of this class which checks that an event with a unique
   // id is received only once within a timeout
   constructor(channel, timeout) {

@@ -1,9 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 mkdir -p /var/lib/overleaf/data
-chown www-data:www-data /var/lib/overleaf
 chown www-data:www-data /var/lib/overleaf/data
+
+if [[ "${OVERLEAF_FILESTORE_MIGRATION_LEVEL:-0}" != "2" ]]; then
+  mkdir -p /var/lib/overleaf/data/user_files
+  chown www-data:www-data /var/lib/overleaf/data/user_files
+fi
 
 mkdir -p /var/lib/overleaf/data/compiles
 chown www-data:www-data /var/lib/overleaf/data/compiles

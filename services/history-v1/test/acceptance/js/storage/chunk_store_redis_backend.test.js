@@ -470,8 +470,10 @@ describe('chunk buffer Redis backend', function () {
       expect(result.status).to.equal('ok')
       expect(result.changes).to.be.an('array').with.lengthOf(2)
 
-      expect(result.changes[0]).to.deep.equal(change2)
-      expect(result.changes[1]).to.deep.equal(change3)
+      // The changes array should contain the raw changes
+      // Note: We're comparing raw objects, not the Change instances
+      expect(result.changes[0]).to.deep.equal(change2.toRaw())
+      expect(result.changes[1]).to.deep.equal(change3.toRaw())
     })
 
     it('should return all changes when requested version is earliest available', async function () {
@@ -501,9 +503,9 @@ describe('chunk buffer Redis backend', function () {
 
       expect(result.status).to.equal('ok')
       expect(result.changes).to.be.an('array').with.lengthOf(3)
-      expect(result.changes[0]).to.deep.equal(change1)
-      expect(result.changes[1]).to.deep.equal(change2)
-      expect(result.changes[2]).to.deep.equal(change3)
+      expect(result.changes[0]).to.deep.equal(change1.toRaw())
+      expect(result.changes[1]).to.deep.equal(change2.toRaw())
+      expect(result.changes[2]).to.deep.equal(change3.toRaw())
     })
   })
 
@@ -539,28 +541,10 @@ describe('chunk buffer Redis backend', function () {
         expect(nonPersistedChanges).to.deep.equal(changes)
       })
 
-      it('should return part of the changes following a given base version if requested', async function () {
+      it('should return part of the changes if requested', async function () {
         const nonPersistedChanges = await redisBackend.getNonPersistedChanges(
           projectId,
           3
-        )
-        expect(nonPersistedChanges).to.deep.equal(changes.slice(1))
-      })
-
-      it('should limit the number of changes returned if requested', async function () {
-        const nonPersistedChanges = await redisBackend.getNonPersistedChanges(
-          projectId,
-          2,
-          { maxChanges: 2 }
-        )
-        expect(nonPersistedChanges).to.deep.equal(changes.slice(0, 2))
-      })
-
-      it('should return all changes if limit is not reached', async function () {
-        const nonPersistedChanges = await redisBackend.getNonPersistedChanges(
-          projectId,
-          3,
-          { maxChanges: 10 }
         )
         expect(nonPersistedChanges).to.deep.equal(changes.slice(1))
       })
@@ -715,8 +699,6 @@ describe('chunk buffer Redis backend', function () {
   })
 
   describe('setPersistedVersion', function () {
-    const persistTime = Date.now() + 60 * 1000 // 1 minute from now
-
     it('should return not_found when project does not exist', async function () {
       const result = await redisBackend.setPersistedVersion(projectId, 5)
       expect(result).to.equal('not_found')
@@ -727,40 +709,14 @@ describe('chunk buffer Redis backend', function () {
         await setupState(projectId, {
           headVersion: 5,
           persistedVersion: null,
-          persistTime,
           changes: 5,
         })
       })
 
       it('should set the persisted version', async function () {
-        const status = await redisBackend.setPersistedVersion(projectId, 3)
-        expect(status).to.equal('ok')
+        await redisBackend.setPersistedVersion(projectId, 3)
         const state = await redisBackend.getState(projectId)
         expect(state.persistedVersion).to.equal(3)
-      })
-
-      it('should leave the persist time if the persisted version is not current', async function () {
-        const status = await redisBackend.setPersistedVersion(projectId, 3)
-        expect(status).to.equal('ok')
-        const state = await redisBackend.getState(projectId)
-        expect(state.persistTime).to.deep.equal(persistTime) // Persist time should remain unchanged
-      })
-
-      it('should refuse to set a persisted version greater than the head version', async function () {
-        await expect(
-          redisBackend.setPersistedVersion(projectId, 10)
-        ).to.be.rejectedWith(VersionOutOfBoundsError)
-        // Ensure persisted version remains unchanged
-        const state = await redisBackend.getState(projectId)
-        expect(state.persistedVersion).to.be.null
-      })
-
-      it('should clear the persist time when the persisted version is current', async function () {
-        const status = await redisBackend.setPersistedVersion(projectId, 5)
-        expect(status).to.equal('ok')
-        const state = await redisBackend.getState(projectId)
-        expect(state.persistedVersion).to.equal(5)
-        expect(state.persistTime).to.be.null // Persist time should be cleared
       })
     })
 
@@ -769,46 +725,18 @@ describe('chunk buffer Redis backend', function () {
         await setupState(projectId, {
           headVersion: 5,
           persistedVersion: 3,
-          persistTime,
           changes: 5,
         })
       })
 
       it('should set the persisted version', async function () {
-        const status = await redisBackend.setPersistedVersion(projectId, 5)
-        expect(status).to.equal('ok')
+        await redisBackend.setPersistedVersion(projectId, 5)
         const state = await redisBackend.getState(projectId)
         expect(state.persistedVersion).to.equal(5)
-      })
-
-      it('should clear the persist time when the persisted version is current', async function () {
-        const status = await redisBackend.setPersistedVersion(projectId, 5)
-        expect(status).to.equal('ok')
-        const state = await redisBackend.getState(projectId)
-        expect(state.persistedVersion).to.equal(5)
-        expect(state.persistTime).to.be.null // Persist time should be cleared
-      })
-
-      it('should leave the persist time if the persisted version is not current', async function () {
-        const status = await redisBackend.setPersistedVersion(projectId, 4)
-        expect(status).to.equal('ok')
-        const state = await redisBackend.getState(projectId)
-        expect(state.persistedVersion).to.equal(4)
-        expect(state.persistTime).to.deep.equal(persistTime) // Persist time should remain unchanged
       })
 
       it('should not decrease the persisted version', async function () {
-        const status = await redisBackend.setPersistedVersion(projectId, 2)
-        expect(status).to.equal('too_low')
-        const state = await redisBackend.getState(projectId)
-        expect(state.persistedVersion).to.equal(3)
-      })
-
-      it('should refuse to set a persisted version greater than the head version', async function () {
-        await expect(
-          redisBackend.setPersistedVersion(projectId, 10)
-        ).to.be.rejectedWith(VersionOutOfBoundsError)
-        // Ensure persisted version remains unchanged
+        await redisBackend.setPersistedVersion(projectId, 2)
         const state = await redisBackend.getState(projectId)
         expect(state.persistedVersion).to.equal(3)
       })
@@ -1204,43 +1132,6 @@ describe('chunk buffer Redis backend', function () {
       expect(state.expireTime).to.equal(newTimestamp)
     })
   })
-
-  describe('hardDeleteProject', function () {
-    it('should delete all keys associated with the project', async function () {
-      // Setup project state
-      await setupState(projectId, {
-        headVersion: 5,
-        headSnapshot: new Snapshot(),
-        persistedVersion: 3,
-        persistTime: Date.now(),
-        expireTime: Date.now() + 3600 * 1000, // 1 hour from now
-        changes: 5,
-      })
-
-      // Verify that state exists before deletion
-      let state = await redisBackend.getState(projectId)
-      expect(state.headVersion).to.equal(5)
-
-      // Call hardDeleteProject
-      const result = await redisBackend.hardDeleteProject(projectId)
-      expect(result).to.equal('ok')
-
-      // Verify that all keys are deleted
-      state = await redisBackend.getState(projectId)
-      expect(state.headVersion).to.be.null
-      expect(state.headSnapshot).to.be.null
-      expect(state.persistedVersion).to.be.null
-      expect(state.persistTime).to.be.null
-      expect(state.expireTime).to.be.null
-      expect(state.changes).to.be.an('array').that.is.empty
-    })
-
-    it('should not throw an error if the project does not exist', async function () {
-      // Call hardDeleteProject on a non-existent project
-      const result = await redisBackend.hardDeleteProject(projectId)
-      expect(result).to.equal('ok')
-    })
-  })
 })
 
 async function queueChanges(projectId, changes, opts = {}) {
@@ -1270,33 +1161,19 @@ function makeChange() {
  * @param {string} projectId
  * @param {object} params
  * @param {number} params.headVersion
- * @param {Snapshot} [params.headSnapshot]
  * @param {number | null} params.persistedVersion
- * @param {number | null} params.persistTime - time when the project should be persisted
- * @param {number | null} params.expireTime - time when the project should expire
  * @param {number} params.changes - number of changes to create
  * @return {Promise<Change[]>} dummy changes that have been created
  */
 async function setupState(projectId, params) {
   await rclient.set(keySchema.headVersion({ projectId }), params.headVersion)
-  if (params.headSnapshot) {
-    await rclient.set(
-      keySchema.head({ projectId }),
-      JSON.stringify(params.headSnapshot.toRaw())
-    )
-  }
   if (params.persistedVersion) {
     await rclient.set(
       keySchema.persistedVersion({ projectId }),
       params.persistedVersion
     )
   }
-  if (params.persistTime) {
-    await rclient.set(keySchema.persistTime({ projectId }), params.persistTime)
-  }
-  if (params.expireTime) {
-    await rclient.set(keySchema.expireTime({ projectId }), params.expireTime)
-  }
+
   const changes = []
   for (let i = 1; i <= params.changes; i++) {
     const change = new Change(

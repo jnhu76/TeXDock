@@ -7,7 +7,7 @@ export const ProjectListOwnerName = memo<{ ownerName: string }>(
 
     const x = ownerName === 'You' ? t('you') : ownerName
 
-    return <span translate="no"> — {t('owned_by_x', { x })}</span>
+    return <> — {t('owned_by_x', { x })}</>
   }
 )
 ProjectListOwnerName.displayName = 'ProjectListOwnerName'

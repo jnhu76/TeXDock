@@ -33,7 +33,7 @@ describe('<RenameProjectModal />', function () {
     )
     screen.getByText('Rename Project')
     const input = screen.getByRole('textbox', {
-      name: /New name/i,
+      name: 'New Name',
     }) as HTMLInputElement
     expect(input.value).to.equal(currentProjects[0].name)
 
@@ -80,7 +80,7 @@ describe('<RenameProjectModal />', function () {
       />
     )
     screen.getByText('Rename Project')
-    const input = screen.getByLabelText(/New name/i) as HTMLButtonElement
+    const input = screen.getByLabelText('New Name') as HTMLButtonElement
     expect(input.value).to.equal(currentProjects[0].name)
 
     fireEvent.change(input, {

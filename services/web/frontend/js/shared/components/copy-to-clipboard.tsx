@@ -1,17 +1,14 @@
 import { memo, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import OLButton from '@/shared/components/ol/ol-button'
-import OLTooltip from '@/shared/components/ol/ol-tooltip'
-import OLIconButton from '@/shared/components/ol/ol-icon-button'
-import MaterialIcon from '@/shared/components/material-icon'
+import OLButton from '@/features/ui/components/ol/ol-button'
+import OLTooltip from '@/features/ui/components/ol/ol-tooltip'
+import OLIconButton from '@/features/ui/components/ol/ol-icon-button'
 
 export const CopyToClipboard = memo<{
   content: string
   tooltipId: string
-  kind?: 'text' | 'icon' | 'button'
-  unfilled?: boolean
-  onClick?: () => void
-}>(({ content, tooltipId, kind = 'icon', unfilled = false, onClick }) => {
+  kind?: 'text' | 'icon'
+}>(({ content, tooltipId, kind = 'icon' }) => {
   const { t } = useTranslation()
 
   const [copied, setCopied] = useState(false)
@@ -23,10 +20,7 @@ export const CopyToClipboard = memo<{
         setCopied(false)
       }, 1500)
     })
-    if (onClick) {
-      onClick()
-    }
-  }, [content, onClick])
+  }, [content])
 
   if (!navigator.clipboard?.writeText) {
     return null
@@ -47,20 +41,6 @@ export const CopyToClipboard = memo<{
         >
           {t('copy')}
         </OLButton>
-      ) : kind === 'button' ? (
-        <OLButton
-          onClick={handleClick}
-          size="sm"
-          variant="ghost"
-          className="copy-button copy-button-ghost"
-        >
-          {copied ? (
-            <MaterialIcon type="check" />
-          ) : (
-            <MaterialIcon type="content_copy" unfilled />
-          )}
-          {t('copy')}
-        </OLButton>
       ) : (
         <OLIconButton
           onClick={handleClick}
@@ -69,7 +49,6 @@ export const CopyToClipboard = memo<{
           accessibilityLabel={t('copy')}
           className="copy-button"
           icon={copied ? 'check' : 'content_copy'}
-          unfilled={unfilled}
         />
       )}
     </OLTooltip>

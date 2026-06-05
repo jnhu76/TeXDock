@@ -10,7 +10,7 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import ProjectDetailsHandler from './ProjectDetailsHandler.mjs'
+import ProjectDetailsHandler from './ProjectDetailsHandler.js'
 
 import logger from '@overleaf/logger'
 

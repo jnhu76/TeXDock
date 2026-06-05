@@ -4,9 +4,9 @@ import Path from 'node:path'
 import cheerio from 'cheerio'
 // checkSanitizeOptions is only used in dev env
 // eslint-disable-next-line import/no-extraneous-dependencies
-import * as prettier from 'prettier'
+import prettier from 'prettier'
 import sanitizeHtml from 'sanitize-html'
-import { sanitizeOptions } from '../../../modules/learn/app/src/sanitizeOptions.mjs'
+import { sanitizeOptions } from '../../../modules/learn/app/src/sanitizeOptions.js'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = Path.dirname(fileURLToPath(import.meta.url))

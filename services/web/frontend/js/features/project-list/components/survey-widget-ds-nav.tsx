@@ -1,7 +1,7 @@
 import usePersistedState from '../../../shared/hooks/use-persisted-state'
 import getMeta from '../../../utils/meta'
 import { useCallback } from 'react'
-import OLButton from '@/shared/components/ol/ol-button'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import { useTranslation } from 'react-i18next'
 import { X } from '@phosphor-icons/react'
 
@@ -22,12 +22,12 @@ export function SurveyWidgetDsNav() {
   }
 
   return (
-    <aside className="user-notifications" aria-label={t('feedback')}>
+    <div className="user-notifications">
       <div className="notification-entry">
         <div role="alert" className="survey-notification">
           <div className="notification-body">
-            <p className="fw-bold fs-6 pe-4">{survey.title}</p>
-            <p>{survey.text}</p>
+            <p className="fw-bold fs-6 pe-4">{survey.preText}</p>
+            <p>{survey.linkText}</p>
             <OLButton
               variant="secondary"
               size="sm"
@@ -35,7 +35,7 @@ export function SurveyWidgetDsNav() {
               target="_blank"
               rel="noreferrer noopener"
             >
-              {survey.cta || t('take_survey')}
+              {t('take_survey')}
             </OLButton>
           </div>
           <OLButton
@@ -48,6 +48,6 @@ export function SurveyWidgetDsNav() {
           </OLButton>
         </div>
       </div>
-    </aside>
+    </div>
   )
 }

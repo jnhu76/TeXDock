@@ -24,7 +24,6 @@ function mountDropDownComponent(user: User, subscriptionId: string) {
       <DropdownButton
         user={user}
         openOffboardingModalForUser={sinon.stub()}
-        openRemoveModalForUser={sinon.stub()}
         openUnlinkUserModal={sinon.stub()}
         groupId={subscriptionId}
         setGroupUserAlert={sinon.stub()}
@@ -175,7 +174,6 @@ describe('DropdownButton', function () {
       beforeEach(function () {
         cy.window().then(win => {
           win.metaAttributesCache.set('ol-users', [user])
-          win.metaAttributesCache.set('ol-isUserGroupManager', true)
         })
         mountDropDownComponent(user, subscriptionId)
       })
@@ -191,7 +189,6 @@ describe('DropdownButton', function () {
         cy.findByRole('button', { name: /actions/i }).click()
 
         cy.findByTestId('delete-user-action').should('be.visible')
-        cy.findByTestId('release-user-action')
 
         cy.findByTestId('remove-user-action').should('not.exist')
         cy.findByTestId('resend-managed-user-invite-action').should('not.exist')
@@ -210,7 +207,6 @@ describe('DropdownButton', function () {
         last_active_at: new Date(),
         enrollment: {},
         isEntityAdmin: undefined,
-        isEntityMember: true,
       }
 
       beforeEach(function () {
@@ -452,7 +448,6 @@ describe('DropdownButton', function () {
           ],
         },
         isEntityAdmin: undefined,
-        isEntityMember: true,
       }
 
       beforeEach(function () {
@@ -495,7 +490,6 @@ describe('DropdownButton', function () {
           sso: [],
         },
         isEntityAdmin: undefined,
-        isEntityMember: true,
       }
 
       beforeEach(function () {
@@ -545,7 +539,6 @@ describe('DropdownButton', function () {
           ],
         },
         isEntityAdmin: true,
-        isEntityMember: true,
       }
 
       beforeEach(function () {
@@ -573,7 +566,6 @@ describe('DropdownButton', function () {
         cy.findByTestId('unlink-user-action').should('be.visible')
 
         cy.findByTestId('delete-user-action').should('not.exist')
-        cy.findByTestId('release-user-action').should('not.exist')
         cy.findByTestId('resend-sso-link-invite-action').should('not.exist')
         cy.findByTestId('no-actions-available').should('not.exist')
       })
@@ -591,7 +583,6 @@ describe('DropdownButton', function () {
           sso: [],
         },
         isEntityAdmin: true,
-        isEntityMember: true,
       }
 
       beforeEach(function () {
@@ -617,7 +608,6 @@ describe('DropdownButton', function () {
         )
         cy.findByTestId('remove-user-action').should('be.visible')
         cy.findByTestId('delete-user-action').should('not.exist')
-        cy.findByTestId('release-user-action').should('not.exist')
         cy.findByTestId('resend-sso-link-invite-action').should('exist')
 
         cy.findByTestId('no-actions-available').should('not.exist')
@@ -643,7 +633,6 @@ describe('DropdownButton', function () {
       beforeEach(function () {
         cy.window().then(win => {
           win.metaAttributesCache.set('ol-users', [user])
-          win.metaAttributesCache.set('ol-isUserGroupManager', true)
         })
         mountDropDownComponent(user, subscriptionId)
       })
@@ -659,7 +648,6 @@ describe('DropdownButton', function () {
         cy.findByRole('button', { name: /actions/i }).click()
 
         cy.findByTestId('delete-user-action').should('be.visible')
-        cy.findByTestId('release-user-action')
 
         cy.findByTestId('remove-user-action').should('not.exist')
         cy.findByTestId('resend-managed-user-invite-action').should('not.exist')
@@ -694,7 +682,6 @@ describe('DropdownButton', function () {
       beforeEach(function () {
         cy.window().then(win => {
           win.metaAttributesCache.set('ol-users', [user])
-          win.metaAttributesCache.set('ol-isUserGroupManager', true)
         })
         mountDropDownComponent(user, subscriptionId)
       })
@@ -710,7 +697,6 @@ describe('DropdownButton', function () {
         cy.findByRole('button', { name: /actions/i }).click()
 
         cy.findByTestId('delete-user-action').should('be.visible')
-        cy.findByTestId('release-user-action')
 
         cy.findByTestId('remove-user-action').should('not.exist')
         cy.findByTestId('resend-managed-user-invite-action').should('not.exist')
@@ -759,7 +745,6 @@ describe('DropdownButton', function () {
         cy.findByTestId('resend-managed-user-invite-action').should('not.exist')
         cy.findByTestId('remove-user-action').should('not.exist')
         cy.findByTestId('delete-user-action').should('not.exist')
-        cy.findByTestId('release-user-action').should('not.exist')
         cy.findByTestId('no-actions-available').should('not.exist')
       })
     })
@@ -808,7 +793,6 @@ describe('DropdownButton', function () {
 
         cy.findByTestId('no-actions-available').should('not.exist')
         cy.findByTestId('delete-user-action').should('not.exist')
-        cy.findByTestId('release-user-action').should('not.exist')
         cy.findByTestId('remove-user-action').should('not.exist')
         cy.findByTestId('resend-managed-user-invite-action').should('not.exist')
         cy.findByTestId('resend-sso-link-invite-action').should('not.exist')

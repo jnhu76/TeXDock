@@ -1,37 +1,26 @@
-import metrics from '@overleaf/metrics'
-import logger from '@overleaf/logger'
-import settings from '@overleaf/settings'
-import WebsocketController from './WebsocketController.js'
-import HttpController from './HttpController.js'
-import HttpApiController from './HttpApiController.js'
-import WebsocketAddressManager from './WebsocketAddressManager.js'
-import bodyParser from 'body-parser'
-import base64id from 'base64id'
-import Errors from './Errors.js'
-import { z, zz } from '@overleaf/validation-tools'
-import { isZodErrorLike } from 'zod-validation-error'
-import os from 'node:os'
+const metrics = require('@overleaf/metrics')
+const logger = require('@overleaf/logger')
+const settings = require('@overleaf/settings')
+const WebsocketController = require('./WebsocketController')
+const HttpController = require('./HttpController')
+const HttpApiController = require('./HttpApiController')
+const WebsocketAddressManager = require('./WebsocketAddressManager')
+const bodyParser = require('body-parser')
+const base64id = require('base64id')
+const { UnexpectedArgumentsError } = require('./Errors')
+const Joi = require('joi')
 
-const { UnexpectedArgumentsError } = Errors
-
-const HOSTNAME = os.hostname()
+const HOSTNAME = require('node:os').hostname()
 const SERVER_PING_INTERVAL = 15000
 const SERVER_PING_LATENCY_THRESHOLD = 5000
 
-const joinDocSchema = z.object({
-  doc_id: zz.objectId(),
-  fromVersion: z.number().int().optional(),
-  options: z.object(),
-})
-
-const applyOtUpdateSchema = z.object({
-  doc_id: zz.objectId(),
-  update: z.object(),
-})
+const JOI_OBJECT_ID = Joi.string()
+  .required()
+  .regex(/^[0-9a-f]{24}$/)
+  .message('invalid id')
 
 let Router
-
-export default Router = {
+module.exports = Router = {
   _handleError(callback, error, client, method, attrs) {
     attrs = attrs || {}
     for (const key of ['project_id', 'user_id']) {
@@ -40,11 +29,11 @@ export default Router = {
     attrs.client_id = client.id
     attrs.err = error
     attrs.method = method
-    if (attrs.validation && isZodErrorLike(error)) {
+    if (Joi.isError(error)) {
       logger.info(attrs, 'validation error')
       let message = 'invalid'
       try {
-        message = error.issues[0].message
+        message = error.details[0].message
       } catch (e) {
         // ignore unexpected errors
         logger.warn({ error, e }, 'unexpected validation error')
@@ -204,7 +193,7 @@ export default Router = {
 
       if (!isDebugging) {
         try {
-          zz.objectId().parse(projectId)
+          Joi.assert(projectId, JOI_OBJECT_ID)
         } catch (error) {
           metrics.inc('socket-io.connection', 1, {
             status: client.transport,
@@ -453,10 +442,16 @@ export default Router = {
           return Router._handleInvalidArguments(client, 'joinDoc', arguments)
         }
         try {
-          joinDocSchema.parse({ doc_id: docId, fromVersion, options })
+          Joi.assert(
+            { doc_id: docId, fromVersion, options },
+            Joi.object({
+              doc_id: JOI_OBJECT_ID,
+              fromVersion: Joi.number().integer(),
+              options: Joi.object().required(),
+            })
+          )
         } catch (error) {
           return Router._handleError(callback, error, client, 'joinDoc', {
-            validation: 1,
             disconnect: 1,
           })
         }
@@ -483,10 +478,9 @@ export default Router = {
           return Router._handleInvalidArguments(client, 'leaveDoc', arguments)
         }
         try {
-          zz.objectId().parse(docId)
+          Joi.assert(docId, JOI_OBJECT_ID)
         } catch (error) {
-          return Router._handleError(callback, error, client, 'leaveDoc', {
-            validation: 1,
+          return Router._handleError(callback, error, client, 'joinDoc', {
             disconnect: 1,
           })
         }
@@ -569,10 +563,15 @@ export default Router = {
           )
         }
         try {
-          applyOtUpdateSchema.parse({ doc_id: docId, update })
+          Joi.assert(
+            { doc_id: docId, update },
+            Joi.object({
+              doc_id: JOI_OBJECT_ID,
+              update: Joi.object().required(),
+            })
+          )
         } catch (error) {
           return Router._handleError(callback, error, client, 'applyOtUpdate', {
-            validation: 1,
             disconnect: 1,
           })
         }

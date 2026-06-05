@@ -1,21 +1,9 @@
-import { FC, useEffect } from 'react'
+import { FC } from 'react'
 import { useTranslation } from 'react-i18next'
-import OLNotification from '@/shared/components/ol/ol-notification'
-import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
-import { useIdeReactContext } from '@/features/ide-react/context/ide-react-context'
+import OLNotification from '@/features/ui/components/ol/ol-notification'
 
 export const UnsavedDocsLockedAlert: FC = () => {
   const { t } = useTranslation()
-  const { openDocs } = useEditorManagerContext()
-  const { reportError } = useIdeReactContext()
-
-  useEffect(() => {
-    const { pendingOpsLength, inflightOpsLength } = openDocs.getUnsavedOpsSize()
-    reportError('connection-lost-with-unsaved-changes', {
-      pendingOpsLength,
-      inflightOpsLength,
-    })
-  }, [reportError, openDocs])
 
   return (
     <OLNotification

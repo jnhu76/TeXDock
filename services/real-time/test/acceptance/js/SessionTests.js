@@ -10,10 +10,10 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { expect } from 'chai'
+const { expect } = require('chai')
 
-import FixturesManager from './helpers/FixturesManager.js'
-import RealTimeClient from './helpers/RealTimeClient.js'
+const FixturesManager = require('./helpers/FixturesManager')
+const RealTimeClient = require('./helpers/RealTimeClient')
 
 describe('Session', function () {
   return describe('with an established session', function () {

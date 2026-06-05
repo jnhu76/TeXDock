@@ -1,11 +1,4 @@
-import {
-  ElementType,
-  memo,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   useCodeMirrorStateContext,
@@ -27,21 +20,11 @@ import { minimumListDepthForSelection } from '../utils/tree-operations/ancestors
 import { debugConsole } from '@/utils/debugging'
 import { useTranslation } from 'react-i18next'
 import { ToggleSearchButton } from '@/features/source-editor/components/toolbar/toggle-search-button'
-import ReviewPanelHeader from '@/features/review-panel/components/review-panel-header'
-import useReviewPanelLayout from '@/features/review-panel/hooks/use-review-panel-layout'
-import Breadcrumbs from '@/features/source-editor/extensions/breadcrumbs'
+import ReviewPanelHeader from '@/features/review-panel-new/components/review-panel-header'
+import useReviewPanelLayout from '@/features/review-panel-new/hooks/use-review-panel-layout'
+import { useIsNewEditorEnabled } from '@/features/ide-redesign/utils/new-editor-utils'
+import Breadcrumbs from '@/features/ide-redesign/components/breadcrumbs'
 import classNames from 'classnames'
-import { useUserSettingsContext } from '@/shared/context/user-settings-context'
-import { useFeatureFlag } from '@/shared/context/split-test-context'
-import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
-
-const sourceEditorToolbarComponents = importOverleafModules(
-  'sourceEditorToolbarComponents'
-) as { import: { default: ElementType }; path: string }[]
-
-const sourceEditorToolbarEndButtons = importOverleafModules(
-  'sourceEditorToolbarEndButtons'
-) as { import: { default: ElementType }; path: string }[]
 
 export const CodeMirrorToolbar = () => {
   const view = useCodeMirrorViewContext()
@@ -58,10 +41,6 @@ const Toolbar = memo(function Toolbar() {
   const { t } = useTranslation()
   const state = useCodeMirrorStateContext()
   const view = useCodeMirrorViewContext()
-  const {
-    userSettings: { breadcrumbs },
-  } = useUserSettingsContext()
-  const visualPreviewEnabled = useFeatureFlag('visual-preview')
 
   const [overflowed, setOverflowed] = useState(false)
 
@@ -72,6 +51,7 @@ const Toolbar = memo(function Toolbar() {
 
   const listDepth = minimumListDepthForSelection(state)
 
+  const newEditor = useIsNewEditorEnabled()
   const { showHeader: showReviewPanelHeader } = useReviewPanelLayout()
 
   const {
@@ -160,11 +140,11 @@ const Toolbar = memo(function Toolbar() {
 
   return (
     <>
-      {showReviewPanelHeader && <ReviewPanelHeader />}
+      {newEditor && showReviewPanelHeader && <ReviewPanelHeader />}
       <div
         id="ol-cm-toolbar-wrapper"
         className={classNames('ol-cm-toolbar-wrapper', {
-          'ol-cm-toolbar-wrapper-indented': showReviewPanelHeader,
+          'ol-cm-toolbar-wrapper-indented': newEditor && showReviewPanelHeader,
         })}
       >
         <div
@@ -173,6 +153,7 @@ const Toolbar = memo(function Toolbar() {
           className="ol-cm-toolbar toolbar-editor"
           ref={elementRef}
         >
+          <EditorSwitch />
           {showActions && (
             <ToolbarItems
               state={state}
@@ -205,24 +186,13 @@ const Toolbar = memo(function Toolbar() {
             className="ol-cm-toolbar-button-group ol-cm-toolbar-end"
             ref={handleButtons}
           >
-            {!visualPreviewEnabled && <EditorSwitch />}
-            {sourceEditorToolbarEndButtons.map(
-              ({ import: { default: Component }, path }) => (
-                <Component key={path} />
-              )
-            )}
             <ToggleSearchButton state={state} />
             <SwitchToPDFButton />
             <DetacherSynctexControl />
             <DetachCompileButtonWrapper />
           </div>
         </div>
-        {sourceEditorToolbarComponents.map(
-          ({ import: { default: Component }, path }) => (
-            <Component key={path} />
-          )
-        )}
-        {breadcrumbs && <Breadcrumbs />}
+        {newEditor && <Breadcrumbs />}
       </div>
     </>
   )

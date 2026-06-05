@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import * as eventTracking from '@/infrastructure/event-tracking'
 import { useDetachCompileContext } from '@/shared/context/detach-compile-context'
 import usePersistedState from '@/shared/hooks/use-persisted-state'
@@ -14,19 +14,10 @@ function CompileTimeWarningUpgradePrompt() {
     Date | undefined
   >(`has-dismissed-10s-compile-time-warning-until`)
 
-  const warningSegmentation = useMemo(
-    () => ({
-      content: 'warning',
-      compileTime: 7,
-      isProjectOwner,
-    }),
-    [isProjectOwner]
-  )
-
   const handleNewCompile = useCallback(
     (compileTime: number) => {
       setShowWarning(false)
-      if (compileTime > 7000) {
+      if (compileTime > 10000) {
         if (isProjectOwner) {
           if (
             !dismissedUntilWarning ||
@@ -34,7 +25,7 @@ function CompileTimeWarningUpgradePrompt() {
           ) {
             setShowWarning(true)
             eventTracking.sendMB('compile-time-warning-displayed', {
-              compileTime: 7,
+              time: 10,
               isProjectOwner,
             })
           }
@@ -46,13 +37,7 @@ function CompileTimeWarningUpgradePrompt() {
 
   const handleDismissWarning = useCallback(() => {
     eventTracking.sendMB('compile-time-warning-dismissed', {
-      compileTime: 7,
-      isProjectOwner,
-    })
-    eventTracking.sendMB('paywall-dismiss', {
-      'paywall-type': 'compile-time-warning',
-      content: 'warning',
-      compileTime: 7,
+      time: 10,
       isProjectOwner,
     })
     setShowWarning(false)
@@ -70,12 +55,7 @@ function CompileTimeWarningUpgradePrompt() {
     return null
   }
 
-  if (
-    compiling ||
-    error ||
-    showLogs ||
-    !deliveryLatencies.compileTimeServerE2E
-  ) {
+  if (compiling || error || showLogs) {
     return null
   }
 
@@ -83,12 +63,13 @@ function CompileTimeWarningUpgradePrompt() {
     return null
   }
 
+  // if showWarning is true then the 10s warning is shown
+
   return (
     <div>
       {showWarning && isProjectOwner && (
         <CompileTimeWarningUpgradePromptInner
           handleDismissWarning={handleDismissWarning}
-          segmentation={warningSegmentation}
         />
       )}
     </div>

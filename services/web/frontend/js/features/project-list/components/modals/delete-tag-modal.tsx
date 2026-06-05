@@ -4,14 +4,13 @@ import { Tag } from '../../../../../../app/src/Features/Tags/types'
 import useAsync from '../../../../shared/hooks/use-async'
 import { deleteTag } from '../../util/api'
 import { debugConsole } from '@/utils/debugging'
-import {
-  OLModal,
+import OLModal, {
   OLModalBody,
   OLModalFooter,
   OLModalHeader,
   OLModalTitle,
-} from '@/shared/components/ol/ol-modal'
-import OLButton from '@/shared/components/ol/ol-button'
+} from '@/features/ui/components/ol/ol-modal'
+import OLButton from '@/features/ui/components/ol/ol-button'
 import Notification from '@/shared/components/notification'
 
 type DeleteTagModalProps = {
@@ -47,7 +46,7 @@ export default function DeleteTagModal({
 
   return (
     <OLModal show animation onHide={onClose} id={id} backdrop="static">
-      <OLModalHeader>
+      <OLModalHeader closeButton>
         <OLModalTitle>{t('delete_tag')}</OLModalTitle>
       </OLModalHeader>
 
@@ -73,7 +72,6 @@ export default function DeleteTagModal({
           variant="danger"
           disabled={isLoading}
           isLoading={isLoading}
-          loadingLabel={t('deleting')}
         >
           {t('delete')}
         </OLButton>

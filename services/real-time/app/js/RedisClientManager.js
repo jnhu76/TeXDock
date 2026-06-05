@@ -1,7 +1,7 @@
-import redis from '@overleaf/redis-wrapper'
-import logger from '@overleaf/logger'
+const redis = require('@overleaf/redis-wrapper')
+const logger = require('@overleaf/logger')
 
-export default {
+module.exports = {
   createClientList(...configs) {
     // create a dynamic list of redis clients, excluding any configurations which are not defined
     return configs.filter(Boolean).map(x => {

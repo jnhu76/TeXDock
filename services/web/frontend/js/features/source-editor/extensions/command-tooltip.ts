@@ -201,16 +201,6 @@ const createTooltipState = (
 
       return buildTooltip(commandName, pos, value, commandNode, argumentNode)
     }
-
-    // a subfile file (\subfile)
-    case 'Subfile': {
-      const argumentNode = commandNode
-        .getChild('SubfileArgument')
-        ?.getChild(FilePathArgument)
-        ?.getChild(LiteralArgContent)
-
-      return buildTooltip(commandName, pos, value, commandNode, argumentNode)
-    }
   }
 
   return null

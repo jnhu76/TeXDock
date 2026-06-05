@@ -1,3 +1,4 @@
+import { useIsNewEditorEnabled } from '@/features/ide-redesign/utils/new-editor-utils'
 import {
   Segmentation,
   sendMB,
@@ -6,20 +7,16 @@ import {
 } from '@/infrastructure/event-tracking'
 import { useCallback } from 'react'
 
-export function populateEditorRedesignSegmentation<
-  SegmentationType extends Segmentation,
->(
-  segmentation: SegmentationType | undefined = {} as SegmentationType
-): SegmentationType & { 'editor-redesign'?: 'enabled' } {
-  return { ...segmentation, 'editor-redesign': 'enabled' }
-}
-
 export const useEditorAnalytics = () => {
+  const editorRedesign = useIsNewEditorEnabled()
+
   const populateSegmentation = useCallback(
     (segmentation: Segmentation | undefined = {}): Segmentation => {
-      return populateEditorRedesignSegmentation(segmentation)
+      return editorRedesign
+        ? { ...segmentation, 'editor-redesign': 'enabled' }
+        : segmentation
     },
-    []
+    [editorRedesign]
   )
 
   const sendEvent: typeof sendMB = useCallback(

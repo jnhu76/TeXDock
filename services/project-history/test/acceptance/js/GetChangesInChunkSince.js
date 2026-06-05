@@ -16,66 +16,76 @@ const fixture = path => new URL(`../fixtures/${path}`, import.meta.url)
 
 describe('GetChangesInChunkSince', function () {
   let projectId, historyId
-  beforeEach(async function () {
+  beforeEach(function (done) {
     projectId = new ObjectId().toString()
     historyId = new ObjectId().toString()
-    await ProjectHistoryApp.ensureRunning()
+    ProjectHistoryApp.ensureRunning(error => {
+      if (error) throw error
 
-    MockHistoryStore().post('/api/projects').reply(200, {
-      projectId: historyId,
-    })
-
-    const olProject = await ProjectHistoryClient.initializeProject(historyId)
-    MockWeb()
-      .get(`/project/${projectId}/details`)
-      .reply(200, {
-        name: 'Test Project',
-        overleaf: { history: { id: olProject.id } },
+      MockHistoryStore().post('/api/projects').reply(200, {
+        projectId: historyId,
       })
 
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/latest/history`)
-      .replyWithFile(200, fixture('chunks/7-8.json'))
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/versions/7/history`)
-      .replyWithFile(200, fixture('chunks/7-8.json'))
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/versions/6/history`)
-      .replyWithFile(200, fixture('chunks/7-8.json'))
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/versions/5/history`)
-      .replyWithFile(200, fixture('chunks/4-6.json'))
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/versions/4/history`)
-      .replyWithFile(200, fixture('chunks/4-6.json'))
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/versions/3/history`)
-      .replyWithFile(200, fixture('chunks/4-6.json'))
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/versions/2/history`)
-      .replyWithFile(200, fixture('chunks/0-3.json'))
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/versions/1/history`)
-      .replyWithFile(200, fixture('chunks/0-3.json'))
-    MockHistoryStore()
-      .get(`/api/projects/${historyId}/versions/0/history`)
-      .replyWithFile(200, fixture('chunks/0-3.json'))
+      ProjectHistoryClient.initializeProject(historyId, (error, olProject) => {
+        if (error) throw error
+        MockWeb()
+          .get(`/project/${projectId}/details`)
+          .reply(200, {
+            name: 'Test Project',
+            overleaf: { history: { id: olProject.id } },
+          })
+
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/latest/history`)
+          .replyWithFile(200, fixture('chunks/7-8.json'))
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/versions/7/history`)
+          .replyWithFile(200, fixture('chunks/7-8.json'))
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/versions/6/history`)
+          .replyWithFile(200, fixture('chunks/7-8.json'))
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/versions/5/history`)
+          .replyWithFile(200, fixture('chunks/4-6.json'))
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/versions/4/history`)
+          .replyWithFile(200, fixture('chunks/4-6.json'))
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/versions/3/history`)
+          .replyWithFile(200, fixture('chunks/4-6.json'))
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/versions/2/history`)
+          .replyWithFile(200, fixture('chunks/0-3.json'))
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/versions/1/history`)
+          .replyWithFile(200, fixture('chunks/0-3.json'))
+        MockHistoryStore()
+          .get(`/api/projects/${historyId}/versions/0/history`)
+          .replyWithFile(200, fixture('chunks/0-3.json'))
+
+        done()
+      })
+    })
   })
 
   afterEach(function () {
     nock.cleanAll()
   })
 
-  async function expectChangesSince(version, n, changes) {
-    const { body } = await ProjectHistoryClient.getChangesInChunkSince(
+  function expectChangesSince(version, n, changes, done) {
+    ProjectHistoryClient.getChangesInChunkSince(
       projectId,
       version,
-      {}
-    )
-    expect(body.latestStartVersion).to.equal(6)
-    expect(body.changes).to.have.length(n)
-    expect(body.changes.map(c => Core.Change.fromRaw(c))).to.deep.equal(
-      changes.map(c => Core.Change.fromRaw(c))
+      {},
+      (error, got) => {
+        if (error) throw error
+        expect(got.latestStartVersion).to.equal(6)
+        expect(got.changes).to.have.length(n)
+        expect(got.changes.map(c => Core.Change.fromRaw(c))).to.deep.equal(
+          changes.map(c => Core.Change.fromRaw(c))
+        )
+        done()
+      }
     )
   }
 
@@ -128,19 +138,21 @@ describe('GetChangesInChunkSince', function () {
   }
 
   for (const [since, { name, n, changes }] of Object.entries(cases)) {
-    it(name, async function () {
-      await expectChangesSince(since, n, changes)
+    it(name, function (done) {
+      expectChangesSince(since, n, changes, done)
     })
   }
 
-  it('should return an error when past the end version', async function () {
-    const { statusCode } = await ProjectHistoryClient.getChangesInChunkSince(
+  it('should return an error when past the end version', function (done) {
+    ProjectHistoryClient.getChangesInChunkSince(
       projectId,
       9,
-      {
-        allowErrors: true,
+      { allowErrors: true },
+      (error, _body, statusCode) => {
+        if (error) throw error
+        expect(statusCode).to.equal(400)
+        done()
       }
     )
-    expect(statusCode).to.equal(400)
   })
 })

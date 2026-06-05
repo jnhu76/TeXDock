@@ -1,7 +1,6 @@
 import FileTreeRoot from '../../../../../frontend/js/features/file-tree/components/file-tree-root'
 import { EditorProviders } from '../../../helpers/editor-providers'
 import { SocketIOMock } from '@/ide/connection/SocketIoShim'
-import type { Socket } from '@/features/ide-react/connection/types/socket'
 
 describe('FileTree Delete Entity Flow', function () {
   beforeEach(function () {
@@ -11,9 +10,9 @@ describe('FileTree Delete Entity Flow', function () {
   })
 
   describe('single entity', function () {
-    let socket: SocketIOMock & Socket
+    let socket: SocketIOMock
     beforeEach(function () {
-      socket = new SocketIOMock() as any
+      socket = new SocketIOMock()
       const rootFolder = [
         {
           _id: 'root-folder-id',
@@ -137,9 +136,9 @@ describe('FileTree Delete Entity Flow', function () {
   })
 
   describe('folders', function () {
-    let socket: SocketIOMock & Socket
+    let socket: SocketIOMock
     beforeEach(function () {
-      socket = new SocketIOMock() as any
+      socket = new SocketIOMock()
       const rootFolder = [
         {
           _id: 'root-folder-id',
@@ -177,7 +176,7 @@ describe('FileTree Delete Entity Flow', function () {
         </div>
       )
 
-      cy.findByLabelText('Expand').click()
+      cy.findByRole('button', { name: 'Expand' }).click()
       cy.findByRole('treeitem', { name: 'main.tex' }).click()
       cy.findByRole('treeitem', { name: 'my.bib' }).click({
         ctrlKey: true,
@@ -208,9 +207,9 @@ describe('FileTree Delete Entity Flow', function () {
   })
 
   describe('multiple entities', function () {
-    let socket: SocketIOMock & Socket
+    let socket: SocketIOMock
     beforeEach(function () {
-      socket = new SocketIOMock() as any
+      socket = new SocketIOMock()
       const rootFolder = [
         {
           _id: 'root-folder-id',
@@ -248,7 +247,7 @@ describe('FileTree Delete Entity Flow', function () {
       })
 
       // open the context menu
-      cy.findByRole('treeitem', { name: 'my.bib' }).trigger('contextmenu')
+      cy.findByRole('button', { name: 'my.bib' }).trigger('contextmenu')
 
       // make sure the menu has opened, with only a "Delete" item (as multiple files are selected)
       cy.findByRole('menu')

@@ -1,38 +1,40 @@
 import { useCallback, useEffect } from 'react'
 import { useIdeContext } from '../../../shared/context/ide-context'
-import { useProjectContext } from '@/shared/context/project-context'
+import useScopeValue from '../../../shared/hooks/use-scope-value'
 import type { ProjectSettings } from '../utils/api'
 
 export default function useProjectWideSettingsSocketListener() {
   const { socket } = useIdeContext()
 
-  const { project, updateProject } = useProjectContext()
+  const [project, setProject] = useScopeValue<ProjectSettings | undefined>(
+    'project'
+  )
 
   const setCompiler = useCallback(
     (compiler: ProjectSettings['compiler']) => {
       if (project) {
-        updateProject({ compiler })
+        setProject({ ...project, compiler })
       }
     },
-    [project, updateProject]
+    [project, setProject]
   )
 
   const setImageName = useCallback(
     (imageName: ProjectSettings['imageName']) => {
       if (project) {
-        updateProject({ imageName })
+        setProject({ ...project, imageName })
       }
     },
-    [project, updateProject]
+    [project, setProject]
   )
 
   const setSpellCheckLanguage = useCallback(
     (spellCheckLanguage: ProjectSettings['spellCheckLanguage']) => {
       if (project) {
-        updateProject({ spellCheckLanguage })
+        setProject({ ...project, spellCheckLanguage })
       }
     },
-    [project, updateProject]
+    [project, setProject]
   )
 
   useEffect(() => {
