@@ -19,18 +19,20 @@
 
 ## 🚀 使用
 
-直接使用预构建镜像 `fred1653/sharelatex-full:latest`，无需自己编译。
+直接使用预构建镜像，无需自己编译。镜像地址：[Docker Hub → fred1653/sharelatex-full](https://hub.docker.com/repository/docker/fred1653/sharelatex-full/general)
 
 ```bash
-# 启动
-docker compose up -d
+# 使用项目根目录的 docker-compose.yml 启动
+docker compose -f docker-compose.yml up -d
 
 # 创建管理员
 # 🌐 浏览器访问 http://localhost/launchpad
 
 # 停止
-docker compose down
+docker compose -f docker-compose.yml down
 ```
+
+> `docker-compose.yml` 已配置好 `OVERLEAF_SITE_LANGUAGE: "zh-CN"`（中文界面），开箱即用。
 
 ### ⚙️ 配置
 
@@ -56,6 +58,17 @@ scripts/tlmgr-in-container.sh install enumitem      # 📥 安装
 ```
 
 > ⚠️ 容器重建后安装的包会丢失。详见 [**构建指南 → 安装宏包**](docs/build-guide.md#4-install-tex-live-macropackages)。
+
+### 🧪 测试中文编译
+
+项目提供两个测试文件，上传到 Overleaf 用 XeLaTeX 编译即可验证中文支持：
+
+| 文件 | 说明 |
+|------|------|
+| [windows字体测试-1.tex](docs/windows字体测试-1.tex) | 简单版：宋体 + 仿宋 + 数学公式 |
+| [windows字体测试-2.tex](docs/windows字体测试-2.tex) | 完整版：宋体/仿宋/黑体/楷体 + 加粗/斜体 + 数学混排 |
+
+> 测试使用 `\setCJKmainfont{SimSun}` 等 Windows 字体名，公开镜像通过 fontconfig 别名映射到开源替代字体，无需安装真实 Windows 字体即可编译。
 
 ### 🔤 安装私有字体
 
