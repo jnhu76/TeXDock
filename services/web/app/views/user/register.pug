@@ -23,13 +23,36 @@ block content
 							a(href="/login")  #{translate("login_here")}
 
 			.row
-				.col-md-8.col-md-offset-2.col-lg-6.col-lg-offset-3
+				.col-lg-6.offset-lg-3.col-xl-4.offset-xl-4
 					.card
-						.page-header
-							h1 #{translate("register")}
-						p
-							| Please contact
-							|
-							strong #{settings.adminEmail}
-							|
-							| to create an account.
+						.card-body
+							.page-header
+								h1 #{translate("register")}
+							form(data-ol-async-form, name="registerForm", action='/register', method="POST")
+								input(name='_csrf', type='hidden', value=csrfToken)
+								+formMessagesNewStyle()
+								.form-group
+									input.form-control(
+										type='email',
+										name='email',
+										required,
+										placeholder=translate("email_address"),
+										autofocus="true"
+									)
+								.form-group
+									input.form-control(
+										type='password',
+										name='password',
+										required,
+										placeholder=translate("password"),
+									)
+								.actions
+									button.btn-primary.btn(
+										type='submit',
+										data-ol-disabled-inflight
+									)
+										span(data-ol-inflight="idle") #{translate("register")}
+										span(hidden data-ol-inflight="pending") #{translate("registering")}
+							p.text-center
+								| #{translate("already_have_sl_account")}
+								a(href="/login")  #{translate("login_here")}

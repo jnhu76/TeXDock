@@ -44,7 +44,7 @@ i18n
   .use(middleware.LanguageDetector)
   .init({
     backend: {
-      loadPath: path.join(__dirname, '../../../locales/__lng__.json'),
+      loadPath: path.join(__dirname, '../../../locales/{{lng}}.json'),
     },
 
     // still using the v3 plural suffixes

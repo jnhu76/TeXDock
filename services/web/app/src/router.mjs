@@ -22,6 +22,7 @@ import UserInfoController from './Features/User/UserInfoController.js'
 import UserController from './Features/User/UserController.js'
 import UserEmailsController from './Features/User/UserEmailsController.js'
 import UserPagesController from './Features/User/UserPagesController.mjs'
+import UserRegistrationHandler from './Features/User/UserRegistrationHandler.js'
 import TutorialController from './Features/Tutorial/TutorialController.mjs'
 import DocumentController from './Features/Documents/DocumentController.mjs'
 import CompileManager from './Features/Compile/CompileManager.js'
@@ -268,6 +269,44 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   if (Features.hasFeature('registration-page')) {
     webRouter.get('/register', UserPagesController.registerPage)
+    webRouter.post(
+      '/register',
+      RateLimiterMiddleware.rateLimit(overleafLoginRateLimiter),
+      async (req, res, next) => {
+        try {
+          const { email, password } = req.body
+          const user =
+            await UserRegistrationHandler.promises.registerNewUser({
+              email,
+              password,
+              first_name: '',
+              last_name: '',
+            })
+          req.session.justRegistered = true
+          await AuthenticationController.promises.finishLogin(
+            user,
+            req,
+            res
+          )
+        } catch (err) {
+          if (
+            err.message === 'EmailAlreadyRegistered' ||
+            err.message === 'request is not valid'
+          ) {
+            return res.status(400).json({
+              message: {
+                type: 'error',
+                text:
+                  err.message === 'EmailAlreadyRegistered'
+                    ? req.i18n.translate('email_already_registered')
+                    : req.i18n.translate('invalid_email_or_password'),
+              },
+            })
+          }
+          next(err)
+        }
+      }
+    )
     AuthenticationController.addEndpointToLoginWhitelist('/register')
   }
 
