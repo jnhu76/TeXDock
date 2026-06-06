@@ -1,6 +1,9 @@
 # docker image build
 .dockerignore
 
+# build logs
+build.log
+
 # user defined files
 .env
 docker-compose.override.yml
