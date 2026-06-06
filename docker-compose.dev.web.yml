@@ -1,0 +1,7 @@
+services:
+  sharelatex:
+    image: fred1653/sharelatex:latest
+    volumes:
+      - ~/sharelatex_data:/var/lib/overleaf
+      - ./services/web:/overleaf/services/web
+      - ./libraries:/overleaf/libraries

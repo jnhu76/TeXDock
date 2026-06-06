@@ -8,6 +8,11 @@ const SpamSafe = require('./SpamSafe')
 const ctaEmailBody = require('./Bodies/cta-email')
 const NoCTAEmailBody = require('./Bodies/NoCTAEmailBody')
 
+// Email i18n support
+const i18n = require('../../infrastructure/Translations.js').i18n
+const emailLng = (settings.i18n && settings.i18n.defaultLng) || 'en'
+const t = i18n.getFixedT(emailLng)
+
 function _emailBodyPlainText(content, opts, ctaEmail) {
   let emailBody = `${content.greeting(opts, true)}`
   emailBody += `\r\n\r\n`
@@ -27,7 +32,7 @@ function _emailBodyPlainText(content, opts, ctaEmail) {
   }
 
   emailBody += `\r\n\r\n`
-  emailBody += `Regards,\r\nThe ${settings.appName} Team - ${settings.siteUrl}`
+  emailBody += `${t('email_footer', { appName: settings.appName, siteUrl: settings.siteUrl })}`
 
   if (
     settings.email &&
@@ -87,7 +92,7 @@ function ctaTemplate(content) {
 
 function NoCTAEmailTemplate(content) {
   if (content.greeting == null) {
-    content.greeting = () => 'Hi,'
+    content.greeting = () => t('email_greeting_hi')
   }
   if (!content.message) {
     throw new Error('missing message')
@@ -103,8 +108,7 @@ ${content.greeting(opts)}
 
 ${content.message(opts, true).join('\r\n\r\n')}
 
-Regards,
-The ${settings.appName} Team - ${settings.siteUrl}\
+${t('email_footer', { appName: settings.appName, siteUrl: settings.siteUrl })}\
       `
     },
     compiledTemplate(opts) {
@@ -138,23 +142,21 @@ const templates = {}
 
 templates.registered = ctaTemplate({
   subject() {
-    return `Activate your ${settings.appName} Account`
+    return t('email_registered_subject', { appName: settings.appName })
   },
   message(opts) {
     return [
-      `Congratulations, you've just had an account created for you on ${
-        settings.appName
-      } with the email address '${_.escape(opts.to)}'.`,
-      'Click here to set your password and log in:',
+      t('email_registered_message', { appName: settings.appName, email: _.escape(opts.to) }),
+      t('email_registered_cta_hint'),
     ]
   },
   secondaryMessage() {
     return [
-      `If you have any questions or problems, please contact ${settings.adminEmail}`,
+      t('email_contact_admin', { adminEmail: settings.adminEmail }),
     ]
   },
   ctaText() {
-    return 'Set password'
+    return t('email_set_password')
   },
   ctaURL(opts) {
     return opts.setNewPasswordUrl
@@ -198,22 +200,22 @@ templates.reactivatedSubscription = ctaTemplate({
 
 templates.passwordResetRequested = ctaTemplate({
   subject() {
-    return `Password Reset - ${settings.appName}`
+    return t('email_password_reset_subject', { appName: settings.appName })
   },
   title() {
-    return 'Password Reset'
+    return t('email_password_reset_title')
   },
   message() {
-    return [`We got a request to reset your ${settings.appName} password.`]
+    return [t('email_password_reset_message', { appName: settings.appName })]
   },
   secondaryMessage() {
     return [
-      "If you ignore this message, your password won't be changed.",
-      "If you didn't request a password reset, let us know.",
+      t('email_password_reset_ignore'),
+      t('email_password_reset_not_you'),
     ]
   },
   ctaText() {
-    return 'Reset password'
+    return t('email_password_reset_cta')
   },
   ctaURL(opts) {
     return opts.setNewPasswordUrl
@@ -222,24 +224,24 @@ templates.passwordResetRequested = ctaTemplate({
 
 templates.confirmEmail = ctaTemplate({
   subject() {
-    return `Confirm email - ${settings.appName}`
+    return t('email_confirm_email_subject', { appName: settings.appName })
   },
   title() {
-    return 'Confirm email'
+    return t('email_confirm_email_title')
   },
   message(opts) {
     return [
-      `Please confirm that you have added a new email, ${opts.to}, to your ${settings.appName} account.`,
+      t('email_confirm_email_message', { appName: settings.appName, email: opts.to }),
     ]
   },
   secondaryMessage() {
     return [
-      `If you did not request this, please let us know at <a href="mailto:${settings.adminEmail}">${settings.adminEmail}</a>.`,
-      `If you have any questions or trouble confirming your email address, please get in touch with our support team at ${settings.adminEmail}.`,
+      t('email_confirm_email_not_you', { adminEmail: settings.adminEmail }),
+      t('email_confirm_email_help', { adminEmail: settings.adminEmail }),
     ]
   },
   ctaText() {
-    return 'Confirm email'
+    return t('email_confirm_email_cta')
   },
   ctaURL(opts) {
     return opts.confirmEmailUrl
@@ -251,18 +253,18 @@ templates.confirmCode = NoCTAEmailTemplate({
     return ''
   },
   subject(opts) {
-    return `Confirm your email address on Overleaf (${opts.confirmCode})`
+    return t('email_confirm_code_subject', { appName: settings.appName, code: opts.confirmCode })
   },
   title(opts) {
-    return 'Confirm your email address'
+    return t('email_confirm_code_title')
   },
   message(opts, isPlainText) {
     const msg = opts.welcomeUser
       ? [
-          `Welcome to Overleaf! We're so glad you joined us.`,
-          'Use this 6-digit confirmation code to finish your setup.',
+          t('email_confirm_code_welcome', { appName: settings.appName }),
+          t('email_confirm_code_use_code'),
         ]
-      : ['Use this 6-digit code to confirm your email address.']
+      : [t('email_confirm_code_use_code_confirm')]
 
     if (isPlainText && opts.confirmCode) {
       msg.push(opts.confirmCode)
@@ -280,45 +282,38 @@ templates.projectInvite = ctaTemplate({
     const safeEmail = SpamSafe.isSafeEmail(opts.owner.email)
 
     if (safeName && safeEmail) {
-      return `"${_.escape(opts.project.name)}" — shared by ${_.escape(
-        opts.owner.email
-      )}`
+      return t('email_project_invite_subject_name_email', { projectName: _.escape(opts.project.name), ownerEmail: _.escape(opts.owner.email) })
     }
     if (safeName) {
-      return `${settings.appName} project shared with you — "${_.escape(
-        opts.project.name
-      )}"`
+      return t('email_project_invite_subject_name', { appName: settings.appName, projectName: _.escape(opts.project.name) })
     }
     if (safeEmail) {
-      return `${_.escape(opts.owner.email)} shared an ${
-        settings.appName
-      } project with you`
+      return t('email_project_invite_subject_email', { ownerEmail: _.escape(opts.owner.email), appName: settings.appName })
     }
 
-    return `An ${settings.appName} project has been shared with you`
+    return t('email_project_invite_subject', { appName: settings.appName })
   },
   title(opts) {
-    return 'Project Invite'
+    return t('email_project_invite_title')
   },
   greeting(opts) {
     return ''
   },
   message(opts, isPlainText) {
-    // build message depending on spam-safe variables
-    const message = [`You have been invited to an ${settings.appName} project.`]
+    const message = [t('email_project_invite_message', { appName: settings.appName })]
 
     if (SpamSafe.isSafeProjectName(opts.project.name)) {
-      message.push('<br/> Project:')
+      message.push(`<br/> ${t('email_project_invite_project')}:`)
       message.push(`<b>${_.escape(opts.project.name)}</b>`)
     }
 
     if (SpamSafe.isSafeEmail(opts.owner.email)) {
-      message.push(`<br/> Shared by:`)
+      message.push(`<br/> ${t('email_project_invite_shared_by')}:`)
       message.push(`<b>${_.escape(opts.owner.email)}</b>`)
     }
 
     if (message.length === 1) {
-      message.push('<br/> Please view the project to find out more.')
+      message.push(`<br/> ${t('email_project_invite_view_more')}`)
     }
 
     return message.map(m => {
@@ -326,7 +321,7 @@ templates.projectInvite = ctaTemplate({
     })
   },
   ctaText() {
-    return 'View project'
+    return t('email_project_invite_cta')
   },
   ctaURL(opts) {
     return opts.inviteUrl
@@ -334,34 +329,35 @@ templates.projectInvite = ctaTemplate({
   gmailGoToAction(opts) {
     return {
       target: opts.inviteUrl,
-      name: 'View project',
-      description: `Join ${_.escape(
-        SpamSafe.safeProjectName(opts.project.name, 'project')
-      )} at ${settings.appName}`,
+      name: t('email_project_invite_cta'),
+      description: t('email_project_invite_gmail_action', {
+        projectName: _.escape(SpamSafe.safeProjectName(opts.project.name, t('email_project_invite_project_fallback'))),
+        appName: settings.appName,
+      }),
     }
   },
 })
 
 templates.reconfirmEmail = ctaTemplate({
   subject() {
-    return `Reconfirm Email - ${settings.appName}`
+    return t('email_reconfirm_subject', { appName: settings.appName })
   },
   title() {
-    return 'Reconfirm Email'
+    return t('email_reconfirm_title')
   },
   message(opts) {
     return [
-      `Please reconfirm your email address, ${opts.to}, on your ${settings.appName} account.`,
+      t('email_reconfirm_message', { appName: settings.appName, email: opts.to }),
     ]
   },
   secondaryMessage() {
     return [
-      'If you did not request this, you can simply ignore this message.',
-      `If you have any questions or trouble confirming your email address, please get in touch with our support team at ${settings.adminEmail}.`,
+      t('email_reconfirm_ignore'),
+      t('email_reconfirm_help', { adminEmail: settings.adminEmail }),
     ]
   },
   ctaText() {
-    return 'Reconfirm Email'
+    return t('email_reconfirm_cta')
   },
   ctaURL(opts) {
     return opts.confirmEmailUrl
@@ -666,19 +662,19 @@ templates.surrenderAccountForManagedUsers = ctaTemplate({
 
 templates.testEmail = ctaTemplate({
   subject() {
-    return `A Test Email from ${settings.appName}`
+    return t('email_test_subject', { appName: settings.appName })
   },
   title() {
-    return `A Test Email from ${settings.appName}`
+    return t('email_test_subject', { appName: settings.appName })
   },
   greeting() {
-    return 'Hi,'
+    return t('email_greeting_hi')
   },
   message() {
-    return [`This is a test Email from ${settings.appName}`]
+    return [t('email_test_message', { appName: settings.appName })]
   },
   ctaText() {
-    return `Open ${settings.appName}`
+    return t('email_test_cta', { appName: settings.appName })
   },
   ctaURL() {
     return settings.siteUrl
@@ -870,44 +866,44 @@ templates.SAMLDataCleared = ctaTemplate({
 
 templates.welcome = ctaTemplate({
   subject() {
-    return `Welcome to ${settings.appName}`
+    return t('email_welcome_subject', { appName: settings.appName })
   },
   title() {
-    return `Welcome to ${settings.appName}`
+    return t('email_welcome_title', { appName: settings.appName })
   },
   greeting() {
-    return 'Hi,'
+    return t('email_greeting_hi')
   },
   message(opts, isPlainText) {
     const logInAgainDisplay = EmailMessageHelper.displayLink(
-      'log in again',
+      t('email_welcome_login_again'),
       `${settings.siteUrl}/login`,
       isPlainText
     )
     const helpGuidesDisplay = EmailMessageHelper.displayLink(
-      'Help Guides',
+      t('email_welcome_help_guides'),
       `${settings.siteUrl}/learn`,
       isPlainText
     )
     const templatesDisplay = EmailMessageHelper.displayLink(
-      'Templates',
+      t('email_welcome_templates'),
       `${settings.siteUrl}/templates`,
       isPlainText
     )
 
     return [
-      `Thanks for signing up to ${settings.appName}! If you ever get lost, you can ${logInAgainDisplay} with the email address '${opts.to}'.`,
-      `If you're new to LaTeX, take a look at our ${helpGuidesDisplay} and ${templatesDisplay}.`,
-      `Please also take a moment to confirm your email address for ${settings.appName}:`,
+      t('email_welcome_message', { appName: settings.appName, loginLink: logInAgainDisplay, email: opts.to }),
+      t('email_welcome_latex_hint', { helpLink: helpGuidesDisplay, templatesLink: templatesDisplay }),
+      t('email_welcome_confirm_hint', { appName: settings.appName }),
     ]
   },
   secondaryMessage() {
     return [
-      `PS. We love talking to our users about ${settings.appName}. Reply to this email to get in touch with us directly, whatever the reason. Questions, comments, problems, suggestions, all welcome!`,
+      t('email_welcome_ps', { appName: settings.appName }),
     ]
   },
   ctaText() {
-    return 'Confirm email'
+    return t('email_welcome_cta')
   },
   ctaURL(opts) {
     return opts.confirmEmailUrl
@@ -916,35 +912,35 @@ templates.welcome = ctaTemplate({
 
 templates.welcomeWithoutCTA = NoCTAEmailTemplate({
   subject() {
-    return `Welcome to ${settings.appName}`
+    return t('email_welcome_subject', { appName: settings.appName })
   },
   title() {
-    return `Welcome to ${settings.appName}`
+    return t('email_welcome_title', { appName: settings.appName })
   },
   greeting() {
-    return 'Hi,'
+    return t('email_greeting_hi')
   },
   message(opts, isPlainText) {
     const logInAgainDisplay = EmailMessageHelper.displayLink(
-      'log in again',
+      t('email_welcome_login_again'),
       `${settings.siteUrl}/login`,
       isPlainText
     )
     const helpGuidesDisplay = EmailMessageHelper.displayLink(
-      'Help Guides',
+      t('email_welcome_help_guides'),
       `${settings.siteUrl}/learn`,
       isPlainText
     )
     const templatesDisplay = EmailMessageHelper.displayLink(
-      'Templates',
+      t('email_welcome_templates'),
       `${settings.siteUrl}/templates`,
       isPlainText
     )
 
     return [
-      `Thanks for signing up to ${settings.appName}! If you ever get lost, you can ${logInAgainDisplay} with the email address '${opts.to}'.`,
-      `If you're new to LaTeX, take a look at our ${helpGuidesDisplay} and ${templatesDisplay}.`,
-      `PS. We love talking to our users about ${settings.appName}. Reply to this email to get in touch with us directly, whatever the reason. Questions, comments, problems, suggestions, all welcome!`,
+      t('email_welcome_message', { appName: settings.appName, loginLink: logInAgainDisplay, email: opts.to }),
+      t('email_welcome_latex_hint', { helpLink: helpGuidesDisplay, templatesLink: templatesDisplay }),
+      t('email_welcome_ps', { appName: settings.appName }),
     ]
   },
 })
