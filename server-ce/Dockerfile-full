@@ -1,21 +1,36 @@
+# syntax=docker/dockerfile:1.6
+
 # Dockerfile-full
 #
-# Build a TeXDock / Overleaf CE image with full TeX Live and common CJK fonts.
+# Stage 1: build the heavy TeX Live / tlmgr base image.
 #
-# Base image:
-#   fred1653/sharelatex:latest
+# This layer should be rebuilt rarely. It installs:
+# - apt tools and open-source font packages
+# - TeX Live scheme-full
+# - helper scripts used by later font layers
+#
+# It deliberately does NOT import private Windows fonts and does NOT install
+# Windows compatibility fontconfig aliases. Those belong in Dockerfile-windows-fonts.
 #
 # Build:
-#   docker build -f server-ce/Dockerfile-full -t fred1653/sharelatex-full:latest .
+#   DOCKER_BUILDKIT=1 docker build \
+#     -f server-ce/Dockerfile-full \
+#     -t fred1653/sharelatex-full:latest .
+#
+# Optional build args:
+#   --build-arg UBUNTU_MIRROR=https://mirrors.aliyun.com/ubuntu
+#   --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
 #
 # Notes:
-# - The base image is expected to already contain a working TeX Live + tlmgr.
-# - TEXLIVE_REPOSITORY is optional. Leave it empty to use the repository already
-#   configured in the base image. Set it when you want to force a specific CTAN
-#   mirror, for example:
-#     --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
-# - If the base image uses an older TeX Live year, do not point tlmgr at the
-#   latest tlnet. Use the matching historic tlnet-final repository instead.
+# - The expensive scheme-full install is isolated in its own RUN layer.
+#   If later package verification or smoke tests fail, this layer can still be cached.
+# - smoke-test-texlive-core is intentionally copied AFTER the heavy tlmgr layer.
+#   This prevents smoke-test edits from invalidating the scheme-full install cache.
+# - import-private-fonts-zip is also copied AFTER the heavy tlmgr layer.
+#   It is needed by later font-overlay images, but not by the TeX Live install layer.
+# - Do NOT run "tlmgr install xeCJK". The tlmgr package name is "xecjk",
+#   but scheme-full already includes it. We verify the actual file with:
+#     kpsewhich xeCJK.sty
 
 FROM fred1653/sharelatex:latest
 
@@ -23,87 +38,201 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Optional CTAN / TeX Live repository override.
-# Example:
-#   https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
-ARG TEXLIVE_REPOSITORY=""
+ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu
+ARG TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
 
-# Install common runtime tools and CJK fonts.
+# ---------------------------------------------------------------------------
+# 1. Force Ubuntu apt sources to the selected mirror.
+# ---------------------------------------------------------------------------
+RUN <<'BASH'
+set -eux
+
+. /etc/os-release
+UBUNTU_CODENAME="${VERSION_CODENAME:-noble}"
+
+rm -f /etc/apt/sources.list
+rm -f /etc/apt/sources.list.d/*.list
+rm -f /etc/apt/sources.list.d/*.sources
+
+mkdir -p /etc/apt/sources.list.d
+
+cat > /etc/apt/sources.list.d/ubuntu.sources <<APT_SOURCES
+Types: deb
+URIs: ${UBUNTU_MIRROR}
+Suites: ${UBUNTU_CODENAME} ${UBUNTU_CODENAME}-updates ${UBUNTU_CODENAME}-backports ${UBUNTU_CODENAME}-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+APT_SOURCES
+
+cat /etc/apt/sources.list.d/ubuntu.sources
+
+if grep -R "archive.ubuntu.com\|security.ubuntu.com" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+  echo "ERROR: official Ubuntu apt sources still exist."
+  exit 1
+fi
+BASH
+
+# ---------------------------------------------------------------------------
+# 2. Install runtime tools and broad open-source font packages.
+# ---------------------------------------------------------------------------
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked <<'BASH'
+set -eux
+
+# Keep downloaded .deb files inside the BuildKit cache mount.
+rm -f /etc/apt/apt.conf.d/docker-clean
+cat > /etc/apt/apt.conf.d/keep-cache <<'APT_CACHE'
+Binary::apt::APT::Keep-Downloaded-Packages "true";
+APT_CACHE
+
+apt-get update
+
+install_if_available() {
+  local available=()
+  local pkg
+
+  for pkg in "$@"; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      available+=("$pkg")
+    else
+      echo "WARN: apt package not available, skipped: $pkg"
+    fi
+  done
+
+  if [ "${#available[@]}" -gt 0 ]; then
+    apt-get install -y --no-install-recommends "${available[@]}"
+  fi
+}
+
+apt-get install -y --no-install-recommends \
+  ca-certificates \
+  cabextract \
+  curl \
+  fontconfig \
+  ghostscript \
+  make \
+  perl \
+  unzip \
+  xz-utils \
+  zip
+
+install_if_available \
+  fonts-noto \
+  fonts-noto-core \
+  fonts-noto-extra \
+  fonts-noto-mono \
+  fonts-noto-ui-core \
+  fonts-noto-ui-extra \
+  fonts-noto-color-emoji \
+  fonts-noto-cjk \
+  fonts-noto-cjk-extra \
+  fonts-wqy-microhei \
+  fonts-wqy-zenhei \
+  fonts-arphic-ukai \
+  fonts-arphic-uming \
+  fonts-droid-fallback \
+  fonts-dejavu \
+  fonts-dejavu-core \
+  fonts-dejavu-extra \
+  fonts-liberation \
+  fonts-liberation2 \
+  fonts-crosextra-carlito \
+  fonts-crosextra-caladea \
+  fonts-freefont-otf \
+  fonts-freefont-ttf \
+  fonts-ubuntu
+
+install_if_available \
+  ttf-wqy-zenhei \
+  ttf-wqy-microhei
+
+# Do not remove /var/lib/apt/lists here: it is a BuildKit cache mount.
+fc-cache -r -v
+BASH
+
+# ---------------------------------------------------------------------------
+# 3. Install only the helper script required by the heavy TeX Live layer.
+# ---------------------------------------------------------------------------
+COPY scripts/fonts/scripts/refresh-texlive-font-cache /usr/local/bin/refresh-texlive-font-cache
+
+RUN chmod +x /usr/local/bin/refresh-texlive-font-cache
+
+# ---------------------------------------------------------------------------
+# 4A. Upgrade the TeX Live installation to scheme-full.
 #
-# fonts-noto-cjk / fonts-noto-cjk-extra:
-#   broad Simplified Chinese, Traditional Chinese, Japanese, Korean coverage.
-# fonts-wqy-*:
-#   useful fallback fonts for older Chinese templates.
-# fonts-arphic-*:
-#   useful for some CJK / legacy documents.
-# fontconfig:
-#   required by XeLaTeX/LuaLaTeX font discovery.
-RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-      ca-certificates \
-      curl \
-      fontconfig \
-      fonts-noto-cjk \
-      fonts-noto-cjk-extra \
-      fonts-noto-color-emoji \
-      fonts-wqy-microhei \
-      fonts-wqy-zenhei \
-      fonts-arphic-ukai \
-      fonts-arphic-uming \
-      ghostscript \
-      make \
-      perl \
-      xz-utils \
-    ; \
-    rm -rf /var/lib/apt/lists/*; \
-    fc-cache -fv
+# Keep this RUN focused and boring.
+# If later package checks or smoke tests fail, this expensive layer should
+# remain cacheable.
+# ---------------------------------------------------------------------------
+RUN --mount=type=cache,target=/tmp/tlmgr-cache,sharing=locked <<'BASH'
+set -eux
 
-# Upgrade the minimal TeX Live installation to scheme-full.
+mkdir -p /tmp/tlmgr-cache/tmp
+export TMPDIR=/tmp/tlmgr-cache/tmp
+
+tlmgr --version
+
+if [[ -n "${TEXLIVE_REPOSITORY}" ]]; then
+  tlmgr option repository "${TEXLIVE_REPOSITORY}"
+fi
+
+tlmgr option repository
+
+tlmgr update --self
+tlmgr update --all
+
+tlmgr install scheme-full
+BASH
+
+# ---------------------------------------------------------------------------
+# 4B. Verify core TeX Live packages/files from scheme-full.
 #
-# Required sequence:
-#   1. optionally set repository
-#   2. tlmgr update --self
-#   3. tlmgr update --all
-#   4. tlmgr install scheme-full
-#   5. tlmgr path add
-#
-# Overleaf notes that tlmgr path add is required after tlmgr install so that
-# binaries are symlinked into the system path.
-RUN set -eux; \
-    tlmgr --version; \
-    if [[ -n "${TEXLIVE_REPOSITORY}" ]]; then \
-      tlmgr option repository "${TEXLIVE_REPOSITORY}"; \
-    fi; \
-    tlmgr option repository; \
-    tlmgr update --self; \
-    tlmgr update --all; \
-    tlmgr install scheme-full; \
-    tlmgr path add; \
-    mktexlsr; \
-    updmap-sys; \
-    luaotfload-tool --update || true; \
-    fc-cache -fv; \
-    latex --version; \
-    xelatex --version; \
-    lualatex --version
+# Important:
+# - The tlmgr package name is "xecjk".
+# - The actual LaTeX file name is "xeCJK.sty".
+# - Since scheme-full is already installed, do not run another tlmgr install here.
+# ---------------------------------------------------------------------------
+RUN <<'BASH'
+set -eux
 
-# Smoke test: compile a tiny Chinese document with XeLaTeX.
-# This verifies ctex + CJK font discovery at image build time.
-RUN set -eux; \
-    mkdir -p /tmp/texlive-smoke; \
-    cat > /tmp/texlive-smoke/main.tex <<'EOF'; \
-\documentclass{ctexart}
-\begin{document}
-中文测试 TeXDock.
-\[
-  E = mc^2
-\]
-\end{document}
-EOF
-    cd /tmp/texlive-smoke; \
-    xelatex -interaction=nonstopmode -halt-on-error main.tex; \
-    test -s main.pdf; \
-    rm -rf /tmp/texlive-smoke
+tlmgr path add || true
 
-# Keep the original image entrypoint/cmd from fred1653/sharelatex:latest.
+latex --version
+xelatex --version
+lualatex --version
+
+command -v latexmk
+latexmk -v | head -n 1
+
+kpsewhich ctex.sty
+kpsewhich xeCJK.sty
+kpsewhich fontspec.sty
+kpsewhich zhnumber.sty
+BASH
+
+# ---------------------------------------------------------------------------
+# 4C. Refresh TeX/font caches.
+# ---------------------------------------------------------------------------
+RUN --mount=type=cache,target=/tmp/tlmgr-cache,sharing=locked <<'BASH'
+set -eux
+
+mkdir -p /tmp/tlmgr-cache/tmp
+export TMPDIR=/tmp/tlmgr-cache/tmp
+
+refresh-texlive-font-cache
+BASH
+
+# ---------------------------------------------------------------------------
+# 5. Install helper scripts used by later font layers and smoke tests.
+# ---------------------------------------------------------------------------
+COPY scripts/fonts/scripts/import-private-fonts-zip /usr/local/bin/import-private-fonts-zip
+COPY scripts/texlive/smoke-test-texlive-core.sh /usr/local/bin/smoke-test-texlive-core
+
+RUN chmod +x \
+  /usr/local/bin/import-private-fonts-zip \
+  /usr/local/bin/smoke-test-texlive-core
+
+# ---------------------------------------------------------------------------
+# 6. Core TeX Live smoke test.
+# ---------------------------------------------------------------------------
+RUN smoke-test-texlive-core

@@ -1,0 +1,160 @@
+# syntax=docker/dockerfile:1.6
+
+# Dockerfile-windows-fonts
+#
+# Stage 2: font overlay layer on top of Dockerfile-full-1.
+#
+# This layer should be rebuilt whenever you change:
+# - scripts/fonts/private/fonts.zip
+# - scripts/fonts/fontconfig/64-chinese-latex-aliases.conf
+# - scripts/fonts/smoke-test-texlive-fonts.sh
+# - scripts/fonts/scripts/smoke-check-private-fonts
+#
+# No tlmgr is executed here.
+#
+# Cache design:
+# - private fonts import is isolated from smoke-test scripts
+# - fontconfig aliases are isolated from smoke-test scripts
+# - changing smoke tests only reruns the final smoke layer
+# - changing REQUIRED_PRIVATE_FONT_FAMILIES only reruns the final smoke layer
+#
+# Build without private Windows fonts, only public aliases/fallbacks:
+#   DOCKER_BUILDKIT=1 docker build \
+#     -f server-ce/Dockerfile-windows-fonts \
+#     --build-arg BASE_IMAGE=fred1653/sharelatex-full:latest \
+#     -t fred1653/sharelatex-full-fonts:latest .
+#
+# Build with private Windows fonts:
+#   1. Put your local font bundle at:
+#        scripts/fonts/private/fonts.zip
+#   2. Run the same build command above.
+#
+# If scripts/fonts/private/fonts.zip exists, it will be imported and exact Windows
+# font smoke checks will run. If it does not exist, private font import is skipped.
+
+ARG BASE_IMAGE=fred1653/sharelatex-full:latest
+
+FROM ${BASE_IMAGE}
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+USER root
+
+# ---------------------------------------------------------------------------
+# 0. Verify required helper scripts from the base image.
+# ---------------------------------------------------------------------------
+RUN <<'BASH'
+set -eux
+
+if ! command -v refresh-texlive-font-cache >/dev/null 2>&1; then
+  echo "ERROR: refresh-texlive-font-cache not found in BASE_IMAGE."
+  echo "Build Dockerfile-full-1 first."
+  exit 1
+fi
+
+if ! command -v import-private-fonts-zip >/dev/null 2>&1; then
+  echo "ERROR: import-private-fonts-zip not found in BASE_IMAGE."
+  echo "Build Dockerfile-full-1 first."
+  exit 1
+fi
+BASH
+
+# ---------------------------------------------------------------------------
+# 1. Optional private Windows font import.
+#
+# Copy the directory, not fonts.zip directly.
+# This makes fonts.zip optional: scripts/fonts/private/.gitignore is enough for
+# COPY to succeed, and a local scripts/fonts/private/fonts.zip can be added when
+# needed.
+#
+# This layer depends only on scripts/fonts/private/.
+# Changing smoke tests or fontconfig aliases will NOT rerun this layer.
+# ---------------------------------------------------------------------------
+COPY scripts/fonts/private/ /tmp/private-fonts-input/
+
+RUN --mount=type=cache,target=/tmp/font-cache,sharing=locked <<'BASH'
+set -eux
+
+mkdir -p /tmp/font-cache/tmp
+export TMPDIR=/tmp/font-cache/tmp
+
+if [ -s /tmp/private-fonts-input/fonts.zip ]; then
+  echo "== Import private Windows fonts from scripts/fonts/private/fonts.zip =="
+  import-private-fonts-zip /tmp/private-fonts-input/fonts.zip /usr/local/share/fonts/private
+else
+  echo "== No scripts/fonts/private/fonts.zip found; skipped private Windows font import =="
+  echo "   Public fallback aliases are still available."
+fi
+
+rm -rf /tmp/private-fonts-input
+BASH
+
+# ---------------------------------------------------------------------------
+# 2. Install fontconfig aliases and refresh font caches.
+#
+# This layer depends on:
+# - previous private font layer
+# - scripts/fonts/fontconfig/64-chinese-latex-aliases.conf
+#
+# Changing smoke tests will NOT rerun this layer.
+# ---------------------------------------------------------------------------
+COPY scripts/fonts/fontconfig/64-chinese-latex-aliases.conf /etc/fonts/conf.d/64-chinese-latex-aliases.conf
+
+RUN --mount=type=cache,target=/tmp/font-cache,sharing=locked <<'BASH'
+set -eux
+
+mkdir -p /tmp/font-cache/tmp
+export TMPDIR=/tmp/font-cache/tmp
+
+echo "== Refresh aliases and font caches =="
+refresh-texlive-font-cache
+BASH
+
+# ---------------------------------------------------------------------------
+# 3. Install smoke-test scripts.
+#
+# These are intentionally copied AFTER private font import and font cache refresh.
+# Changing smoke tests should only rerun the final smoke-test layer.
+# ---------------------------------------------------------------------------
+COPY --chmod=0755 scripts/fonts/smoke-test-texlive-fonts.sh /usr/local/bin/smoke-test-texlive-fonts
+COPY --chmod=0755 scripts/fonts/scripts/smoke-check-private-fonts /usr/local/bin/smoke-check-private-fonts
+
+# ---------------------------------------------------------------------------
+# 4. Smoke-test configuration.
+#
+# Keep these ARG/ENV values near the final smoke layer so changing font check
+# lists does not invalidate private font import or cache refresh layers.
+# ---------------------------------------------------------------------------
+ARG REQUIRED_PRIVATE_FONT_FAMILIES="SimSun|SimHei|FangSong|KaiTi"
+ARG OPTIONAL_PRIVATE_FONT_FAMILIES="NSimSun|Microsoft YaHei|Microsoft JhengHei|PMingLiU|MingLiU|DengXian|Arial|Times New Roman|Courier New|Calibri|Cambria|Consolas"
+
+ENV REQUIRED_PRIVATE_FONT_FAMILIES="${REQUIRED_PRIVATE_FONT_FAMILIES}"
+ENV OPTIONAL_PRIVATE_FONT_FAMILIES="${OPTIONAL_PRIVATE_FONT_FAMILIES}"
+ENV PRIVATE_FONT_COMPILE_SMOKE=true
+
+# ---------------------------------------------------------------------------
+# 5. Font smoke tests.
+#
+# This layer depends on:
+# - smoke-test scripts
+# - smoke-test ARG/ENV values
+# - final font state from previous layers
+#
+# Changing smoke-test scripts or REQUIRED_PRIVATE_FONT_FAMILIES only reruns this.
+# ---------------------------------------------------------------------------
+RUN --mount=type=cache,target=/tmp/font-cache,sharing=locked <<'BASH'
+set -eux
+
+mkdir -p /tmp/font-cache/tmp
+export TMPDIR=/tmp/font-cache/tmp
+
+if find /usr/local/share/fonts/private -type f 2>/dev/null | grep -q .; then
+  echo "== Run exact private Windows font smoke check =="
+  smoke-check-private-fonts
+else
+  echo "== No private fonts installed; skipped exact private Windows font smoke check =="
+fi
+
+echo "== Run public CJK/font alias smoke test =="
+smoke-test-texlive-fonts
+BASH

@@ -1,6 +1,10 @@
+# 开发环境 override 文件
+# 用法：docker compose -f docker-compose.yml -f docker-compose.dev.web.yml up
+# 挂载本地 web 源码和共享库，用于前端/后端开发调试
+
 services:
   sharelatex:
-    image: fred1653/sharelatex:latest
+    image: fred1653/sharelatex-full:latest
     volumes:
       - ~/sharelatex_data:/var/lib/overleaf
       - ./services/web:/overleaf/services/web

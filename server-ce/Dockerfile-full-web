@@ -6,7 +6,7 @@
 # 用法:
 #   docker build -f server-ce/Dockerfile-full-web -t fred1653/sharelatex-full:latest .
 
-FROM fred1653/sharelatex-full-base:latest
+FROM fred1653/sharelatex-full:latest
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
