@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+echo "== Refresh TeX Live and fontconfig caches =="
+
+mkdir -p /etc/fonts/conf.d
+mkdir -p /usr/local/share/fonts/private
+
+echo
+echo "== Expose TeX Live fonts to fontconfig =="
+
+TEXLIVE_FONTCONF=""
+
+if command -v kpsewhich >/dev/null 2>&1; then
+  TEXMFSYSVAR="$(kpsewhich -var-value=TEXMFSYSVAR 2>/dev/null || true)"
+  TEXMFDIST="$(kpsewhich -var-value=TEXMFDIST 2>/dev/null || true)"
+
+  if [ -n "${TEXMFSYSVAR}" ] && [ -f "${TEXMFSYSVAR}/fonts/conf/texlive-fontconfig.conf" ]; then
+    TEXLIVE_FONTCONF="${TEXMFSYSVAR}/fonts/conf/texlive-fontconfig.conf"
+  elif [ -n "${TEXMFDIST}" ] && [ -f "${TEXMFDIST}/tex/generic/texlive/texlive-fontconfig.conf" ]; then
+    TEXLIVE_FONTCONF="${TEXMFDIST}/tex/generic/texlive/texlive-fontconfig.conf"
+  fi
+fi
+
+if [ -z "${TEXLIVE_FONTCONF}" ]; then
+  TEXLIVE_FONTCONF="$(find /usr/local/texlive /opt/texlive /usr/share/texlive -name texlive-fontconfig.conf -type f 2>/dev/null | head -n 1 || true)"
+fi
+
+if [ -n "${TEXLIVE_FONTCONF}" ] && [ -f "${TEXLIVE_FONTCONF}" ]; then
+  echo "Using TeX Live fontconfig file: ${TEXLIVE_FONTCONF}"
+  cp -f "${TEXLIVE_FONTCONF}" /etc/fonts/conf.d/09-texlive.conf
+else
+  echo "WARN: texlive-fontconfig.conf not found."
+  echo "      TeX Live fonts may still be available to TeX itself,"
+  echo "      but fc-list/fc-match may not see all of them."
+fi
+
+if [ -f /etc/fonts/conf.d/64-chinese-latex-aliases.conf ]; then
+  echo
+  echo "== Chinese LaTeX aliases installed =="
+  ls -l /etc/fonts/conf.d/64-chinese-latex-aliases.conf
+else
+  echo
+  echo "WARN: /etc/fonts/conf.d/64-chinese-latex-aliases.conf not found."
+fi
+
+echo
+echo "== Refresh fontconfig cache =="
+
+fc-cache -r -v
+
+echo
+echo "== Refresh TeX filename/map/font caches =="
+
+if command -v mktexlsr >/dev/null 2>&1; then
+  mktexlsr || true
+fi
+
+if command -v updmap-sys >/dev/null 2>&1; then
+  updmap-sys || true
+fi
+
+if command -v luaotfload-tool >/dev/null 2>&1; then
+  luaotfload-tool --update --force || true
+fi
+
+echo
+echo "== Common font matches =="
+
+for name in \
+  "SimSun" \
+  "NSimSun" \
+  "SimHei" \
+  "KaiTi" \
+  "FangSong" \
+  "Microsoft YaHei" \
+  "Microsoft JhengHei" \
+  "PMingLiU" \
+  "MingLiU" \
+  "Noto Serif CJK SC" \
+  "Noto Sans CJK SC" \
+  "FandolSong" \
+  "FandolHei" \
+  "FandolKai" \
+  "FandolFang" \
+  "Arial" \
+  "Times New Roman" \
+  "Courier New" \
+  "Calibri" \
+  "Cambria"
+do
+  echo "--- ${name}"
+  fc-match "${name}" || true
+done
+
+echo
+echo "== TeX Live Fandol lookup =="
+
+if command -v kpsewhich >/dev/null 2>&1; then
+  for file in \
+    FandolSong-Regular.otf \
+    FandolHei-Regular.otf \
+    FandolKai-Regular.otf \
+    FandolFang-Regular.otf
+  do
+    echo "--- ${file}"
+    kpsewhich "${file}" || true
+  done
+fi
+
+echo
+echo "Font cache refresh complete."

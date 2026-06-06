@@ -184,7 +184,9 @@ environment:
   # 禁用注册时的邮箱确认（默认已禁用）
   EMAIL_CONFIRMATION_DISABLED: "true"
 
-  # 定时清理过期资源
+  # 资源删除安全阀：cron 触发后是否真的执行项目清理/过期删除操作。
+  # 不控制 cron 是否运行，仅控制是否执行破坏性操作。默认关闭更安全。
+  # 仅在明确需要自动清理旧项目时设为 true。
   # ENABLE_CRON_RESOURCE_DELETION: "true"
 ```
 
@@ -325,7 +327,7 @@ docker compose up -d
 services:
   sharelatex:
     restart: always
-    image: fred1653/sharelatex:latest
+    image: fred1653/sharelatex-full:latest
     container_name: sharelatex
     depends_on:
       mongo:

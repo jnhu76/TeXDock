@@ -1,0 +1,35 @@
+\documentclass[UTF8,a4paper,12pt]{ctexart}
+
+\usepackage{fontspec}
+\usepackage{xeCJK}
+
+\setCJKmainfont{SimSun}[AutoFakeBold=true]
+\setCJKfamilyfont{fangsong}{FangSong}[AutoFakeBold=true]
+
+\newcommand{\fangsongwin}{\CJKfamily{fangsong}}
+
+\begin{document}
+
+\section{宋体测试}
+
+这是默认宋体 SimSun 正文。
+
+中文测试：你好，世界。  
+繁体测试：臺灣、資料庫、軟體工程。  
+英文测试：Hello XeLaTeX.
+
+\section{仿宋测试}
+
+{\fangsongwin
+这是仿宋 FangSong 段落。
+
+如果这一段和上面的宋体明显不同，说明仿宋字体加载成功。
+}
+
+\section{数学测试}
+
+\[
+E = mc^2
+\]
+
+\end{document}

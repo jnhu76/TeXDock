@@ -429,26 +429,26 @@ git commit -m "feat(register): customize registration flow"
 TeXDock 采用三层镜像结构，避免每次改 web 都重新安装完整 TeX Live：
 
 ```
-1. fred1653/sharelatex:latest
-   ← 基础 Overleaf web 镜像（官方或自建）
+1. fred1653/sharelatex-base:latest
+   ← Ubuntu + Node.js + TeX Live basic
+   ← 对应 Dockerfile: server-ce/Dockerfile-base
 
-2. fred1653/sharelatex-full-base:latest
-   ← 基础镜像 + 完整 TeX Live + CJK 字体
-   ← 变更极少，构建一次长期复用
-   ← 对应 Dockerfile: server-ce/Dockerfile-full-base
+2. fred1653/sharelatex:latest
+   ← Overleaf CE 应用代码
+   ← 对应 Dockerfile: server-ce/Dockerfile
 
 3. fred1653/sharelatex-full:latest
-   ← 基于 full-base，覆盖最新 web 代码
-   ← 日常 web 修改后只需 rebuild 此层
-   ← 对应 Dockerfile: server-ce/Dockerfile-full-web
+   ← 完整 TeX Live + CJK 字体 + 辅助脚本
+   ← 对应 Dockerfile: server-ce/Dockerfile-full
+   ← 日常 web 修改后可通过 Dockerfile-full-web 只覆盖 web 代码
 ```
 
-### 第一步：构建 full-base（只做一次或少量更新）
+### 构建 sharelatex-full（TeX Live 变更时才需要）
 
 ```bash
 docker build \
-  -f server-ce/Dockerfile-full-base \
-  -t fred1653/sharelatex-full-base:latest \
+  -f server-ce/Dockerfile-full \
+  -t fred1653/sharelatex-full:latest \
   .
 ```
 
@@ -457,12 +457,12 @@ docker build \
 ```bash
 docker build \
   --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet \
-  -f server-ce/Dockerfile-full-base \
-  -t fred1653/sharelatex-full-base:latest \
+  -f server-ce/Dockerfile-full \
+  -t fred1653/sharelatex-full:latest \
   .
 ```
 
-### 第二步：日常 web 修改后，只覆盖 web 代码
+### 日常 web 修改后，只覆盖 web 代码
 
 ```bash
 docker build \
@@ -505,7 +505,7 @@ docker build \
 docker build -f server-ce/Dockerfile -t fred1653/sharelatex:latest .
 ```
 
-然后需要重新构建 full-base 和 full-web。
+然后需要重新构建 full 和 full-web。
 
 ### 方案 C：完整重建（含 TeX Live）
 
@@ -639,7 +639,7 @@ docker exec sharelatex bash -lc 'sv restart /etc/service/web-overleaf'
 | 前端构建 | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run webpack:production'` |
 | lint | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run lint'` |
 | type-check | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run type-check'` |
-| 构建 full-base（少做） | `docker build -f server-ce/Dockerfile-full-base -t fred1653/sharelatex-full-base:latest .` |
+| 构建 full（少做） | `docker build -f server-ce/Dockerfile-full -t fred1653/sharelatex-full:latest .` |
 | 构建 full-web（常用） | `docker build -f server-ce/Dockerfile-full-web -t fred1653/sharelatex-full:latest .` |
 | 使用新 image 启动 | `docker compose up -d --force-recreate` |
 

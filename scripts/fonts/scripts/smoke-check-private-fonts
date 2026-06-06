@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+echo "== Private font smoke check =="
+
+if ! command -v fc-match >/dev/null 2>&1; then
+  echo "ERROR: fc-match is required."
+  exit 1
+fi
+
+trim() {
+  sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+font_match_line() {
+  local name="$1"
+  fc-match -f '%{family}|%{file}\n' "${name}" | head -n 1
+}
+
+font_family_list() {
+  local name="$1"
+  fc-match -f '%{family}\n' "${name}" | head -n 1 | tr ',' '\n' | trim
+}
+
+font_file() {
+  local name="$1"
+  font_match_line "${name}" | cut -d'|' -f2-
+}
+
+has_exact_family() {
+  local name="$1"
+  font_family_list "${name}" | grep -Fx -- "${name}" >/dev/null 2>&1
+}
+
+print_match() {
+  local name="$1"
+  echo "--- ${name}"
+  echo "families:"
+  font_family_list "${name}" | sed 's/^/  - /' || true
+  echo "file: $(font_file "${name}")"
+}
+
+check_required_family() {
+  local name="$1"
+  print_match "${name}"
+
+  if ! has_exact_family "${name}"; then
+    echo "ERROR: required private font family is not an exact match: ${name}"
+    echo "       This usually means fontconfig fell back to Noto/Fandol alias instead of real Windows font."
+    echo "       Check whether fonts.zip contains the corresponding .ttf/.ttc/.otf file."
+    exit 1
+  fi
+}
+
+IFS='|' read -r -a required_fonts <<< "${REQUIRED_PRIVATE_FONT_FAMILIES:-SimSun|SimHei|FangSong|KaiTi}"
+IFS='|' read -r -a optional_fonts <<< "${OPTIONAL_PRIVATE_FONT_FAMILIES:-NSimSun|Microsoft YaHei|Microsoft JhengHei|PMingLiU|MingLiU|DengXian|Arial|Times New Roman|Courier New|Calibri|Cambria|Consolas}"
+
+echo
+echo "== Required exact private font families =="
+
+for name in "${required_fonts[@]}"; do
+  [ -n "${name}" ] || continue
+  check_required_family "${name}"
+done
+
+echo
+echo "== Optional font matches =="
+
+for name in "${optional_fonts[@]}"; do
+  [ -n "${name}" ] || continue
+  print_match "${name}" || true
+done
+
+echo
+echo "== TeX Live Fandol lookup =="
+
+if command -v kpsewhich >/dev/null 2>&1; then
+  for file in \
+    FandolSong-Regular.otf \
+    FandolHei-Regular.otf \
+    FandolKai-Regular.otf \
+    FandolFang-Regular.otf
+  do
+    echo "--- ${file}"
+    kpsewhich "${file}" || true
+  done
+fi
+
+if [ "${PRIVATE_FONT_COMPILE_SMOKE:-true}" = "true" ]; then
+  echo
+  echo "== XeLaTeX private Windows font compile smoke test =="
+
+  if ! command -v xelatex >/dev/null 2>&1; then
+    echo "WARN: xelatex not found, skipped compile smoke test."
+  else
+    tmp_dir="$(mktemp -d)"
+    cleanup() {
+      rm -rf "${tmp_dir}"
+    }
+    trap cleanup EXIT
+
+    cd "${tmp_dir}"
+
+    cat > private-fonts.tex <<'TEXDOC'
+\documentclass{article}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+
+\setCJKmainfont{SimSun}
+\setCJKsansfont{SimHei}
+\setCJKmonofont{FangSong}
+\newCJKfontfamily\kaiti{KaiTi}
+
+\begin{document}
+Windows private fonts smoke test.
+
+SimSun 宋体中文测试。
+
+{\sffamily SimHei 黑体中文测试。}
+
+{\ttfamily FangSong 仿宋中文测试。}
+
+{\kaiti KaiTi 楷体中文测试。}
+
+\end{document}
+TEXDOC
+
+    xelatex -interaction=nonstopmode -halt-on-error private-fonts.tex
+    test -s private-fonts.pdf
+  fi
+fi
+
+echo
+echo "Private font smoke check passed."

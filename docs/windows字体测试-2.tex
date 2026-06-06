@@ -1,0 +1,131 @@
+\documentclass[UTF8,a4paper,12pt]{ctexart}
+
+\usepackage{geometry}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\usepackage{amsmath}
+
+\geometry{
+  left=2.5cm,
+  right=2.5cm,
+  top=2.5cm,
+  bottom=2.5cm
+}
+
+% ------------------------------------------------------------
+% Windows 中文字体测试
+% 如果你已经导入 Windows fonts.zip，这里应该直接命中真实字体。
+% 如果你配置了 fontconfig alias，也可以测试 alias 是否生效。
+% ------------------------------------------------------------
+\setCJKmainfont{SimSun}[
+  AutoFakeBold=true,
+  AutoFakeSlant=true
+]
+
+\setCJKfamilyfont{song}{SimSun}[
+  AutoFakeBold=true,
+  AutoFakeSlant=true
+]
+
+\setCJKfamilyfont{fangsong}{FangSong}[
+  AutoFakeBold=true,
+  AutoFakeSlant=true
+]
+
+\setCJKfamilyfont{hei}{SimHei}[
+  AutoFakeBold=true,
+  AutoFakeSlant=true
+]
+
+\setCJKfamilyfont{kai}{KaiTi}[
+  AutoFakeBold=true,
+  AutoFakeSlant=true
+]
+
+\newcommand{\songtiwin}{\CJKfamily{song}}
+\newcommand{\fangsongwin}{\CJKfamily{fangsong}}
+\newcommand{\heitiwin}{\CJKfamily{hei}}
+\newcommand{\kaitiwin}{\CJKfamily{kai}}
+
+\title{中文字体测试文档}
+\author{TeXDock / ShareLaTeX 字体环境测试}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{基础中文测试}
+
+这是默认正文。当前正文主字体应为宋体 SimSun。
+
+中文测试：你好，世界。  
+标点测试：，。！？；：“”‘’（）《》——……  
+繁体测试：臺灣、資料庫、軟體工程、雲端服務。  
+英文混排测试：This is a XeLaTeX Chinese font test.
+
+\section{宋体测试}
+
+{\songtiwin
+这是宋体 SimSun 测试段落。
+
+宋体通常用于正文。这里测试普通中文、英文 ABC、数字 1234567890，以及数学公式旁边的文字。
+
+加粗测试：\textbf{这是宋体加粗测试。}
+
+倾斜测试：\textit{这是宋体倾斜测试。}
+}
+
+\section{仿宋测试}
+
+{\fangsongwin
+这是仿宋 FangSong 测试段落。
+
+仿宋常用于公文、标题说明或正式文档中的特定段落。
+
+加粗测试：\textbf{这是仿宋加粗测试。}
+
+倾斜测试：\textit{这是仿宋倾斜测试。}
+}
+
+\section{黑体测试}
+
+{\heitiwin
+这是黑体 SimHei 测试段落。
+
+黑体通常用于标题、强调文字或小节名称。
+
+加粗测试：\textbf{这是黑体加粗测试。}
+}
+
+\section{楷体测试}
+
+{\kaitiwin
+这是楷体 KaiTi 测试段落。
+
+楷体通常用于引文、说明、题词或示例文本。
+
+加粗测试：\textbf{这是楷体加粗测试。}
+}
+
+\section{中英文与数学混排测试}
+
+这是一个中英文混排段落：The quick brown fox jumps over the lazy dog。
+
+数学公式测试：
+
+\[
+E = mc^2
+\]
+
+\[
+\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+\]
+
+中文公式说明：上面的公式用于测试数学环境是否正常，中文字体是否和数学字体共存。
+
+\section{结论}
+
+如果本文档能够正常编译，并且 PDF 中可以看到宋体、仿宋、黑体、楷体的不同字形，说明中文字体、fontconfig alias、XeLaTeX 和 ctex 基本工作正常。
+
+\end{document}
