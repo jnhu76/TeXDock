@@ -399,9 +399,85 @@ git commit -m "feat(register): customize registration flow"
 
 ---
 
-## 12. 重新构建 image
+## 12. 镜像固化：不要用 export / commit
 
-开发态验证通过后，需要将修改固化进 image。
+> **结论：不要用 `docker export` 或 `docker commit` 做正式版本。**
+>
+> 正式路线：
+> ```
+> 源码修改 → docker build 生成新 image → compose 使用新 image
+> ```
+
+### 为什么不建议导出？
+
+**`docker export`** 问题最大：
+
+- 只导出容器文件系统，不保留 image 的 `CMD` / `ENTRYPOINT` / `ENV` / `EXPOSE` / `HEALTHCHECK` / history
+- 导出来再 `docker import`，容易变成"能看到文件，但启动逻辑丢了"的镜像
+
+**`docker commit`** 比 export 好一点，但也不推荐正式用：
+
+- 能保留部分容器状态，但修改来源不可复现
+- 以后你不知道这个 image 里到底手工改过什么
+
+现在已经有源码仓库了，应该让 image 从源码构建出来。
+
+---
+
+## 13. 多层镜像架构
+
+TeXDock 采用三层镜像结构，避免每次改 web 都重新安装完整 TeX Live：
+
+```
+1. fred1653/sharelatex:latest
+   ← 基础 Overleaf web 镜像（官方或自建）
+
+2. fred1653/sharelatex-full-base:latest
+   ← 基础镜像 + 完整 TeX Live + CJK 字体
+   ← 变更极少，构建一次长期复用
+   ← 对应 Dockerfile: server-ce/Dockerfile-full-base
+
+3. fred1653/sharelatex-full:latest
+   ← 基于 full-base，覆盖最新 web 代码
+   ← 日常 web 修改后只需 rebuild 此层
+   ← 对应 Dockerfile: server-ce/Dockerfile-full-web
+```
+
+### 第一步：构建 full-base（只做一次或少量更新）
+
+```bash
+docker build \
+  -f server-ce/Dockerfile-full-base \
+  -t fred1653/sharelatex-full-base:latest \
+  .
+```
+
+可选指定 TeX Live 镜像源加速：
+
+```bash
+docker build \
+  --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet \
+  -f server-ce/Dockerfile-full-base \
+  -t fred1653/sharelatex-full-base:latest \
+  .
+```
+
+### 第二步：日常 web 修改后，只覆盖 web 代码
+
+```bash
+docker build \
+  -f server-ce/Dockerfile-full-web \
+  -t fred1653/sharelatex-full:latest \
+  .
+```
+
+这样以后改 web，只需要跑这一条命令，不用每次重新安装 TeX Live。
+
+---
+
+## 14. 镜像固化流程
+
+开发态验证通过后，将修改固化进 image。
 
 先停止开发态容器：
 
@@ -412,28 +488,50 @@ docker compose \
   down
 ```
 
-构建新 image：
+### 方案 A：仅更新 web 层（推荐日常使用）
 
 ```bash
-docker build -f server-ce/Dockerfile -t texdock:dev .
+docker build \
+  -f server-ce/Dockerfile-full-web \
+  -t fred1653/sharelatex-full:latest \
+  .
+```
+
+### 方案 B：重新构建基础 web 镜像
+
+如果修改了 web 之外的内容（如 libraries）：
+
+```bash
+docker build -f server-ce/Dockerfile -t fred1653/sharelatex:latest .
+```
+
+然后需要重新构建 full-base 和 full-web。
+
+### 方案 C：完整重建（含 TeX Live）
+
+```bash
+docker build -f server-ce/Dockerfile-full -t fred1653/sharelatex-full:latest .
 ```
 
 如果想带版本号：
 
 ```bash
-docker build -f server-ce/Dockerfile -t texdock:web-customization-$(date +%Y%m%d-%H%M) .
+docker build \
+  -f server-ce/Dockerfile-full-web \
+  -t fred1653/sharelatex-full:$(date +%Y%m%d-%H%M) \
+  .
 ```
 
 ---
 
-## 13. 使用新 image 启动
+## 15. 使用新 image 启动
 
 确认 `docker-compose.yml` 中 `sharelatex` 使用新 image：
 
 ```yaml
 services:
   sharelatex:
-    image: texdock:dev
+    image: fred1653/sharelatex-full:latest
 ```
 
 然后**不带** dev overlay 启动：
@@ -456,6 +554,14 @@ docker exec sharelatex bash -lc 'sv status /etc/service/web-overleaf /etc/servic
 docker exec sharelatex bash -lc 'tail -n 120 /var/log/overleaf/web.log'
 ```
 
+验证中文 LaTeX 支持：
+
+```bash
+docker exec sharelatex bash -lc 'kpsewhich ctex.sty'
+docker exec sharelatex bash -lc 'fc-list | grep -i "Noto Sans CJK" | head'
+docker exec sharelatex bash -lc 'xelatex --version'
+```
+
 浏览器访问：
 
 - `http://localhost/`
@@ -464,7 +570,7 @@ docker exec sharelatex bash -lc 'tail -n 120 /var/log/overleaf/web.log'
 
 ---
 
-## 14. 最终验证清单
+## 16. 最终验证清单
 
 构建 image 后，至少验证：
 
@@ -478,17 +584,19 @@ docker exec sharelatex bash -lc 'tail -n 120 /var/log/overleaf/web.log'
 - [ ] `web-overleaf` 状态稳定，不再反复 1s 重启
 - [ ] `/var/log/overleaf/web.log` 没有启动级别异常
 - [ ] 不挂载 `docker-compose.dev.web.yml` 时功能仍然存在
+- [ ] `kpsewhich ctex.sty` 能找到 ctex（full 镜像）
+- [ ] `xelatex` 可用（full 镜像）
 
 ---
 
-## 15. 回滚方式
+## 17. 回滚方式
 
 如果新 image 有问题，可以先恢复原 image。
 
 查看本地 image：
 
 ```bash
-docker images | grep texdock
+docker images | grep -E 'sharelatex|texdock'
 ```
 
 切回旧 image，例如：
@@ -496,15 +604,7 @@ docker images | grep texdock
 ```yaml
 services:
   sharelatex:
-    image: sharelatex/sharelatex
-```
-
-或者切回之前的自定义 tag：
-
-```yaml
-services:
-  sharelatex:
-    image: texdock:previous
+    image: fred1653/sharelatex-full:previous
 ```
 
 然后：
@@ -528,7 +628,7 @@ docker exec sharelatex bash -lc 'sv restart /etc/service/web-overleaf'
 
 ---
 
-## 16. 命令速查
+## 18. 命令速查
 
 | 操作 | 命令 |
 |------|------|
@@ -539,12 +639,13 @@ docker exec sharelatex bash -lc 'sv restart /etc/service/web-overleaf'
 | 前端构建 | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run webpack:production'` |
 | lint | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run lint'` |
 | type-check | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run type-check'` |
-| 构建新 image | `docker build -f server-ce/Dockerfile -t texdock:dev .` |
+| 构建 full-base（少做） | `docker build -f server-ce/Dockerfile-full-base -t fred1653/sharelatex-full-base:latest .` |
+| 构建 full-web（常用） | `docker build -f server-ce/Dockerfile-full-web -t fred1653/sharelatex-full:latest .` |
 | 使用新 image 启动 | `docker compose up -d --force-recreate` |
 
 ---
 
-## 17. 推荐原则
+## 19. 推荐原则
 
 **开发时：**
 
@@ -552,6 +653,10 @@ docker exec sharelatex bash -lc 'sv restart /etc/service/web-overleaf'
 
 **发布 / 固化时：**
 
-> 本地源码 + docker build + 新 image
+> 本地源码 + docker build + 新 image（不要 export / commit）
+
+**日常 web 修改固化：**
+
+> 只 rebuild `Dockerfile-full-web`，不重建 TeX Live 层
 
 不要长期在容器内部直接改代码。容器内手改无法稳定复现，也不方便 git diff、测试和重新构建。
