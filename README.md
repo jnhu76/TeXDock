@@ -40,11 +40,22 @@ docker compose -f docker-compose.yml down
 
 ```yaml
 OVERLEAF_SITE_URL: http://your-server-ip           # 🌍 外网访问时必须设置
-OVERLEAF_EMAIL_SMTP_HOST: smtp.example.com          # 📧 SMTP 邮件
-OVERLEAF_EMAIL_SMTP_PORT: 587
+```
+
+#### 📧 邮件配置（SMTP）
+
+邮件功能用于注册确认、密码重置、项目邀请等。在 `docker-compose.yml` 中取消注释以下变量并填入你的 SMTP 信息：
+
+```yaml
+OVERLEAF_EMAIL_FROM_ADDRESS: "noreply@example.com"  # 发件人地址
+OVERLEAF_EMAIL_SMTP_HOST: smtp.example.com          # SMTP 服务器
+OVERLEAF_EMAIL_SMTP_PORT: 587                       # 端口（465 或 587）
+OVERLEAF_EMAIL_SMTP_SECURE: false                   # 465→true, 587→false
 OVERLEAF_EMAIL_SMTP_USER: user@example.com
 OVERLEAF_EMAIL_SMTP_PASS: your-password
 ```
+
+> ⚠️ **TLS 证书问题**：如果遇到邮件发送失败（尤其是自建邮件服务器），建议将 `OVERLEAF_EMAIL_SMTP_TLS_REJECT_UNAUTH` 设为 `false` 或注释掉。
 
 📖 完整配置说明见 [**部署指南**](docs/deployment-guide.md)。
 
