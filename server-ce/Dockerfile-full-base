@@ -1,0 +1,49 @@
+# server-ce/Dockerfile-full-base
+#
+# 基于 sharelatex 基础镜像，安装完整 TeX Live + CJK 字体。
+# 此层变更较少，构建一次后长期复用。
+#
+# 用法:
+#   docker build -f server-ce/Dockerfile-full-base -t fred1653/sharelatex-full-base:latest .
+#   # 可选指定 TeX Live 镜像源加速:
+#   # docker build --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet ...
+
+FROM fred1653/sharelatex:latest
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG TEXLIVE_REPOSITORY=""
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      fontconfig \
+      fonts-noto-cjk \
+      fonts-noto-cjk-extra \
+      fonts-noto-color-emoji \
+      fonts-wqy-microhei \
+      fonts-wqy-zenhei \
+      fonts-arphic-ukai \
+      fonts-arphic-uming \
+      ghostscript \
+      make \
+      perl \
+      xz-utils; \
+    rm -rf /var/lib/apt/lists/*; \
+    fc-cache -fv
+
+RUN set -eux; \
+    if [[ -n "${TEXLIVE_REPOSITORY}" ]]; then \
+      tlmgr option repository "${TEXLIVE_REPOSITORY}"; \
+    fi; \
+    tlmgr update --self; \
+    tlmgr update --all; \
+    tlmgr install scheme-full; \
+    tlmgr path add; \
+    mktexlsr; \
+    updmap-sys; \
+    luaotfload-tool --update || true; \
+    fc-cache -fv
