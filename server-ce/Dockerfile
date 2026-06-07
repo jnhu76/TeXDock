@@ -5,6 +5,10 @@
 ARG OVERLEAF_BASE_TAG=fred1653/sharelatex-base:latest
 FROM $OVERLEAF_BASE_TAG
 
+ARG TEXDOCK_VERSION=dev
+LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
+      texdock.version="${TEXDOCK_VERSION}"
+
 WORKDIR /overleaf
 
 # Add required source files for yarn/npm install

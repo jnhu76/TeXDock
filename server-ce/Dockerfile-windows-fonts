@@ -36,6 +36,10 @@ ARG BASE_IMAGE=fred1653/sharelatex-full:latest
 
 FROM ${BASE_IMAGE}
 
+ARG TEXDOCK_VERSION=dev
+LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
+      texdock.version="${TEXDOCK_VERSION}"
+
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 USER root

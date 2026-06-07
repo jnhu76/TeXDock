@@ -4,6 +4,10 @@
 # --------------------------------------------------
 FROM phusion/baseimage:noble-1.0.3
 
+ARG TEXDOCK_VERSION=dev
+LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
+      texdock.version="${TEXDOCK_VERSION}"
+
 # Makes sure LuaTex cache is writable
 # -----------------------------------
 ENV TEXMFVAR=/var/lib/overleaf/tmp/texmf-var
