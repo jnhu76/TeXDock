@@ -10,6 +10,7 @@
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green)
 ![TeX Live](https://img.shields.io/badge/TeX%20Live-2026-blue)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20x86__64-lightgrey)
+![Version](https://img.shields.io/badge/version-0.2.0-orange)
 
 本项目基于 [Overleaf Community Edition](https://github.com/overleaf/overleaf) 修改，遵循 [AGPL-3.0](LICENSE) 许可证发布。
 
@@ -20,6 +21,8 @@
 ## 🚀 使用
 
 直接使用预构建镜像，无需自己编译。镜像地址：[Docker Hub → fred1653/sharelatex-full](https://hub.docker.com/repository/docker/fred1653/sharelatex-full/general)
+
+> 当前版本 **0.2.0**。`latest` tag 等价于 `0.2.0`。正式部署推荐使用固定版本号 tag。详见 [**版本策略**](docs/version-policy.md)。
 
 ```bash
 # 使用项目根目录的 docker-compose.yml 启动
@@ -108,9 +111,19 @@ Dockerfile-base  →  sharelatex-base    →  sharelatex       →  sharelatex-f
 ```
 
 ```bash
-docker build -f server-ce/Dockerfile-base -t fred1653/sharelatex-base:latest .
-docker build -f server-ce/Dockerfile -t fred1653/sharelatex:latest .
-docker build -f server-ce/Dockerfile-full -t fred1653/sharelatex-full:latest .
+VERSION=$(cat VERSION)
+
+docker build -f server-ce/Dockerfile-base \
+  --build-arg TEXDOCK_VERSION=$VERSION \
+  -t fred1653/sharelatex-base:$VERSION -t fred1653/sharelatex-base:latest .
+docker build -f server-ce/Dockerfile \
+  --build-arg TEXDOCK_VERSION=$VERSION \
+  --build-arg OVERLEAF_BASE_TAG=fred1653/sharelatex-base:$VERSION \
+  -t fred1653/sharelatex:$VERSION -t fred1653/sharelatex:latest .
+docker build -f server-ce/Dockerfile-full \
+  --build-arg TEXDOCK_VERSION=$VERSION \
+  --build-arg BASE_IMAGE=fred1653/sharelatex:$VERSION \
+  -t fred1653/sharelatex-full:$VERSION -t fred1653/sharelatex-full:latest .
 ```
 
 📖 完整构建说明、字体策略、私有字体镜像见 [**构建指南**](docs/build-guide.md)。
@@ -153,6 +166,7 @@ docker compose up -d --force-recreate
 | 🚀 部署使用 | [**部署指南**](docs/deployment-guide.md) — 系统要求、配置详解、启动初始化、常见问题 |
 | 🔨 镜像构建 | [**构建指南**](docs/build-guide.md) — 三级构建、字体策略、宏包安装 |
 | 💻 Web 开发 | [**Web 开发流程**](docs/web-development-workflow.md) — volume overlay、调试、镜像固化 |
+| 📌 版本策略 | [**版本策略**](docs/version-policy.md) — 版本号规则、Docker tag 策略 |
 
 ## 📂 目录结构
 

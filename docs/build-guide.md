@@ -2,6 +2,8 @@
 
 镜像构建、字体策略、TeX Live 宏包安装。
 
+> 当前版本 **0.2.0**。`latest` tag 等价于 `0.2.0`。正式部署推荐使用固定版本号 tag（如 `fred1653/sharelatex-full:0.2.0`），开发可以使用 `latest`。详见 [**版本策略**](version-policy.md)。
+
 ---
 
 ## 1. 构建流程
@@ -31,10 +33,27 @@ Dockerfile-full-web  →  fred1653/sharelatex-full:latest
 ### 完整三级构建
 
 ```bash
-docker build -f server-ce/Dockerfile-base -t fred1653/sharelatex-base:latest .
-docker build -f server-ce/Dockerfile -t fred1653/sharelatex:latest .
-docker build -f server-ce/Dockerfile-full -t fred1653/sharelatex-full:latest .
+VERSION=$(cat VERSION)
+
+docker build -f server-ce/Dockerfile-base \
+  --build-arg TEXDOCK_VERSION=$VERSION \
+  -t fred1653/sharelatex-base:$VERSION \
+  -t fred1653/sharelatex-base:latest .
+
+docker build -f server-ce/Dockerfile \
+  --build-arg TEXDOCK_VERSION=$VERSION \
+  --build-arg OVERLEAF_BASE_TAG=fred1653/sharelatex-base:$VERSION \
+  -t fred1653/sharelatex:$VERSION \
+  -t fred1653/sharelatex:latest .
+
+docker build -f server-ce/Dockerfile-full \
+  --build-arg TEXDOCK_VERSION=$VERSION \
+  --build-arg BASE_IMAGE=fred1653/sharelatex:$VERSION \
+  -t fred1653/sharelatex-full:$VERSION \
+  -t fred1653/sharelatex-full:latest .
 ```
+
+> 每一级必须使用上一级的版本号 tag（`$VERSION`），不得使用 `latest`。详见 [**版本策略**](version-policy.md)。
 
 ### 日常 web 修改
 
@@ -45,8 +64,12 @@ docker build -f server-ce/Dockerfile-full-web -t fred1653/sharelatex-full:latest
 ### 构建私有字体镜像
 
 ```bash
+VERSION=$(cat VERSION)
+
 docker build -f server-ce/Dockerfile-windows-fonts \
-  --build-arg BASE_IMAGE=fred1653/sharelatex-full:latest \
+  --build-arg TEXDOCK_VERSION=$VERSION \
+  --build-arg BASE_IMAGE=fred1653/sharelatex-full:$VERSION \
+  -t fred1653/sharelatex-full-private:$VERSION \
   -t fred1653/sharelatex-full-private:latest .
 ```
 
@@ -54,6 +77,7 @@ docker build -f server-ce/Dockerfile-windows-fonts \
 
 | 参数 | 适用 Dockerfile | 默认值 | 说明 |
 |------|----------------|--------|------|
+| `TEXDOCK_VERSION` | 全部 | `dev` | 版本号，写入 OCI label |
 | `UBUNTU_MIRROR` | base, full | `https://mirrors.tuna.tsinghua.edu.cn/ubuntu` | Ubuntu apt 镜像 |
 | `TEXLIVE_MIRROR` | base | `https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet` | TeX Live 安装源 |
 | `TEXLIVE_REPOSITORY` | full | `https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet` | CTAN 镜像（tlmgr） |
