@@ -80,11 +80,18 @@ export default {
       return res.status(404).render(viewPath('not-found'), { type: 'User' })
     }
 
-    const projects = await ProjectGetter.promises.findAllUsersProjects(userId, {
-      name: 1,
-      lastUpdated: 1,
-      createdAt: 1,
-    })
+    const projectsResult = await ProjectGetter.promises.findAllUsersProjects(
+      userId,
+      { name: 1, lastUpdated: 1 }
+    )
+    const projects = [
+      ...projectsResult.owned,
+      ...projectsResult.readAndWrite,
+      ...projectsResult.readOnly,
+      ...projectsResult.tokenReadAndWrite,
+      ...projectsResult.tokenReadOnly,
+      ...projectsResult.review,
+    ]
 
     const deletedProjects = await db.projects
       .find({

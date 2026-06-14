@@ -36,12 +36,12 @@ block content
 														a(href='/admin/user/' + owner._id)= owner.email
 													else
 														| -
-											tr
-												th Created
-												td= project.createdAt ? new Date(project.createdAt).toLocaleString() : '-'
-											tr
-												th Last Updated
-												td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleString() : '-'
+										tr
+											th Created
+											td -
+										tr
+											th Last Updated
+											td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleString() : '-'
 
 									h3 Actions
 									.row
@@ -56,14 +56,15 @@ block content
 											.col-sm-6
 												form(method='POST', action='/admin/project/' + project._id + '/transfer')
 													input(type='hidden', name='_csrf', value=csrfToken)
-													.input-group
-														input.form-control(
-															type='text'
-															name='targetUserId'
-															placeholder='User ID or Email'
-														)
-														span.input-group-btn
-															button.btn.btn-primary(type='submit') Transfer
+													.form-group
+														.input-group
+															input.form-control(
+																type='text'
+																name='targetUserId'
+																placeholder='User ID or Email'
+															)
+															span.input-group-btn
+																button.btn.btn-primary(type='submit') Transfer
 
 								.tab-pane(
 									role="tabpanel"
