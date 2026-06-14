@@ -6,6 +6,50 @@ const CommandRunner = require('./CommandRunner')
 const fs = require('node:fs')
 
 const ProcessTable = {} // table of currently running jobs (pids or docker container names)
+// Each entry: { pid, startTime, timeout }
+
+const WATCHDOG_INTERVAL_MS = 30 * 1000 // check every 30 seconds
+
+let watchdogTimer = null
+
+function _startWatchdog() {
+  if (watchdogTimer) return
+  if (Settings.maxCompileTimeMs === 0) return
+  const maxTime = Settings.maxCompileTimeMs || 10 * 60 * 1000
+  logger.info({ maxTimeMs: maxTime }, 'starting compile watchdog')
+  watchdogTimer = setInterval(() => {
+    const now = Date.now()
+    for (const [id, entry] of Object.entries(ProcessTable)) {
+      const elapsed = now - entry.startTime
+      if (elapsed > entry.timeout) {
+        logger.warn(
+          { id, elapsed, timeout: entry.timeout },
+          'watchdog: killing stuck compile process'
+        )
+        try {
+          CommandRunner.kill(entry.pid, (err) => {
+            if (err) {
+              logger.err({ err, id }, 'watchdog: failed to kill process')
+            }
+          })
+        } catch (err) {
+          logger.err({ err, id }, 'watchdog: exception killing process')
+        }
+      }
+    }
+    // Stop watchdog when no processes are running
+    if (Object.keys(ProcessTable).length === 0) {
+      _stopWatchdog()
+    }
+  }, WATCHDOG_INTERVAL_MS)
+}
+
+function _stopWatchdog() {
+  if (watchdogTimer) {
+    clearInterval(watchdogTimer)
+    watchdogTimer = null
+  }
+}
 
 const TIME_V_METRICS = Object.entries({
   'cpu-percent': /Percent of CPU this job got: (\d+)/m,
@@ -62,7 +106,11 @@ function runLatex(projectId, options, callback) {
 
   const id = `${projectId}` // record running project under this id
 
-  ProcessTable[id] = CommandRunner.run(
+  const startTime = Date.now()
+  const maxTime = Settings.maxCompileTimeMs || 10 * 60 * 1000
+  const effectiveTimeout =
+    maxTime > 0 && timeout > maxTime ? maxTime : timeout
+  const pid = CommandRunner.run(
     projectId,
     command,
     directory,
@@ -101,6 +149,8 @@ function runLatex(projectId, options, callback) {
       })
     }
   )
+  ProcessTable[id] = { pid, startTime, timeout: effectiveTimeout }
+  _startWatchdog()
 }
 
 function _writeLogOutput(projectId, directory, output, callback) {
@@ -138,7 +188,7 @@ function killLatex(projectId, callback) {
     logger.warn({ id }, 'no such project to kill')
     callback(null)
   } else {
-    CommandRunner.kill(ProcessTable[id], callback)
+    CommandRunner.kill(ProcessTable[id].pid, callback)
   }
 }
 

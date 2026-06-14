@@ -81,6 +81,10 @@ module.exports = {
   pdfCachingWorkerPoolBackLogLimit:
     parseInt(process.env.PDF_CACHING_WORKER_POOL_BACK_LOG_LIMIT, 10) || 40,
   compileConcurrencyLimit: isPreEmptible ? 32 : 64,
+  maxCompileTimeMs: (() => {
+    const val = parseInt(process.env.MAX_COMPILE_TIMEOUT_MINUTES, 10)
+    return isNaN(val) ? 10 * 60 * 1000 : val * 60 * 1000
+  })(),
 }
 
 if (process.env.ALLOWED_COMPILE_GROUPS) {
