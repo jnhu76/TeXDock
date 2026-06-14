@@ -38,10 +38,6 @@ import PasswordResetRouter from './Features/PasswordReset/PasswordResetRouter.mj
 import StaticPagesRouter from './Features/StaticPages/StaticPagesRouter.mjs'
 import ChatController from './Features/Chat/ChatController.js'
 import CommentController from './Features/Chat/CommentController.js'
-import ChatApiHandler from './Features/Chat/ChatApiHandler.js'
-import DocstoreManager from './Features/Docstore/DocstoreManager.js'
-import ProjectGetter from './Features/Project/ProjectGetter.js'
-import UserInfoManager from './Features/User/UserInfoManager.js'
 import Modules from './infrastructure/Modules.js'
 import {
   RateLimiter,
@@ -1144,20 +1140,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
       PermissionsController.requirePermission('chat'),
-      async (req, res, next) => {
-        try {
-          const { project_id: projectId } = req.params
-          const ranges = await DocstoreManager.promises.getAllRanges(projectId)
-          res.json(
-            ranges.map(doc => ({
-              id: doc._id.toString(),
-              ranges: doc.ranges,
-            }))
-          )
-        } catch (err) {
-          next(err)
-        }
-      }
+      CommentController.getRanges
     )
 
     // Threads endpoint for review panel
@@ -1166,96 +1149,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
       PermissionsController.requirePermission('chat'),
-      async (req, res, next) => {
-        try {
-          const { project_id: projectId } = req.params
-          const loggedInUserId = String(
-            SessionManager.getLoggedInUserId(req.session) || ''
-          )
-          const threads = await new Promise((resolve, reject) => {
-            ChatApiHandler.getThreads(projectId, (err, threads) => {
-              if (err) return reject(err)
-              resolve(threads)
-            })
-          })
-
-          // Collect unique user IDs from all messages
-          const userIds = new Set()
-          for (const thread of Object.values(threads)) {
-            for (const msg of thread.messages || []) {
-              if (msg.user_id) userIds.add(String(msg.user_id))
-            }
-          }
-
-          // Fetch user info for all unique users in parallel
-          const userMap = {}
-          const results = await Promise.allSettled(
-            Array.from(userIds).map(async userId => {
-              const user =
-                await UserInfoManager.promises.getPersonalInfo(userId)
-              return { userId, user }
-            })
-          )
-          for (const result of results) {
-            if (result.status === 'fulfilled') {
-              const { userId, user } = result.value
-              if (user) {
-                userMap[userId] = {
-                  id: user._id.toString(),
-                  email: user.email,
-                  name:
-                    [user.first_name, user.last_name]
-                      .filter(Boolean)
-                      .join(' ') || user.email,
-                  avatar_text: (
-                    user.first_name ||
-                    user.email ||
-                    '?'
-                  )[0].toUpperCase(),
-                  hue:
-                    Math.abs(
-                      userId
-                        .split('')
-                        .reduce(
-                          (a, c) =>
-                            ((a << 5) - a + c.charCodeAt(0)) | 0,
-                          0
-                        )
-                    ) % 360,
-                  isSelf: userId === loggedInUserId,
-                }
-              }
-            }
-          }
-
-          // Enrich messages with user objects
-          const enrichedThreads = {}
-          for (const [threadId, thread] of Object.entries(threads)) {
-            enrichedThreads[threadId] = {
-              ...thread,
-              messages: (thread.messages || []).map(msg => {
-                const msgUserId = String(msg.user_id)
-                return {
-                  ...msg,
-                  timestamp: new Date(msg.timestamp),
-                  user: userMap[msgUserId] || {
-                    id: msgUserId,
-                    email: 'unknown',
-                    name: 'Unknown User',
-                    avatar_text: '?',
-                    hue: 0,
-                    isSelf: msgUserId === loggedInUserId,
-                  },
-                }
-              }),
-            }
-          }
-
-          res.json(enrichedThreads)
-        } catch (err) {
-          next(err)
-        }
-      }
+      CommentController.getThreads
     )
 
     // Changes users endpoint for review panel
@@ -1263,30 +1157,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       '/project/:project_id/changes/users',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
-      async (req, res, next) => {
-        try {
-          const { project_id: projectId } = req.params
-          const project = await ProjectGetter.promises.getProject(projectId, {
-            owner_ref: true,
-          })
-          if (!project) {
-            return res.sendStatus(404)
-          }
-          const owner = await UserInfoManager.promises.getPersonalInfo(project.owner_ref)
-          const users = []
-          if (owner) {
-            users.push({
-              id: owner._id.toString(),
-              email: owner.email,
-              first_name: owner.first_name,
-              last_name: owner.last_name,
-            })
-          }
-          res.json(users)
-        } catch (err) {
-          next(err)
-        }
-      }
+      CommentController.getChangesUsers
     )
   }
 
