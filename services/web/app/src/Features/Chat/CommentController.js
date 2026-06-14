@@ -27,7 +27,9 @@ function sendComment(req, res, next) {
         if (err) {
           return next(err)
         }
-        message.user = UserInfoController.formatPersonalInfo(user)
+        message.user = user
+          ? UserInfoController.formatPersonalInfo(user)
+          : null
         EditorRealTimeController.emitToRoom(
           projectId,
           'new-chat-message',

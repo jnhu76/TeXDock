@@ -1091,6 +1091,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       '/project/:project_id/thread/:thread_id/messages',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
       RateLimiterMiddleware.rateLimit(rateLimiters.sendChatMessage),
       CommentController.sendComment
     )
@@ -1098,36 +1099,42 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       '/project/:project_id/thread/:thread_id/messages/:message_id/edit',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
       CommentController.editMessage
     )
     webRouter.delete(
       '/project/:project_id/thread/:thread_id/messages/:message_id',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanAdminProject,
+      PermissionsController.requirePermission('chat'),
       CommentController.deleteMessage
     )
     webRouter.delete(
       '/project/:project_id/thread/:thread_id/own-messages/:message_id',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
       CommentController.deleteUserMessage
     )
     webRouter.post(
       '/project/:project_id/thread/:thread_id/resolve',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
       CommentController.resolveThread
     )
     webRouter.post(
       '/project/:project_id/thread/:thread_id/reopen',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
       CommentController.reopenThread
     )
     webRouter.delete(
       '/project/:project_id/thread/:thread_id',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanAdminProject,
+      PermissionsController.requirePermission('chat'),
       CommentController.deleteThread
     )
 
@@ -1160,6 +1167,9 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       async (req, res, next) => {
         try {
           const { project_id: projectId } = req.params
+          const loggedInUserId = String(
+            SessionManager.getLoggedInUserId(req.session) || ''
+          )
           const threads = await new Promise((resolve, reject) => {
             ChatApiHandler.getThreads(projectId, (err, threads) => {
               if (err) return reject(err)
@@ -1171,27 +1181,48 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
           const userIds = new Set()
           for (const thread of Object.values(threads)) {
             for (const msg of thread.messages || []) {
-              if (msg.user_id) userIds.add(msg.user_id)
+              if (msg.user_id) userIds.add(String(msg.user_id))
             }
           }
 
-          // Fetch user info for all unique users
+          // Fetch user info for all unique users in parallel
           const userMap = {}
-          for (const userId of userIds) {
-            try {
-              const user = await UserInfoManager.promises.getPersonalInfo(userId)
+          const results = await Promise.allSettled(
+            Array.from(userIds).map(async userId => {
+              const user =
+                await UserInfoManager.promises.getPersonalInfo(userId)
+              return { userId, user }
+            })
+          )
+          for (const result of results) {
+            if (result.status === 'fulfilled') {
+              const { userId, user } = result.value
               if (user) {
                 userMap[userId] = {
                   id: user._id.toString(),
                   email: user.email,
-                  name: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email,
-                  avatar_text: (user.first_name || user.email || '?')[0].toUpperCase(),
-                  hue: Math.abs(userId.split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0)) % 360,
-                  isSelf: false,
+                  name:
+                    [user.first_name, user.last_name]
+                      .filter(Boolean)
+                      .join(' ') || user.email,
+                  avatar_text: (
+                    user.first_name ||
+                    user.email ||
+                    '?'
+                  )[0].toUpperCase(),
+                  hue:
+                    Math.abs(
+                      userId
+                        .split('')
+                        .reduce(
+                          (a, c) =>
+                            ((a << 5) - a + c.charCodeAt(0)) | 0,
+                          0
+                        )
+                    ) % 360,
+                  isSelf: userId === loggedInUserId,
                 }
               }
-            } catch (e) {
-              // user not found, skip
             }
           }
 
@@ -1200,18 +1231,21 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
           for (const [threadId, thread] of Object.entries(threads)) {
             enrichedThreads[threadId] = {
               ...thread,
-              messages: (thread.messages || []).map(msg => ({
-                ...msg,
-                timestamp: new Date(msg.timestamp),
-                user: userMap[msg.user_id] || {
-                  id: msg.user_id,
-                  email: 'unknown',
-                  name: 'Unknown User',
-                  avatar_text: '?',
-                  hue: 0,
-                  isSelf: false,
-                },
-              })),
+              messages: (thread.messages || []).map(msg => {
+                const msgUserId = String(msg.user_id)
+                return {
+                  ...msg,
+                  timestamp: new Date(msg.timestamp),
+                  user: userMap[msgUserId] || {
+                    id: msgUserId,
+                    email: 'unknown',
+                    name: 'Unknown User',
+                    avatar_text: '?',
+                    hue: 0,
+                    isSelf: msgUserId === loggedInUserId,
+                  },
+                }
+              }),
             }
           }
 
@@ -1237,12 +1271,15 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
             return res.sendStatus(404)
           }
           const owner = await UserInfoManager.promises.getPersonalInfo(project.owner_ref)
-          const users = [{
-            id: owner._id.toString(),
-            email: owner.email,
-            first_name: owner.first_name,
-            last_name: owner.last_name,
-          }]
+          const users = []
+          if (owner) {
+            users.push({
+              id: owner._id.toString(),
+              email: owner.email,
+              first_name: owner.first_name,
+              last_name: owner.last_name,
+            })
+          }
           res.json(users)
         } catch (err) {
           next(err)
