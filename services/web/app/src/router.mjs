@@ -1103,7 +1103,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     webRouter.delete(
       '/project/:project_id/thread/:thread_id/messages/:message_id',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
-      AuthorizationMiddleware.ensureUserCanReadProject,
+      AuthorizationMiddleware.ensureUserCanAdminProject,
       CommentController.deleteMessage
     )
     webRouter.delete(
@@ -1127,7 +1127,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     webRouter.delete(
       '/project/:project_id/thread/:thread_id',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
-      AuthorizationMiddleware.ensureUserCanReadProject,
+      AuthorizationMiddleware.ensureUserCanAdminProject,
       CommentController.deleteThread
     )
 
