@@ -24,28 +24,26 @@ block content
 									.row-spaced
 										form(method='GET', action='/admin/user')
 											.row
-												.col-sm-5
+												.col-xs-12
 													.form-group
-														input.form-control(
-															type='text'
-															name='search'
-															placeholder='Search users by email or id…'
-															value=search
-														)
-												.col-sm-3
-													.checkbox
-														label
-															input(
-																type='checkbox'
-																name='searchType'
-																value='regexp'
-																checked=(searchType === 'regexp')
+														.input-group
+															input.form-control(
+																type='text'
+																name='search'
+																placeholder='Search users by email or id…'
+																value=search
 															)
-															|  RegExp
-											.form-group
-												button.btn.btn-primary(type='submit') Search
-												| &nbsp;
-												a.btn.btn-success(href='/admin/register') New User
+															span.input-group-addon
+																input(
+																	type='checkbox'
+																	name='searchType'
+																	value='regexp'
+																	checked=(searchType === 'regexp')
+																)
+															span.input-group-addon RegExp
+															span.input-group-btn
+																button.btn.btn-primary(type='submit') Search
+																a.btn.btn-success(href='/admin/register') New User
 
 									if users.length > 0
 										table.table.table-striped
