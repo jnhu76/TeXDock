@@ -127,7 +127,7 @@ environment:
 
 ```yaml
   # 启用管理面板（/admin），允许管理员管理用户、项目、查看审计日志
-  # 默认关闭。启用后可通过 /admin/user 和 /admin/project 访问。
+  # 默认关闭。启用后可通过 /admin 访问。
   ADMIN_PRIVILEGE_AVAILABLE: "true"
 ```
 

@@ -50,7 +50,7 @@ docker compose -f docker-compose.yml down
 ```yaml
 OVERLEAF_SITE_URL: http://your-server-ip           # 🌍 外网访问时必须设置
 ADMIN_PRIVILEGE_AVAILABLE: "true"                   # 🔧 启用管理面板（/admin）
-TZ: Asia/Shanghai                                   # 🕐 时区（影响时间显示）
+TZ: "Asia/Shanghai"                                 # 🕐 时区（影响时间显示）
 MAX_COMPILE_TIMEOUT_MINUTES: "10"                   # ⏱️ 编译超时（分钟）
 ```
 

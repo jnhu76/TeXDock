@@ -39,6 +39,9 @@ services:
       # 站点语言（zh-CN=简体中文, en=English）
       OVERLEAF_SITE_LANGUAGE: "zh-CN"
 
+      # 管理员面板 - 启用后可访问 /admin 管理界面
+      # ADMIN_PRIVILEGE_AVAILABLE: "true"
+
       # 管理员域名（可选，用于多域名部署）
       # ADMIN_URL: "https://admin.example.com"
 
