@@ -37,12 +37,21 @@ docker compose -f docker-compose.yml down
 
 > `docker-compose.yml` 已配置好 `OVERLEAF_SITE_LANGUAGE: "zh-CN"`（中文界面），开箱即用。
 
+### 🆕 新增功能
+
+- **Admin 管理面板**：设置 `ADMIN_PRIVILEGE_AVAILABLE: "true"` 启用，支持用户管理、项目管理、审计日志
+- **Track Changes 修订跟踪**：默认启用，编辑器工具栏可切换修订模式
+- **审阅面板**：支持评论、解决线程、实时同步
+
 ### ⚙️ 配置
 
 编辑 `docker-compose.yml` 的 environment 部分，按需取消注释：
 
 ```yaml
 OVERLEAF_SITE_URL: http://your-server-ip           # 🌍 外网访问时必须设置
+ADMIN_PRIVILEGE_AVAILABLE: "true"                   # 🔧 启用管理面板（/admin）
+TZ: Asia/Shanghai                                   # 🕐 时区（影响时间显示）
+MAX_COMPILE_TIMEOUT_MINUTES: "10"                   # ⏱️ 编译超时（分钟）
 ```
 
 #### 📧 邮件配置（SMTP）
