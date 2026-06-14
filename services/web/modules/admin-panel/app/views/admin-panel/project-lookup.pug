@@ -1,40 +1,44 @@
-extends ../../../../../app/views/layout-marketing
+extends ../../../../app/views/layout-marketing
 
 block content
-  .container
-    .page-header
-      h1 Project URL Lookup
+	.content.content-alt#main-content
+		.container
+			.row
+				.col-sm-12
+					.card
+						.card-body
+							.page-header
+								h1 Project URL Lookup
 
-    .card.mb-4
-      .card-body
-        form.mb-3.d-flex.gap-2(method='GET', action='/admin/project')
-          .input-group
-            input.form-control(
-              type='text',
-              name='search',
-              placeholder='Search by project ID or name…',
-              value=search
-            )
-          button.btn.btn-primary(type='submit') Search
+							form.mb-4(method='GET', action='/admin/project')
+								.row
+									.col-sm-8
+										.input-group
+											input.form-control(
+												type='text'
+												name='search'
+												placeholder='Search by project ID or name…'
+												value=search
+											)
+									.col-sm-4
+										button.btn.btn-primary(type='submit') Search
 
-        if projects.length > 0
-          table.table.table-striped
-            thead
-              tr
-                th Name
-                th ID
-                th Created
-                th Last Updated
-            tbody
-              each project in projects
-                tr
-                  td
-                    a(href=`/admin/project/${project._id}`)= project.name
-                  td
-                    code= project._id
-                  td= project.createdAt ? new Date(project.createdAt).toLocaleDateString() : '-'
-                  td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleDateString() : '-'
-        else if search
-          p.text-muted No projects found.
-
-    script(src='/socket.io/socket.io.js')
+							if projects.length > 0
+								table.table.table-striped
+									thead
+										tr
+											th Name
+											th ID
+											th Created
+											th Last Updated
+									tbody
+										each project in projects
+											tr
+												td
+													a(href='/admin/project/' + project._id)= project.name
+												td
+													code= project._id
+												td= project.createdAt ? new Date(project.createdAt).toLocaleDateString() : '-'
+												td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleDateString() : '-'
+							else if search
+								p No projects found.

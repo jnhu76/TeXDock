@@ -1,62 +1,73 @@
-extends ../../../../../app/views/layout-marketing
+extends ../../../../app/views/layout-marketing
+include ../../../../app/views/_mixins/bookmarkable_tabset
 
 block content
-  .container
-    .page-header
-      h1 User Management
+	.content.content-alt#main-content
+		.container
+			.row
+				.col-sm-12
+					.card
+						.card-body
+							.page-header
+								h1 User Management
+							.ol-tabs(data-ol-bookmarkable-tabset)
+								.nav-tabs-container
+									ul.nav.nav-tabs.align-left(role="tablist")
+										+bookmarkable-tabset-header('users', 'Users', true)
+										+bookmarkable-tabset-header('license', 'License Usage')
 
-    ul.nav.nav-tabs.mb-4
-      li.nav-item
-        a.nav-link.active(data-bs-toggle='tab', href='#users') Users
-      li.nav-item
-        a.nav-link(data-bs-toggle='tab', href='#license') License Usage
+							.tab-content
+								.tab-pane.active(
+									role="tabpanel"
+									id='users'
+								)
+									form.mb-4(method='GET', action='/admin/user')
+										.row
+											.col-sm-8
+												.input-group
+													input.form-control(
+														type='text'
+														name='search'
+														placeholder='Search users by email or id…'
+														value=search
+													)
+											.col-sm-4
+												.input-group
+													span.input-group-addon
+														input(
+															type='checkbox'
+															name='searchType'
+															value='regexp'
+															id='regexpCheck'
+															checked=(searchType === 'regexp')
+														)
+													span.input-group-addon RegExp
+													button.btn.btn-primary(type='submit') Search
+													a.btn.btn-success(href='/admin/register') New User
 
-    .tab-content
-      #users.tab-pane.fade.show.active
-        .card
-          .card-body
-            form.mb-3.d-flex.gap-2(method='GET', action='/admin/user')
-              .input-group
-                input.form-control(
-                  type='text',
-                  name='search',
-                  placeholder='Search users by email or id…',
-                  value=search
-                )
-              .form-check
-                input.form-check-input(
-                  type='checkbox',
-                  name='searchType',
-                  value='regexp',
-                  id='regexpCheck',
-                  checked=searchType === 'regexp'
-                )
-                label.form-check-label(for='regexpCheck') RegExp
-              button.btn.btn-primary(type='submit') Search
-              a.btn.btn-success(href='/admin/register') New User
+									if users.length > 0
+										table.table.table-striped
+											thead
+												tr
+													th Email
+													th Signed Up
+													th Last Login
+													th Logins
+													th Admin
+											tbody
+												each user in users
+													tr
+														td
+															a(href='/admin/user/' + user._id)= user.email || 'No email'
+														td= user.signUpDate ? new Date(user.signUpDate).toLocaleDateString() : '-'
+														td= user.lastLoggedIn ? new Date(user.lastLoggedIn).toLocaleDateString() : '-'
+														td= user.loginCount || 0
+														td= user.isAdmin ? 'Yes' : 'No'
+									else if search
+										p No users found.
 
-            if users.length > 0
-              table.table.table-striped
-                thead
-                  tr
-                    th Email
-                    th Created
-                    th Last Login
-                    th Admin
-                tbody
-                  each user in users
-                    tr
-                      td
-                        a(href=`/admin/user/${user._id}`)= user.email || 'No email'
-                      td= user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'
-                      td= user.lastLoggedInAt ? new Date(user.lastLoggedInAt).toLocaleDateString() : '-'
-                      td= user.isAdmin ? 'Yes' : 'No'
-            else if search
-              p.text-muted No users found.
-
-      #license.tab-pane.fade
-        .card
-          .card-body
-            p An active user is one who has opened a project in this Server Pro instance in the last 12 months.
-
-    script(src='/socket.io/socket.io.js')
+								.tab-pane(
+									role="tabpanel"
+									id='license'
+								)
+									p An active user is one who has opened a project in this Server Pro instance in the last 12 months.

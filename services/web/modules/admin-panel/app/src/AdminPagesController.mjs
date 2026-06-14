@@ -18,10 +18,17 @@ function viewPath(name) {
   return path.resolve(__dirname, `../views/admin-panel/${name}`)
 }
 
+const USER_FIELDS = {
+  email: 1,
+  signUpDate: 1,
+  isAdmin: 1,
+  lastLoggedIn: 1,
+  lastLoginIp: 1,
+  loginCount: 1,
+  holdingAccount: 1,
+}
+
 export default {
-  /**
-   * GET /admin/user - 用户列表页
-   */
   getUserList: expressify(async (req, res) => {
     const { search, searchType } = req.query
     let users = []
@@ -32,32 +39,28 @@ export default {
           const regex = new RegExp(search, 'i')
           const allUsers = await UserGetter.promises.getUsers(
             { email: { $exists: true } },
-            { email: 1, createdAt: 1, isAdmin: 1, lastLoggedInAt: 1 }
+            USER_FIELDS
           )
           users = allUsers.filter(u => u.email && regex.test(u.email))
         } catch {
           users = []
         }
       } else {
-        const user = await UserGetter.promises.getUserByAnyEmail(search, {
-          email: 1,
-          createdAt: 1,
-          isAdmin: 1,
-          lastLoggedInAt: 1,
-        })
+        const user = await UserGetter.promises.getUserByAnyEmail(
+          search,
+          USER_FIELDS
+        )
         if (user) users = [user]
 
         if (users.length === 0) {
           try {
-            const userById = await UserGetter.promises.getUser(search, {
-              email: 1,
-              createdAt: 1,
-              isAdmin: 1,
-              lastLoggedInAt: 1,
-            })
+            const userById = await UserGetter.promises.getUser(
+              search,
+              USER_FIELDS
+            )
             if (userById) users = [userById]
           } catch {
-            // 无效 ID
+            // invalid id
           }
         }
       }
@@ -70,9 +73,6 @@ export default {
     })
   }),
 
-  /**
-   * GET /admin/user/:userId - 用户详情页
-   */
   getUserDetail: expressify(async (req, res) => {
     const { userId } = req.params
     const user = await UserGetter.promises.getUser(userId)
@@ -107,9 +107,6 @@ export default {
     })
   }),
 
-  /**
-   * GET /admin/project - 项目查找页
-   */
   getProjectLookup: expressify(async (req, res) => {
     const { search } = req.query
     let projects = []
@@ -124,14 +121,21 @@ export default {
         })
         if (project) projects = [project]
       } catch {
-        // 无效 ID
+        // invalid id
       }
 
       if (projects.length === 0) {
         const nameResults = await db.projects
           .find(
             { name: { $regex: search, $options: 'i' } },
-            { projection: { name: 1, owner_ref: 1, createdAt: 1, lastUpdated: 1 } }
+            {
+              projection: {
+                name: 1,
+                owner_ref: 1,
+                createdAt: 1,
+                lastUpdated: 1,
+              },
+            }
           )
           .limit(50)
           .toArray()
@@ -145,14 +149,13 @@ export default {
     })
   }),
 
-  /**
-   * GET /admin/project/:projectId - 项目详情页
-   */
   getProjectDetail: expressify(async (req, res) => {
     const { projectId } = req.params
     const project = await ProjectGetter.promises.getProject(projectId)
     if (!project) {
-      return res.status(404).render(viewPath('not-found'), { type: 'Project' })
+      return res
+        .status(404)
+        .render(viewPath('not-found'), { type: 'Project' })
     }
 
     const owner = await UserGetter.promises.getUser(project.owner_ref, {
@@ -171,18 +174,12 @@ export default {
     })
   }),
 
-  /**
-   * POST /admin/project/:projectId/undelete - 恢复已删除项目
-   */
   undeleteProject: expressify(async (req, res) => {
     const { projectId } = req.params
     await ProjectDeleter.promises.undeleteProject(projectId)
     res.redirect(`/admin/project/${projectId}`)
   }),
 
-  /**
-   * POST /admin/project/:projectId/transfer - 转移项目所有权
-   */
   transferOwnership: expressify(async (req, res) => {
     const { projectId } = req.params
     const { targetUserId } = req.body
@@ -191,13 +188,13 @@ export default {
     try {
       targetUser = await UserGetter.promises.getUserByAnyEmail(targetUserId)
     } catch {
-      // 尝试按 ID 查找
+      // try by id
     }
     if (!targetUser) {
       try {
         targetUser = await UserGetter.promises.getUser(targetUserId)
       } catch {
-        // 用户不存在
+        // user not found
       }
     }
 
