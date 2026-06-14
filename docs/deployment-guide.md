@@ -111,6 +111,26 @@ environment:
 
 > 当设为 `zh-CN` 时，界面文字、邮件模板均自动切换为中文。
 
+### 时区与编译
+
+```yaml
+  # 时区设置：控制 Node.js 进程的时区，影响 toLocaleString() 等时间显示
+  # 默认 UTC。中国用户可设为 Asia/Shanghai。
+  TZ: "Asia/Shanghai"
+
+  # 编译看门狗超时（分钟）：超过此时间的编译进程会被自动终止
+  # 默认 10 分钟。设为 0 可禁用看门狗。
+  MAX_COMPILE_TIMEOUT_MINUTES: "10"
+```
+
+### 管理面板
+
+```yaml
+  # 启用管理面板（/admin），允许管理员管理用户、项目、查看审计日志
+  # 默认关闭。启用后可通过 /admin 访问。
+  ADMIN_PRIVILEGE_AVAILABLE: "true"
+```
+
 ### 邮件配置
 
 邮件功能用于：注册确认、密码重置、项目邀请等。**不配置邮件也能使用系统**，但无法发送邮件通知。
@@ -129,7 +149,11 @@ environment:
   OVERLEAF_EMAIL_SMTP_PASS: "your_smtp_password"
   OVERLEAF_EMAIL_SMTP_TLS_REJECT_UNAUTH: "true"
   OVERLEAF_EMAIL_SMTP_IGNORE_TLS: "false"
+  # OVERLEAF_EMAIL_SMTP_NAME: "127.0.0.1"    # SMTP 客户端主机名
+  # OVERLEAF_EMAIL_SMTP_LOGGER: "true"       # 启用 SMTP 日志
 ```
+
+> ⚠️ **TLS 证书问题**：如果遇到邮件发送失败（尤其是自建邮件服务器），建议将 `OVERLEAF_EMAIL_SMTP_TLS_REJECT_UNAUTH` 设为 `false` 或注释掉。
 
 常见 SMTP 服务器配置示例：
 
@@ -188,7 +212,37 @@ environment:
   # 不控制 cron 是否运行，仅控制是否执行破坏性操作。默认关闭更安全。
   # 仅在明确需要自动清理旧项目时设为 true。
   # ENABLE_CRON_RESOURCE_DELETION: "true"
+
+  # 自定义邮件页脚文字
+  # OVERLEAF_CUSTOM_EMAIL_FOOTER: "This system is run by department x"
+
+  # 项目模板用户 ID（用于新项目模板列表）
+  # OVERLEAF_TEMPLATES_USER_ID: "578773160210479700917ee5"
+
+  # 自定义新项目模板链接
+  # OVERLEAF_NEW_PROJECT_TEMPLATE_LINKS: '[ {"name":"All Templates","url":"/templates/all"}]'
+
+  # Learn 功能代理
+  # OVERLEAF_PROXY_LEARN: "true"
 ```
+
+### LDAP 登录（可选）
+
+需要配合 LDAP 服务器使用，如 OpenLDAP 或 Active Directory：
+
+```yaml
+  OVERLEAF_LDAP_URL: "ldap://ldap:389"
+  OVERLEAF_LDAP_SEARCH_BASE: "ou=people,dc=example,dc=com"
+  OVERLEAF_LDAP_SEARCH_FILTER: "(uid={{username}})"
+  OVERLEAF_LDAP_BIND_DN: "cn=admin,dc=example,dc=com"
+  OVERLEAF_LDAP_BIND_CREDENTIALS: "your_ldap_password"
+  OVERLEAF_LDAP_EMAIL_ATT: "mail"
+  OVERLEAF_LDAP_NAME_ATT: "cn"
+  OVERLEAF_LDAP_LAST_NAME_ATT: "sn"
+  OVERLEAF_LDAP_UPDATE_USER_DETAILS_ON_LOGIN: "true"
+```
+
+> 启用 LDAP 后，用户可通过 LDAP 账户登录，首次登录时自动创建本地账户。
 
 ---
 
@@ -350,6 +404,9 @@ services:
       ENABLED_LINKED_FILE_TYPES: "project_file,project_output_file"
       ENABLE_CONVERSIONS: "true"
       EMAIL_CONFIRMATION_DISABLED: "true"
+      ADMIN_PRIVILEGE_AVAILABLE: "true"
+      TZ: "Asia/Shanghai"
+      MAX_COMPILE_TIMEOUT_MINUTES: "10"
       # 邮件配置（按需启用）
       # OVERLEAF_EMAIL_FROM_ADDRESS: "texdock@example.com"
       # OVERLEAF_EMAIL_SMTP_HOST: "smtp.example.com"
