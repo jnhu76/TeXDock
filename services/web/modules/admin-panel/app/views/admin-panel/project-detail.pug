@@ -1,0 +1,104 @@
+extends ../../../../../app/views/layout-marketing
+include ../../../../../app/views/_mixins/bookmarkable_tabset
+
+block content
+	.content.content-alt#main-content
+		.container
+			.row
+				.col-sm-12
+					.card
+						.card-body
+							.page-header
+								h1= project.name || 'Project Details'
+								p.small.text-muted ID: #{project._id}
+
+							.ol-tabs(data-ol-bookmarkable-tabset)
+								.nav-tabs-container
+									ul.nav.nav-tabs.align-left(role="tablist")
+										+bookmarkable-tabset-header('info', 'Project Info', true)
+										+bookmarkable-tabset-header('deleted-docs', 'Deleted Docs')
+										+bookmarkable-tabset-header('audit', 'Audit Log')
+
+							.tab-content
+								.tab-pane.active(
+									role="tabpanel"
+									id='info'
+								)
+									.row-spaced
+										table.table
+											tr
+												th Name
+												td= project.name || '-'
+											tr
+												th Owner
+												td
+													if owner
+														a(href='/admin/user/' + owner._id)= owner.email
+													else
+														| -
+											tr
+												th Last Updated
+												td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleString() : '-'
+
+									h3 Actions
+									.row
+										.col-sm-6
+											form(method='POST', action='/admin/project/' + project._id + '/undelete')
+												input(type='hidden', name='_csrf', value=csrfToken)
+												button.btn.btn-warning(type='submit') Undelete
+
+									.row-spaced
+										h3 Transfer Ownership
+										.row
+											.col-sm-6
+												form(method='POST', action='/admin/project/' + project._id + '/transfer')
+													input(type='hidden', name='_csrf', value=csrfToken)
+													.form-group
+														label.form-label(for='targetUserId') Target User
+														input.form-control(
+															type='text'
+															name='targetUserId'
+															placeholder='User ID or Email'
+														)
+													button.btn.btn-primary(type='submit') Transfer
+
+								.tab-pane(
+									role="tabpanel"
+									id='deleted-docs'
+								)
+									.row-spaced
+										if project.deletedDocs && project.deletedDocs.length > 0
+											table.table.table-striped
+												thead
+													tr
+														th Name
+														th Deleted At
+												tbody
+													each doc in project.deletedDocs
+														tr
+															td= doc.name || '-'
+															td= doc.deletedAt ? new Date(doc.deletedAt).toLocaleDateString() : '-'
+										else
+											p No deleted documents.
+
+								.tab-pane(
+									role="tabpanel"
+									id='audit'
+								)
+									.row-spaced
+										if auditLog && auditLog.length > 0
+											table.table.table-striped
+												thead
+													tr
+														th Action
+														th Timestamp
+														th Details
+												tbody
+													each entry in auditLog
+														tr
+															td= entry.operation || '-'
+															td= entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '-'
+															td
+																pre.small= JSON.stringify(entry.info || {}, null, 2)
+										else
+											p No audit log entries.

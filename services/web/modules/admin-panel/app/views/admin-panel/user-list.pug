@@ -1,0 +1,84 @@
+extends ../../../../../app/views/layout-marketing
+include ../../../../../app/views/_mixins/bookmarkable_tabset
+
+block content
+	.content.content-alt#main-content
+		style.
+			.admin-panel-search .input-group { display: flex; align-items: stretch; }
+			.admin-panel-search .form-control { flex: 1 1 auto; min-width: 0; }
+			.admin-panel-search .input-group-addon { display: flex; align-items: center; padding: 5px 10px; white-space: nowrap; }
+			.admin-panel-search .input-group-addon input[type='checkbox'] { margin: 0; }
+			.admin-panel-search .input-group-addon + .input-group-addon { padding-left: 6px; padding-right: 10px; }
+			.admin-panel-search .input-group-btn { display: flex; align-items: stretch; }
+			.admin-panel-search .input-group-btn .btn { padding: 5px 12px; font-size: 13px; }
+			.admin-panel-search .input-group-btn .btn + .btn,
+			.admin-panel-search .input-group-btn .btn + a { margin-left: 4px; }
+		.container
+			.row
+				.col-sm-12
+					.card
+						.card-body
+							.page-header
+								h1 User Management
+							.ol-tabs(data-ol-bookmarkable-tabset)
+								.nav-tabs-container
+									ul.nav.nav-tabs.align-left(role="tablist")
+										+bookmarkable-tabset-header('users', 'Users', true)
+										+bookmarkable-tabset-header('license', 'License Usage')
+
+							.tab-content
+								.tab-pane.active(
+									role="tabpanel"
+									id='users'
+								)
+									.row-spaced
+										form(method='GET', action='/admin/user')
+											.row.admin-panel-search
+												.col-xs-12
+													.form-group
+														.input-group.input-group-sm
+															input.form-control(
+																type='text'
+																name='search'
+																placeholder='Search users by email or id…'
+																value=search
+															)
+															span.input-group-addon
+																input(
+																	type='checkbox'
+																	name='searchType'
+																	value='regexp'
+																	checked=(searchType === 'regexp')
+																)
+															span.input-group-addon RegExp
+															span.input-group-btn
+																button.btn.btn-primary(type='submit') Search
+																a.btn.btn-success(href='/admin/register') New User
+
+										if users.length > 0
+											table.table.table-striped
+												thead
+													tr
+														th Email
+														th Signed Up
+														th Last Login
+														th Logins
+														th Admin
+												tbody
+													each user in users
+														tr
+															td
+																a(href='/admin/user/' + user._id)= user.email || 'No email'
+															td= user.signUpDate ? new Date(user.signUpDate).toLocaleDateString() : '-'
+															td= user.lastLoggedIn ? new Date(user.lastLoggedIn).toLocaleDateString() : '-'
+															td= user.loginCount || 0
+															td= user.isAdmin ? 'Yes' : 'No'
+										else if search
+											p No users found.
+
+								.tab-pane(
+									role="tabpanel"
+									id='license'
+								)
+									.row-spaced
+										p An active user is one who has opened a project in this Server Pro instance in the last 12 months.

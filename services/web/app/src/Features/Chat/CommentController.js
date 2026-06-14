@@ -39,6 +39,23 @@ function sendComment(req, res, next) {
           'new-chat-message',
           message
         )
+        EditorRealTimeController.emitToRoom(
+          projectId,
+          'new-comment',
+          threadId,
+          message
+        )
+        // Also emit new-comment-threads so review panel picks up new threads
+        const threadData = {}
+        threadData[threadId] = {
+          messages: [message],
+          resolved: false,
+        }
+        EditorRealTimeController.emitToRoom(
+          projectId,
+          'new-comment-threads',
+          threadData
+        )
         res.status(201).json(message)
       })
     }
@@ -69,6 +86,13 @@ function editMessage(req, res, next) {
       if (err) {
         return next(err)
       }
+      EditorRealTimeController.emitToRoom(
+        projectId,
+        'edit-message',
+        threadId,
+        messageId,
+        content
+      )
       res.sendStatus(204)
     }
   )
@@ -88,6 +112,12 @@ function deleteMessage(req, res, next) {
       if (err) {
         return next(err)
       }
+      EditorRealTimeController.emitToRoom(
+        projectId,
+        'delete-message',
+        threadId,
+        messageId
+      )
       res.sendStatus(204)
     }
   )
@@ -112,6 +142,12 @@ function deleteUserMessage(req, res, next) {
       if (err) {
         return next(err)
       }
+      EditorRealTimeController.emitToRoom(
+        projectId,
+        'delete-message',
+        threadId,
+        messageId
+      )
       res.sendStatus(204)
     }
   )
@@ -127,7 +163,21 @@ function resolveThread(req, res, next) {
     if (err) {
       return next(err)
     }
-    res.sendStatus(204)
+    UserInfoManager.getPersonalInfo(userId, (err, user) => {
+      if (err) {
+        return next(err)
+      }
+      const resolvedBy = user
+        ? UserInfoController.formatPersonalInfo(user)
+        : { id: userId, email: 'unknown', first_name: 'Unknown' }
+      EditorRealTimeController.emitToRoom(
+        projectId,
+        'resolve-thread',
+        threadId,
+        resolvedBy
+      )
+      res.sendStatus(204)
+    })
   })
 }
 
@@ -137,6 +187,11 @@ function reopenThread(req, res, next) {
     if (err) {
       return next(err)
     }
+    EditorRealTimeController.emitToRoom(
+      projectId,
+      'reopen-thread',
+      threadId
+    )
     res.sendStatus(204)
   })
 }
@@ -147,6 +202,11 @@ function deleteThread(req, res, next) {
     if (err) {
       return next(err)
     }
+    EditorRealTimeController.emitToRoom(
+      projectId,
+      'delete-thread',
+      threadId
+    )
     res.sendStatus(204)
   })
 }
