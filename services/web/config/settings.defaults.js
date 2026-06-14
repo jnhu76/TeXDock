@@ -1009,6 +1009,7 @@ module.exports = {
     'server-ce-scripts',
     'user-activate',
     'admin-panel',
+    'track-changes',
   ],
   viewIncludes: {},
 
