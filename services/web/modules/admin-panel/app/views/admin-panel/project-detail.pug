@@ -37,9 +37,6 @@ block content
 													else
 														| -
 										tr
-											th Created
-											td -
-										tr
 											th Last Updated
 											td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleString() : '-'
 
@@ -57,14 +54,13 @@ block content
 												form(method='POST', action='/admin/project/' + project._id + '/transfer')
 													input(type='hidden', name='_csrf', value=csrfToken)
 													.form-group
-														.input-group
-															input.form-control(
-																type='text'
-																name='targetUserId'
-																placeholder='User ID or Email'
-															)
-															span.input-group-btn
-																button.btn.btn-primary(type='submit') Transfer
+														label.form-label(for='targetUserId') Target User
+														input.form-control(
+															type='text'
+															name='targetUserId'
+															placeholder='User ID or Email'
+														)
+													button.btn.btn-primary(type='submit') Transfer
 
 								.tab-pane(
 									role="tabpanel"
