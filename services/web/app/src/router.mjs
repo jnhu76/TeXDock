@@ -1133,6 +1133,28 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       PermissionsController.requirePermission('chat'),
       CommentController.deleteThread
     )
+    // Routes with /doc/:doc_id/ (used by review panel frontend)
+    webRouter.post(
+      '/project/:project_id/doc/:doc_id/thread/:thread_id/resolve',
+      AuthorizationMiddleware.blockRestrictedUserFromProject,
+      AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
+      CommentController.resolveThread
+    )
+    webRouter.post(
+      '/project/:project_id/doc/:doc_id/thread/:thread_id/reopen',
+      AuthorizationMiddleware.blockRestrictedUserFromProject,
+      AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
+      CommentController.reopenThread
+    )
+    webRouter.delete(
+      '/project/:project_id/doc/:doc_id/thread/:thread_id',
+      AuthorizationMiddleware.blockRestrictedUserFromProject,
+      AuthorizationMiddleware.ensureUserCanWriteProjectContent,
+      PermissionsController.requirePermission('chat'),
+      CommentController.deleteThread
+    )
 
     // Ranges endpoint for review panel
     webRouter.get(
