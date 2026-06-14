@@ -8,3 +8,8 @@ build.log
 .env
 docker-compose.override.yml
 docker-compose.test.yml
+
+# local docs (not tracked in repo)
+docs/complete-features-guide.md
+docs/features-implementation-status.md
+docs/project-inventory.md
