@@ -82,6 +82,10 @@ services:
       # 默认 10 分钟。设为 0 可禁用看门狗。
       MAX_COMPILE_TIMEOUT_MINUTES: "10"
 
+      # 时区设置：控制 Node.js 进程的时区，影响 toLocaleString() 等时间显示。
+      # 默认 UTC。中国用户可设为 Asia/Shanghai。
+      TZ: Asia/Shanghai
+
       ################
       ## Server Pro ##
       ################

@@ -36,9 +36,9 @@ block content
 														a(href='/admin/user/' + owner._id)= owner.email
 													else
 														| -
-										tr
-											th Last Updated
-											td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleString() : '-'
+											tr
+												th Last Updated
+												td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleString() : '-'
 
 									h3 Actions
 									.row
