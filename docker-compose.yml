@@ -78,6 +78,10 @@ services:
       # 仅在明确需要自动清理旧项目时设为 true。
       # ENABLE_CRON_RESOURCE_DELETION: true
 
+      # 编译看门狗超时（分钟）：超过此时间的编译进程会被自动终止。
+      # 默认 10 分钟。设为 0 可禁用看门狗。
+      MAX_COMPILE_TIMEOUT_MINUTES: "10"
+
       ################
       ## Server Pro ##
       ################

@@ -1,6 +1,6 @@
 # 开发环境 override 文件
 # 用法：docker compose -f docker-compose.yml -f docker-compose.dev.web.yml up
-# 挂载本地 web 源码和共享库，用于前端/后端开发调试
+# 挂载本地 web 和 clsi 源码，用于前端/后端开发调试
 #
 # 注意：不要挂载整个 services/web 目录，否则会覆盖镜像中 public/ 下的 webpack 编译产物，
 # 导致 manifest.json 缺失、前端 502 错误。
@@ -13,4 +13,6 @@ services:
       - ~/sharelatex_data:/var/lib/overleaf
       - ./services/web/app:/overleaf/services/web/app
       - ./services/web/config:/overleaf/services/web/config
+      - ./services/clsi/app:/overleaf/services/clsi/app
+      - ./services/clsi/config:/overleaf/services/clsi/config
       - ./libraries:/overleaf/libraries
