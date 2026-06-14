@@ -10,12 +10,20 @@ TeXDock 是基于 Overleaf Community Edition 的中文本地化版本，支持�
   - [基础配置](#基础配置必填)
   - [界面与品牌](#界面与品牌可选)
   - [语言设置](#语言设置)
+  - [时区与编译](#时区与编译)
+  - [管理面板](#管理面板)
   - [邮件配置](#邮件配置)
+  - [LDAP 登录](#ldap-登录可选)
   - [安全设置](#安全设置可选)
   - [高级配置](#高级配置可选)
 - [启动与初始化](#启动与初始化)
 - [创建管理员账户](#创建管理员账户)
+- [管理面板与审计日志](#管理面板与审计日志)
+- [Track Changes 修订跟踪](#track-changes-修订跟踪)
+- [审阅面板](#审阅面板)
 - [用户使用流程](#用户使用流程)
+- [升级指南](#升级指南)
+- [备份策略](#备份策略)
 - [常见问题](#常见问题)
 
 ---
@@ -129,6 +137,9 @@ environment:
   # 启用管理面板（/admin），允许管理员管理用户、项目、查看审计日志
   # 默认关闭。启用后可通过 /admin 访问。
   ADMIN_PRIVILEGE_AVAILABLE: "true"
+
+  # 管理员独立域名（可选，用于多域名部署）
+  # ADMIN_URL: "https://admin.example.com"
 ```
 
 ### 邮件配置
@@ -176,6 +187,24 @@ environment:
 #### 方式三：不配置邮件
 
 注释掉或删除所有 `OVERLEAF_EMAIL_*` 变量即可。系统会正常运行，日志中会出现 SMTP 连接失败的警告（可忽略）。
+
+### LDAP 登录（可选）
+
+需要配合 LDAP 服务器使用，如 OpenLDAP 或 Active Directory：
+
+```yaml
+  OVERLEAF_LDAP_URL: "ldap://ldap:389"
+  OVERLEAF_LDAP_SEARCH_BASE: "ou=people,dc=example,dc=com"
+  OVERLEAF_LDAP_SEARCH_FILTER: "(uid={{username}})"
+  OVERLEAF_LDAP_BIND_DN: "cn=admin,dc=example,dc=com"
+  OVERLEAF_LDAP_BIND_CREDENTIALS: "your_ldap_password"
+  OVERLEAF_LDAP_EMAIL_ATT: "mail"
+  OVERLEAF_LDAP_NAME_ATT: "cn"
+  OVERLEAF_LDAP_LAST_NAME_ATT: "sn"
+  OVERLEAF_LDAP_UPDATE_USER_DETAILS_ON_LOGIN: "true"
+```
+
+> 启用 LDAP 后，用户可通过 LDAP 账户登录，首次登录时自动创建本地账户。
 
 ### 安全设置（可选）
 
@@ -225,24 +254,6 @@ environment:
   # Learn 功能代理
   # OVERLEAF_PROXY_LEARN: "true"
 ```
-
-### LDAP 登录（可选）
-
-需要配合 LDAP 服务器使用，如 OpenLDAP 或 Active Directory：
-
-```yaml
-  OVERLEAF_LDAP_URL: "ldap://ldap:389"
-  OVERLEAF_LDAP_SEARCH_BASE: "ou=people,dc=example,dc=com"
-  OVERLEAF_LDAP_SEARCH_FILTER: "(uid={{username}})"
-  OVERLEAF_LDAP_BIND_DN: "cn=admin,dc=example,dc=com"
-  OVERLEAF_LDAP_BIND_CREDENTIALS: "your_ldap_password"
-  OVERLEAF_LDAP_EMAIL_ATT: "mail"
-  OVERLEAF_LDAP_NAME_ATT: "cn"
-  OVERLEAF_LDAP_LAST_NAME_ATT: "sn"
-  OVERLEAF_LDAP_UPDATE_USER_DETAILS_ON_LOGIN: "true"
-```
-
-> 启用 LDAP 后，用户可通过 LDAP 账户登录，首次登录时自动创建本地账户。
 
 ---
 
@@ -300,6 +311,100 @@ exit
 
 ---
 
+## 管理面板与审计日志
+
+### 启用管理面板
+
+在 `docker-compose.yml` 中设置：
+
+```yaml
+ADMIN_PRIVILEGE_AVAILABLE: "true"
+```
+
+重启容器后生效：
+
+```bash
+docker compose restart sharelatex
+```
+
+### 访问管理面板
+
+浏览器访问 `http://your-server-ip/admin`，使用管理员账户登录。
+
+管理面板提供：
+
+- **用户管理**：查看、禁用、删除用户账户
+- **项目管理**：查看所有项目、管理项目所有权
+- **审计日志**：查看系统操作记录
+
+### 审计日志
+
+审计日志记录以下事件：
+
+| 事件类型 | 说明 |
+|---------|------|
+| 用户注册 | 新用户创建账户 |
+| 用户登录 | 登录成功/失败记录 |
+| 项目创建 | 新建项目 |
+| 项目删除 | 删除项目 |
+| 协作者管理 | 添加/移除协作者 |
+| 设置变更 | 管理员修改系统设置 |
+
+审计日志可在管理面板的「Audit Log」页面查看，支持按时间和事件类型筛选。
+
+---
+
+## Track Changes 修订跟踪
+
+Track Changes 功能允许协作者在编辑文档时标记修改，便于审阅和追踪变更历史。
+
+### 使用方法
+
+1. 打开项目，进入编辑器
+2. 点击工具栏中的 **Track Changes** 按钮启用修订模式
+3. 启用后，所有编辑操作会被标记为修订
+4. 其他协作者可以看到谁在何时做了什么修改
+
+### 修订操作
+
+- **接受修订**：点击修订标记，选择「Accept」
+- **拒绝修订**：点击修订标记，选择「Reject」
+- **接受所有**：工具栏菜单 → Accept All Changes
+- **拒绝所有**：工具栏菜单 → Reject All Changes
+
+> Track Changes 默认启用，无需额外配置。
+
+---
+
+## 审阅面板
+
+审阅面板提供了集中管理评论和讨论的功能。
+
+### 功能
+
+- **评论线程**：在文档任意位置添加评论
+- **讨论回复**：团队成员可回复评论形成讨论
+- **解决线程**：讨论完毕后标记为已解决
+- **重新打开**：已解决的线程可重新打开
+
+### 使用方法
+
+1. 在编辑器中选中文本，点击评论按钮添加评论
+2. 点击右侧面板的「Review」标签查看所有评论
+3. 在审阅面板中回复、解决或删除评论
+
+### 权限说明
+
+| 操作 | 权限要求 |
+|------|---------|
+| 查看评论 | 项目任何成员 |
+| 添加评论 | 项目任何成员 |
+| 编辑自己的评论 | 评论作者 |
+| 删除任何人的评论 | 项目写入权限 |
+| 删除评论线程 | 项目写入权限 |
+
+---
+
 ## 用户使用流程
 
 ### 注册
@@ -324,6 +429,136 @@ exit
 1. 在项目中点击「Share」
 2. 输入协作者的邮箱地址
 3. 协作者会收到邮件邀请（需配置 SMTP）
+
+---
+
+## 升级指南
+
+### 从 0.2.0 升级到 0.2.1
+
+0.2.1 是向后兼容的增量更新，数据格式无变化，可直接升级。
+
+```bash
+# 1. 备份数据（推荐）
+bash scripts/backup.sh
+
+# 2. 拉取新镜像
+docker compose pull sharelatex
+
+# 3. 重启服务
+docker compose up -d
+
+# 4. 验证版本
+docker exec sharelatex cat /etc/texdock-version
+# 应输出 0.2.1
+```
+
+### 升级注意事项
+
+- **数据兼容**：PATCH 版本保证数据格式兼容，升级不会丢失数据
+- **配置兼容**：现有环境变量无需修改
+- **新功能**：管理面板需手动启用 `ADMIN_PRIVILEGE_AVAILABLE: "true"`
+- **回滚**：如需回滚，修改 `docker-compose.yml` 中镜像 tag 为旧版本号即可
+
+> 版本兼容性承诺（PATCH / MINOR / MAJOR）详见 [**版本策略 → 升级兼容性**](version-policy.md#升级兼容性)。
+
+---
+
+## 备份策略
+
+### 需要备份的内容
+
+`docker-compose.yml` 中暴露了三个 volume 目录：
+
+| 目录 | 容器路径 | 说明 |
+|------|---------|------|
+| `~/mongo_data` | `/data/db` | MongoDB 数据库 |
+| `~/redis_data` | `/data` | Redis 持久化数据 |
+| `~/sharelatex_data` | `/var/lib/overleaf` | 用户项目文件、编译输出 |
+
+### 使用 rsync 硬链接增量备份
+
+项目提供 `scripts/backup.sh`，通过 rsync + `--link-dest` 硬链接实现增量快照。每次备份只占用变更文件的额外空间，且每个快照都可以直接浏览和恢复。
+
+#### 参数说明
+
+```bash
+bash scripts/backup.sh [目标目录] [--tar]
+```
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `目标目录` | `~/texdock-backups/` | 备份存储位置，支持本地路径或挂载的外部存储 |
+| `--tar` | 不启用 | 额外打 tar.gz 压缩包，适合拷贝到异地/U盘/NAS |
+
+#### 使用示例
+
+```bash
+# 备份到默认目录 ~/texdock-backups/
+bash scripts/backup.sh
+
+# 备份到外部硬盘
+bash scripts/backup.sh /mnt/usb/texdock
+
+# 备份到 NAS 挂载点 + 打压缩包
+bash scripts/backup.sh /mnt/nas/texdock --tar
+
+# 只打压缩包（备份到默认目录）
+bash scripts/backup.sh --tar
+```
+
+#### 备份目录结构
+
+```text
+/mnt/usb/texdock/
+  latest → 20260614_030000/       # 软链接，始终指向最新快照
+  20260614_030000/                 # 今天的快照
+    mongo_data/                    # MongoDB 数据
+    redis_data/                    # Redis 数据
+    sharelatex_data/               # 用户项目文件
+  20260613_030000/                 # 昨天的快照
+    ...                            # 未变更文件是硬链接，不额外占空间
+  texdock-20260614.tar.gz          # --tar 生成的压缩包
+```
+
+#### 存储空间预估
+
+- 首次全量快照：约等于三个目录的实际大小
+- 后续增量快照：仅占用变更文件的空间
+- 建议备份目标分区至少有 **2 倍** 数据量的可用空间
+
+### 定时自动备份
+
+添加 crontab 定时任务：
+
+```bash
+# 每天凌晨 3 点执行增量快照（备份到外部硬盘）
+0 3 * * * /path/to/scripts/backup.sh /mnt/usb/texdock >> /var/log/texdock-backup.log 2>&1
+
+# 每周日凌晨 4 点额外打 tar.gz 包（用于异地冷备）
+0 4 * * 0 /path/to/scripts/backup.sh /mnt/usb/texdock --tar >> /var/log/texdock-backup.log 2>&1
+```
+
+### 恢复数据
+
+```bash
+# 停止服务
+docker compose stop
+
+# 从最新快照恢复
+rsync -av /mnt/usb/texdock/latest/mongo_data/ ~/mongo_data/
+rsync -av /mnt/usb/texdock/latest/redis_data/ ~/redis_data/
+rsync -av /mnt/usb/texdock/latest/sharelatex_data/ ~/sharelatex_data/
+
+# 从 tar.gz 包恢复（异地备份场景）
+# tar -xzf texdock-20260614.tar.gz -C /tmp/restore
+# rsync -av /tmp/restore/mongo_data/ ~/mongo_data/
+# rsync -av /tmp/restore/redis_data/ ~/redis_data/
+# rsync -av /tmp/restore/sharelatex_data/ ~/sharelatex_data/
+
+# 重启服务
+docker compose up -d
+```
 
 ---
 
@@ -354,14 +589,7 @@ node modules/user-creator/js/reset-password.js --email=admin@example.com
 
 ### Q: 如何备份数据？
 
-```bash
-# 备份 MongoDB
-docker exec mongo mongodump --db sharelatex --out /tmp/backup
-docker cp mongo:/tmp/backup ./mongodb-backup
-
-# 备份用户文件（在宿主机上）
-tar -czf sharelatex-data-backup.tar.gz ~/sharelatex_data
-```
+参考上方 [备份策略](#备份策略) 章节。
 
 ### Q: 如何更新镜像？
 
@@ -370,6 +598,19 @@ docker compose pull sharelatex
 docker compose up -d
 # 数据保存在 volume 中不会丢失
 ```
+
+### Q: 管理面板无法访问？
+
+1. 确认已设置 `ADMIN_PRIVILEGE_AVAILABLE: "true"`
+2. 重启容器：`docker compose restart sharelatex`
+3. 使用管理员账户登录
+4. 访问 `http://your-server-ip/admin`
+
+### Q: Track Changes 不显示？
+
+Track Changes 需要项目所有协作者都使用支持该功能的编辑器版本。确保：
+1. 所有用户使用最新版本的 TeXDock
+2. 在编辑器工具栏中手动启用 Track Changes
 
 ---
 

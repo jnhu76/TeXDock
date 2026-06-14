@@ -13,3 +13,4 @@ docker-compose.test.yml
 docs/complete-features-guide.md
 docs/features-implementation-status.md
 docs/project-inventory.md
+docs/review-panel-permissions.md

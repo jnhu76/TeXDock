@@ -2,7 +2,7 @@
 
 镜像构建、字体策略、TeX Live 宏包安装。
 
-> 当前版本 **0.2.0**。`latest` tag 等价于 `0.2.0`。正式部署推荐使用固定版本号 tag（如 `fred1653/sharelatex-full:0.2.0`），开发可以使用 `latest`。详见 [**版本策略**](version-policy.md)。
+> 当前版本 **0.2.1**。`latest` tag 等价于 `0.2.1`。正式部署推荐使用固定版本号 tag（如 `fred1653/sharelatex-full:0.2.1`），开发可以使用 `latest`。详见 [**版本策略**](version-policy.md)。
 
 ---
 
@@ -203,7 +203,64 @@ scripts/tlmgr-in-container.sh install minted
 
 ---
 
-## 5. 构建验证
+## 5. Upstream 同步策略
+
+TeXDock 基于 Overleaf Community Edition，需要定期同步上游更新。
+
+### 5.1 同步流程
+
+```text
+上游 Overleaf CE 发布新版本
+        ↓
+1. 更新 Dockerfile-base 中的 Overleaf 版本引用
+        ↓
+2. 重新执行三级构建
+        ↓
+3. 运行冒烟测试
+        ↓
+4. 更新 VERSION 文件
+        ↓
+5. 发布新版本
+```
+
+### 5.2 Patch 管理
+
+TeXDock 的自定义修改集中在以下位置：
+
+| 文件 | 修改内容 |
+|------|---------|
+| `Dockerfile-base` | Ubuntu 基础镜像、TeX Live 安装 |
+| `Dockerfile` | Overleaf CE 代码集成 |
+| `Dockerfile-full` | 字体、辅助脚本、冒烟测试 |
+| `docker-compose.yml` | 默认配置、环境变量 |
+| `services/web/` | 中文化、功能定制 |
+
+### 5.3 上游更新检查
+
+```bash
+# 检查上游 Overleaf CE 版本
+git remote add upstream https://github.com/overleaf/overleaf.git
+git fetch upstream
+
+# 查看上游变更
+git log HEAD..upstream/master --oneline
+```
+
+### 5.4 冲突解决策略
+
+当上游有重大变更时：
+
+1. **评估影响**：检查变更是否影响 TeXDock 的自定义修改
+2. **创建分支**：从当前版本创建升级分支
+3. **逐步合并**：先合并基础层（Dockerfile-base），再合并应用层
+4. **测试验证**：运行完整冒烟测试
+5. **发布更新**：通过新版本号发布
+
+> 建议在上游发布新版本后 1-2 周内完成同步，避免积累过多变更。
+
+---
+
+## 6. 构建验证
 
 构建完成后验证：
 
@@ -220,4 +277,24 @@ docker exec sharelatex xelatex --version
 # 检查 Windows 字体别名
 docker exec sharelatex fc-match SimSun
 docker exec sharelatex fc-match SimHei
+
+# 检查版本号
+docker exec sharelatex cat /etc/texdock-version
+# 应输出当前版本号（如 0.2.1）
 ```
+
+### 冒烟测试
+
+构建完成后运行冒烟测试脚本：
+
+```bash
+# 在容器内执行
+docker exec sharelatex texdock-smoke-test
+```
+
+冒烟测试包括：
+
+- TeX Live 基础编译测试
+- 中文编译测试（XeLaTeX + ctex）
+- 字体别名测试
+- 辅助脚本可用性测试
