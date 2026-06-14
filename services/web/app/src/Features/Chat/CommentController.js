@@ -5,11 +5,15 @@ const SessionManager = require('../Authentication/SessionManager')
 const UserInfoManager = require('../User/UserInfoManager')
 const UserInfoController = require('../User/UserInfoController')
 const EditorRealTimeController = require('../Editor/EditorRealTimeController')
-const logger = require('@overleaf/logger')
+const DocstoreManager = require('../Docstore/DocstoreManager')
+const ProjectGetter = require('../Project/ProjectGetter')
 
 function sendComment(req, res, next) {
   const { project_id: projectId, thread_id: threadId } = req.params
   const { content } = req.body
+  if (typeof content !== 'string' || content.trim() === '') {
+    return res.status(400).json({ message: 'content must be a non-empty string' })
+  }
   const userId = SessionManager.getLoggedInUserId(req.session)
   if (userId == null) {
     return next(new Error('no logged-in user'))
@@ -48,6 +52,9 @@ function editMessage(req, res, next) {
     message_id: messageId,
   } = req.params
   const { content } = req.body
+  if (typeof content !== 'string' || content.trim() === '') {
+    return res.status(400).json({ message: 'content must be a non-empty string' })
+  }
   const userId = SessionManager.getLoggedInUserId(req.session)
   if (userId == null) {
     return next(new Error('no logged-in user'))
@@ -144,6 +151,133 @@ function deleteThread(req, res, next) {
   })
 }
 
+async function getRanges(req, res, next) {
+  try {
+    const { project_id: projectId } = req.params
+    const ranges = await DocstoreManager.promises.getAllRanges(projectId)
+    res.json(
+      (ranges || []).map(doc => ({
+        id: doc._id.toString(),
+        ranges: doc.ranges,
+      }))
+    )
+  } catch (err) {
+    next(err)
+  }
+}
+
+async function getThreads(req, res, next) {
+  try {
+    const { project_id: projectId } = req.params
+    const loggedInUserId = String(
+      SessionManager.getLoggedInUserId(req.session) || ''
+    )
+    const threads = await ChatApiHandler.promises.getThreads(projectId)
+
+    // Collect unique user IDs from all messages
+    const userIds = new Set()
+    for (const thread of Object.values(threads || {})) {
+      for (const msg of thread.messages || []) {
+        if (msg.user_id) userIds.add(String(msg.user_id))
+      }
+    }
+
+    // Fetch user info for all unique users in parallel
+    const userMap = {}
+    const results = await Promise.allSettled(
+      Array.from(userIds).map(async userId => {
+        const user = await UserInfoManager.promises.getPersonalInfo(userId)
+        return { userId, user }
+      })
+    )
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const { userId, user } = result.value
+        if (user) {
+          userMap[userId] = {
+            id: user._id.toString(),
+            email: user.email,
+            name:
+              [user.first_name, user.last_name]
+                .filter(Boolean)
+                .join(' ') || user.email,
+            avatar_text: (
+              user.first_name ||
+              user.email ||
+              '?'
+            )[0].toUpperCase(),
+            hue:
+              Math.abs(
+                userId
+                  .split('')
+                  .reduce(
+                    (a, c) =>
+                      ((a << 5) - a + c.charCodeAt(0)) | 0,
+                    0
+                  )
+              ) % 360,
+            isSelf: userId === loggedInUserId,
+          }
+        }
+      }
+    }
+
+    // Enrich messages with user objects
+    const enrichedThreads = {}
+    for (const [threadId, thread] of Object.entries(threads || {})) {
+      enrichedThreads[threadId] = {
+        ...thread,
+        messages: (thread.messages || []).map(msg => {
+          const msgUserId = String(msg.user_id)
+          return {
+            ...msg,
+            timestamp: new Date(msg.timestamp),
+            user: userMap[msgUserId] || {
+              id: msgUserId,
+              email: 'unknown',
+              name: 'Unknown User',
+              avatar_text: '?',
+              hue: 0,
+              isSelf: msgUserId === loggedInUserId,
+            },
+          }
+        }),
+      }
+    }
+
+    res.json(enrichedThreads)
+  } catch (err) {
+    next(err)
+  }
+}
+
+async function getChangesUsers(req, res, next) {
+  try {
+    const { project_id: projectId } = req.params
+    const project = await ProjectGetter.promises.getProject(projectId, {
+      owner_ref: true,
+    })
+    if (!project) {
+      return res.sendStatus(404)
+    }
+    const users = []
+    if (project.owner_ref) {
+      const owner = await UserInfoManager.promises.getPersonalInfo(project.owner_ref)
+      if (owner) {
+        users.push({
+          id: owner._id.toString(),
+          email: owner.email,
+          first_name: owner.first_name,
+          last_name: owner.last_name,
+        })
+      }
+    }
+    res.json(users)
+  } catch (err) {
+    next(err)
+  }
+}
+
 module.exports = {
   sendComment,
   editMessage,
@@ -152,4 +286,7 @@ module.exports = {
   resolveThread,
   reopenThread,
   deleteThread,
+  getRanges,
+  getThreads,
+  getChangesUsers,
 }
