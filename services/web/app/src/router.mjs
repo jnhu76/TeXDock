@@ -1143,6 +1143,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       '/project/:project_id/ranges',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
       async (req, res, next) => {
         try {
           const { project_id: projectId } = req.params
@@ -1164,6 +1165,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       '/project/:project_id/threads',
       AuthorizationMiddleware.blockRestrictedUserFromProject,
       AuthorizationMiddleware.ensureUserCanReadProject,
+      PermissionsController.requirePermission('chat'),
       async (req, res, next) => {
         try {
           const { project_id: projectId } = req.params
