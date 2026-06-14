@@ -44,7 +44,7 @@ docker exec sharelatex curl -s http://127.0.0.1:3000/admin -H "Cookie: <session>
 
 ## Project Structure
 
-```
+```text
 services/web/modules/admin-panel/
 ├── index.mjs                              # 模块入口
 ├── app/
@@ -103,8 +103,8 @@ block content
 - [ ] `GET /admin/user/:userId` 显示 6 个标签页
 - [ ] `GET /admin/project` 显示项目搜索
 - [ ] `GET /admin/project/:projectId` 显示 3 个标签页
-- [ ] `POST /admin/project/:id/undelete` 恢复项目
-- [ ] `POST /admin/project/:id/transfer` 转移所有权
+- [ ] `POST /admin/project/:projectId/undelete` 恢复项目
+- [ ] `POST /admin/project/:projectId/transfer` 转移所有权
 - [ ] 所有 admin.spec.ts 测试通过
 
 ## Implementation Order
@@ -114,5 +114,5 @@ block content
 3. 用户详情页 (`GET /admin/user/:userId`)
 4. 项目查找页 (`GET /admin/project`)
 5. 项目详情页 (`GET /admin/project/:projectId`)
-6. 项目恢复 (`POST /admin/project/:id/undelete`)
-7. 所有权转移 (`POST /admin/project/:id/transfer`)
+6. 项目恢复 (`POST /admin/project/:projectId/undelete`)
+7. 所有权转移 (`POST /admin/project/:projectId/transfer`)

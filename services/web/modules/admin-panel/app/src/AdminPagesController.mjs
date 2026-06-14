@@ -210,7 +210,12 @@ export default {
     }
 
     const project = await ProjectGetter.promises.getProject(projectId)
-    const previousOwnerId = project?.owner_ref
+    if (!project) {
+      return res
+        .status(404)
+        .render(viewPath('not-found'), { type: 'Project' })
+    }
+    const previousOwnerId = project.owner_ref
 
     await db.projects.updateOne(
       { _id: projectId },

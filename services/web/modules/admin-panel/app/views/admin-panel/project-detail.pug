@@ -77,7 +77,7 @@ block content
 													each doc in project.deletedDocs
 														tr
 															td= doc.name || '-'
-															td= doc.deleted ? new Date(doc.deleted).toLocaleDateString() : '-'
+															td= doc.deletedAt ? new Date(doc.deletedAt).toLocaleDateString() : '-'
 										else
 											p No deleted documents.
 
