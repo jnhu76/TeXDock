@@ -10,7 +10,7 @@
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green)
 ![TeX Live](https://img.shields.io/badge/TeX%20Live-2026-blue)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20x86__64-lightgrey)
-![Version](https://img.shields.io/badge/version-0.2.0-orange)
+![Version](https://img.shields.io/badge/version-0.2.1-orange)
 
 本项目基于 [Overleaf Community Edition](https://github.com/overleaf/overleaf) 修改，遵循 [AGPL-3.0](LICENSE) 许可证发布。
 
@@ -22,7 +22,7 @@
 
 直接使用预构建镜像，无需自己编译。镜像地址：[Docker Hub → fred1653/sharelatex-full](https://hub.docker.com/repository/docker/fred1653/sharelatex-full/general)
 
-> 当前版本 **0.2.0**。`latest` tag 等价于 `0.2.0`。正式部署推荐使用固定版本号 tag。详见 [**版本策略**](docs/version-policy.md)。
+> 当前版本 **0.2.1**。`latest` tag 等价于 `0.2.1`。正式部署推荐使用固定版本号 tag。详见 [**版本策略**](docs/version-policy.md)。
 
 ```bash
 # 使用项目根目录的 docker-compose.yml 启动
@@ -37,11 +37,12 @@ docker compose -f docker-compose.yml down
 
 > `docker-compose.yml` 已配置好 `OVERLEAF_SITE_LANGUAGE: "zh-CN"`（中文界面），开箱即用。
 
-### 🆕 新增功能
+### 🆕 新增功能（0.2.1）
 
-- **Admin 管理面板**：设置 `ADMIN_PRIVILEGE_AVAILABLE: "true"` 启用，支持用户管理、项目管理、审计日志
+- **Admin 管理面板**：设置 `ADMIN_PRIVILEGE_AVAILABLE: "true"` 启用，支持用户管理、项目管理
+- **审计日志**：管理面板内置审计日志，记录用户操作和系统事件
 - **Track Changes 修订跟踪**：默认启用，编辑器工具栏可切换修订模式
-- **审阅面板**：支持评论、解决线程、实时同步
+- **审阅面板**：支持评论线程、解决讨论、实时同步
 
 ### ⚙️ 配置
 
@@ -68,6 +69,18 @@ OVERLEAF_EMAIL_SMTP_PASS: your-password
 ```
 
 > ⚠️ **TLS 证书问题**：如果遇到邮件发送失败（尤其是自建邮件服务器），建议将 `OVERLEAF_EMAIL_SMTP_TLS_REJECT_UNAUTH` 设为 `false` 或注释掉。
+
+#### 🔐 LDAP 登录（可选）
+
+支持 LDAP 统一认证（OpenLDAP / Active Directory），启用后用户可通过 LDAP 账户登录：
+
+```yaml
+OVERLEAF_LDAP_URL: "ldap://ldap:389"
+OVERLEAF_LDAP_SEARCH_BASE: "ou=people,dc=example,dc=com"
+OVERLEAF_LDAP_SEARCH_FILTER: "(uid={{username}})"
+OVERLEAF_LDAP_BIND_DN: "cn=admin,dc=example,dc=com"
+OVERLEAF_LDAP_BIND_CREDENTIALS: "your_ldap_password"
+```
 
 📖 完整配置说明见 [**部署指南**](docs/deployment-guide.md)。
 
@@ -107,6 +120,25 @@ docker build -f server-ce/Dockerfile-windows-fonts \
   --build-arg BASE_IMAGE=fred1653/sharelatex-full:latest \
   -t fred1653/sharelatex-full-private:latest .
 ```
+
+---
+
+## 📊 功能对比
+
+| 功能 | TeXDock | Overleaf CE | Overleaf Server Pro |
+|------|:-------:|:-----------:|:-------------------:|
+| 中文界面 (zh-CN) | ✅ | ❌ | ❌ |
+| 完整 TeX Live | ✅ | ❌ | ❌ |
+| Windows 字体兼容 | ✅ | ❌ | ❌ |
+| Track Changes 修订跟踪 | ✅ | ❌ | ✅ |
+| 审阅面板 | ✅ | ❌ | ✅ |
+| 评论线程 | ✅ | ❌ | ✅ |
+| 审计日志 | ✅ | ❌ | ✅ |
+| Admin 管理面板 | ✅ | ❌ | ✅ |
+| LDAP 登录 | ✅ | ❌ | ✅ |
+| SMTP 邮件 | ✅ | ✅ | ✅ |
+| 沙箱编译 | ❌ | ❌ | ✅ |
+| SSO / SAML / OIDC | ❌ | ❌ | ✅ |
 
 ---
 
@@ -192,3 +224,25 @@ server-ce/
   Dockerfile-full-web             # 3️⃣ web 代码覆盖（日常 rebuild）
   Dockerfile-windows-fonts        # 🔒 私有字体镜像（本地构建使用）
 ```
+
+---
+
+## 🗺️ 路线图
+
+### 0.2.x
+
+- 沙箱编译支持（Sandboxed Compiles）
+- 管理面板功能增强
+
+### 0.3.x
+
+- 认证改进（SSO 研究）
+- 企业级部署特性
+
+### 未来
+
+- 更好的可观测性（日志、监控）
+- 升级自动化工具
+- SAML / OIDC 集成
+
+> 不承诺具体交付日期。

@@ -15,19 +15,47 @@ TeXDock 使用 [语义化版本](https://semver.org/lang/zh-CN/)（SemVer）：`
 | Tag | 说明 |
 |-----|------|
 | `latest` | 跟随最新开发版本，适合本地开发和测试 |
-| `0.2.0` | 固定版本，适合生产部署 |
+| `0.2.1` | 固定版本，适合生产部署 |
 
 - `latest` 始终指向最新构建
-- 每次发布新版本时同步推送版本号 tag（如 `0.2.0`）
+- 每次发布新版本时同步推送版本号 tag（如 `0.2.1`）
 
 ## 生产部署建议
 
-正式部署**推荐使用固定版本号 tag**（如 `0.2.0`），避免 `latest` 带来的不可预期变更。
+正式部署**推荐使用固定版本号 tag**（如 `0.2.1`），避免 `latest` 带来的不可预期变更。
 
 ```yaml
 # docker-compose.yml 示例
-image: fred1653/sharelatex-full:0.2.0
+image: fred1653/sharelatex-full:0.2.1
 ```
+
+---
+
+## 升级兼容性
+
+### 版本兼容性承诺
+
+| 版本变更 | 兼容性 | 说明 |
+|---------|--------|------|
+| PATCH (0.2.0 → 0.2.1) | ✅ 完全兼容 | 数据格式不变，配置无需修改 |
+| MINOR (0.2.x → 0.3.x) | ⚠️ 可能有新配置项 | 需检查文档，现有配置通常无需修改 |
+| MAJOR (0.x → 1.x) | ❌ 可能有破坏性变更 | 需仔细阅读迁移指南 |
+
+### 升级步骤
+
+```bash
+# 1. 备份数据
+bash scripts/backup.sh              # 详见部署指南 → 备份策略
+
+# 2. 拉取新镜像并重启
+docker compose pull sharelatex
+docker compose up -d
+
+# 3. 验证版本
+docker exec sharelatex cat /etc/texdock-version
+```
+
+> 完整升级说明（含回滚、注意事项）详见 [**部署指南 → 升级指南**](deployment-guide.md#升级指南)。
 
 ---
 
@@ -52,6 +80,8 @@ LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
 1. **更新 `VERSION` 文件** — 写入新版本号（如 `0.3.0`）
 2. **确认所有测试通过** — 冒烟测试、中文编译测试
 3. **按顺序执行三级构建** — 不得跳级、不得用 `latest` 做中间 tag
+4. **更新文档** — README、部署指南、构建指南中的版本号
+5. **编写变更日志** — 在下方「版本变更记录」中添加新条目
 
 ### 3. 标准构建命令
 
@@ -123,4 +153,5 @@ git push --tags
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.2.1 | 2026-06 | 新增管理面板、审计日志、Track Changes、审阅面板；完善 LDAP 文档；新增升级指南和备份策略 |
 | 0.2.0 | 2026-06 | 基于 Overleaf CE，TeX Live 2026，内置 CJK 字体支持 |
