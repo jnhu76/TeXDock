@@ -7,6 +7,7 @@ import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.
 import { UserAuditLogEntry } from '../../../../app/src/models/UserAuditLogEntry.js'
 import { ProjectAuditLogEntry } from '../../../../app/src/models/ProjectAuditLogEntry.js'
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.js'
+import OwnershipTransferHandler from '../../../../app/src/Features/Collaborators/OwnershipTransferHandler.js'
 import mongodb from '../../../../app/src/infrastructure/mongodb.js'
 
 const { db } = mongodb
@@ -37,11 +38,10 @@ export default {
       if (searchType === 'regexp') {
         try {
           const regex = new RegExp(search, 'i')
-          const allUsers = await UserGetter.promises.getUsers(
-            { email: { $exists: true } },
-            USER_FIELDS
-          )
-          users = allUsers.filter(u => u.email && regex.test(u.email))
+          users = await db.users
+            .find({ email: { $regex: regex } }, { projection: USER_FIELDS })
+            .limit(50)
+            .toArray()
         } catch {
           users = []
         }
@@ -215,22 +215,19 @@ export default {
         .status(404)
         .render(viewPath('not-found'), { type: 'Project' })
     }
-    const previousOwnerId = project.owner_ref
-
-    await db.projects.updateOne(
-      { _id: projectId },
-      { $set: { owner_ref: targetUser._id } }
-    )
 
     const adminUserId = SessionManager.getLoggedInUserId(req.session)
     const ipAddress = req.ip
-    await ProjectAuditLogEntry.create({
+    await OwnershipTransferHandler.promises.transferOwnership(
       projectId,
-      operation: 'transfer-ownership',
-      initiatorId: adminUserId,
-      ipAddress,
-      info: { previousOwnerId, newOwnerId: targetUser._id },
-    })
+      targetUser._id,
+      {
+        allowTransferToNonCollaborators: true,
+        sessionUserId: adminUserId,
+        skipEmails: true,
+        ipAddress,
+      }
+    )
 
     res.redirect(`/admin/project/${projectId}`)
   }),
