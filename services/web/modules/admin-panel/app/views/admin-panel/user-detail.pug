@@ -1,0 +1,95 @@
+extends ../../../../../app/views/layout-marketing
+
+block content
+  .container
+    .page-header
+      h1= user.email || 'User Details'
+      p.text-muted ID: #{user._id}
+
+    ul.nav.nav-tabs.mb-4
+      li.nav-item
+        a.nav-link.active(data-bs-toggle='tab', href='#info') User Info
+      li.nav-item
+        a.nav-link(data-bs-toggle='tab', href='#projects') Projects
+      li.nav-item
+        a.nav-link(data-bs-toggle='tab', href='#deleted') Deleted Projects
+      li.nav-item
+        a.nav-link(data-bs-toggle='tab', href='#audit') Audit Log
+
+    .tab-content
+      #info.tab-pane.fade.show.active
+        .card.mb-4
+          .card-header
+            h5 Profile
+          .card-body
+            table.table
+              tr
+                th Email
+                td= user.email || '-'
+              tr
+                th Created
+                td= user.createdAt ? new Date(user.createdAt).toLocaleString() : '-'
+              tr
+                th Last Login
+                td= user.lastLoggedInAt ? new Date(user.lastLoggedInAt).toLocaleString() : '-'
+              tr
+                th isAdmin
+                td= user.isAdmin ? 'Yes' : 'No'
+
+      #projects.tab-pane.fade
+        .card
+          .card-body
+            if projects.length > 0
+              table.table.table-striped
+                thead
+                  tr
+                    th Name
+                    th Created
+                    th Last Updated
+                tbody
+                  each project in projects
+                    tr
+                      td
+                        a(href=`/admin/project/${project._id}`)= project.name
+                      td= project.createdAt ? new Date(project.createdAt).toLocaleDateString() : '-'
+                      td= project.lastUpdated ? new Date(project.lastUpdated).toLocaleDateString() : '-'
+            else
+              p.text-muted No projects found.
+
+      #deleted.tab-pane.fade
+        .card
+          .card-body
+            if deletedProjects.length > 0
+              table.table.table-striped
+                thead
+                  tr
+                    th Name
+                    th Deleted At
+                tbody
+                  each project in deletedProjects
+                    tr
+                      td= project.name || '-'
+                      td= project.deleted ? new Date(project.deleted).toLocaleDateString() : '-'
+            else
+              p.text-muted No deleted projects.
+
+      #audit.tab-pane.fade
+        .card
+          .card-body
+            if auditLog && auditLog.length > 0
+              table.table.table-striped
+                thead
+                  tr
+                    th Action
+                    th Timestamp
+                    th Details
+                tbody
+                  each entry in auditLog
+                    tr
+                      td= entry.operation || '-'
+                      td= entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '-'
+                      td= JSON.stringify(entry.info || {})
+            else
+              p.text-muted No audit log entries.
+
+    script(src='/socket.io/socket.io.js')

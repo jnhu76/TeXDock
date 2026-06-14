@@ -1,0 +1,228 @@
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { expressify } from '@overleaf/promise-utils'
+import UserGetter from '../../../../app/src/Features/User/UserGetter.js'
+import ProjectGetter from '../../../../app/src/Features/Project/ProjectGetter.js'
+import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.js'
+import { UserAuditLogEntry } from '../../../../app/src/models/UserAuditLogEntry.js'
+import { ProjectAuditLogEntry } from '../../../../app/src/models/ProjectAuditLogEntry.js'
+import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.js'
+import mongodb from '../../../../app/src/infrastructure/mongodb.js'
+
+const { db } = mongodb
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+function viewPath(name) {
+  return path.resolve(__dirname, `../views/admin-panel/${name}`)
+}
+
+export default {
+  /**
+   * GET /admin/user - 用户列表页
+   */
+  getUserList: expressify(async (req, res) => {
+    const { search, searchType } = req.query
+    let users = []
+
+    if (search) {
+      if (searchType === 'regexp') {
+        try {
+          const regex = new RegExp(search, 'i')
+          const allUsers = await UserGetter.promises.getUsers(
+            { email: { $exists: true } },
+            { email: 1, createdAt: 1, isAdmin: 1, lastLoggedInAt: 1 }
+          )
+          users = allUsers.filter(u => u.email && regex.test(u.email))
+        } catch {
+          users = []
+        }
+      } else {
+        const user = await UserGetter.promises.getUserByAnyEmail(search, {
+          email: 1,
+          createdAt: 1,
+          isAdmin: 1,
+          lastLoggedInAt: 1,
+        })
+        if (user) users = [user]
+
+        if (users.length === 0) {
+          try {
+            const userById = await UserGetter.promises.getUser(search, {
+              email: 1,
+              createdAt: 1,
+              isAdmin: 1,
+              lastLoggedInAt: 1,
+            })
+            if (userById) users = [userById]
+          } catch {
+            // 无效 ID
+          }
+        }
+      }
+    }
+
+    res.render(viewPath('user-list'), {
+      users,
+      search: search || '',
+      searchType: searchType || '',
+    })
+  }),
+
+  /**
+   * GET /admin/user/:userId - 用户详情页
+   */
+  getUserDetail: expressify(async (req, res) => {
+    const { userId } = req.params
+    const user = await UserGetter.promises.getUser(userId)
+    if (!user) {
+      return res.status(404).render(viewPath('not-found'), { type: 'User' })
+    }
+
+    const projects = await ProjectGetter.promises.findAllUsersProjects(userId, {
+      name: 1,
+      lastUpdated: 1,
+      createdAt: 1,
+    })
+
+    const deletedProjects = await db.projects
+      .find({
+        'overleaf.history.projectId': { $exists: true },
+        deleted: { $exists: true },
+        owner_ref: user._id,
+      })
+      .toArray()
+
+    const auditLog = await UserAuditLogEntry.find({ userId })
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .lean()
+
+    res.render(viewPath('user-detail'), {
+      user,
+      projects,
+      deletedProjects,
+      auditLog,
+    })
+  }),
+
+  /**
+   * GET /admin/project - 项目查找页
+   */
+  getProjectLookup: expressify(async (req, res) => {
+    const { search } = req.query
+    let projects = []
+
+    if (search) {
+      try {
+        const project = await ProjectGetter.promises.getProject(search, {
+          name: 1,
+          owner_ref: 1,
+          createdAt: 1,
+          lastUpdated: 1,
+        })
+        if (project) projects = [project]
+      } catch {
+        // 无效 ID
+      }
+
+      if (projects.length === 0) {
+        const nameResults = await db.projects
+          .find(
+            { name: { $regex: search, $options: 'i' } },
+            { projection: { name: 1, owner_ref: 1, createdAt: 1, lastUpdated: 1 } }
+          )
+          .limit(50)
+          .toArray()
+        projects = nameResults
+      }
+    }
+
+    res.render(viewPath('project-lookup'), {
+      projects,
+      search: search || '',
+    })
+  }),
+
+  /**
+   * GET /admin/project/:projectId - 项目详情页
+   */
+  getProjectDetail: expressify(async (req, res) => {
+    const { projectId } = req.params
+    const project = await ProjectGetter.promises.getProject(projectId)
+    if (!project) {
+      return res.status(404).render(viewPath('not-found'), { type: 'Project' })
+    }
+
+    const owner = await UserGetter.promises.getUser(project.owner_ref, {
+      email: 1,
+    })
+
+    const auditLog = await ProjectAuditLogEntry.find({ projectId })
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .lean()
+
+    res.render(viewPath('project-detail'), {
+      project,
+      owner,
+      auditLog,
+    })
+  }),
+
+  /**
+   * POST /admin/project/:projectId/undelete - 恢复已删除项目
+   */
+  undeleteProject: expressify(async (req, res) => {
+    const { projectId } = req.params
+    await ProjectDeleter.promises.undeleteProject(projectId)
+    res.redirect(`/admin/project/${projectId}`)
+  }),
+
+  /**
+   * POST /admin/project/:projectId/transfer - 转移项目所有权
+   */
+  transferOwnership: expressify(async (req, res) => {
+    const { projectId } = req.params
+    const { targetUserId } = req.body
+
+    let targetUser = null
+    try {
+      targetUser = await UserGetter.promises.getUserByAnyEmail(targetUserId)
+    } catch {
+      // 尝试按 ID 查找
+    }
+    if (!targetUser) {
+      try {
+        targetUser = await UserGetter.promises.getUser(targetUserId)
+      } catch {
+        // 用户不存在
+      }
+    }
+
+    if (!targetUser) {
+      return res.status(404).render(viewPath('not-found'), { type: 'User' })
+    }
+
+    const project = await ProjectGetter.promises.getProject(projectId)
+    const previousOwnerId = project?.owner_ref
+
+    await db.projects.updateOne(
+      { _id: projectId },
+      { $set: { owner_ref: targetUser._id } }
+    )
+
+    const adminUserId = SessionManager.getLoggedInUserId(req.session)
+    const ipAddress = req.ip
+    await ProjectAuditLogEntry.create({
+      projectId,
+      operation: 'transfer-ownership',
+      initiatorId: adminUserId,
+      ipAddress,
+      info: { previousOwnerId, newOwnerId: targetUser._id },
+    })
+
+    res.redirect(`/admin/project/${projectId}`)
+  }),
+}
