@@ -4,7 +4,7 @@
 #
 # 这是 sharelatex-base + server-ce/Dockerfile 的合并版，【去掉了所有 TeXLive】。
 # 沙箱编译模式下，主容器只跑 web 全栈，不负责编译——编译交给 sibling 容器
-# （见 Dockerfile-texlive-sibling）。
+# （见 Dockerfile-sandbox-texlive）。
 #
 # 本镜像自包含：直接 FROM phusion/baseimage，不再依赖 sharelatex-base。
 #
@@ -16,12 +16,17 @@
 # 可选 build args：
 #   --build-arg UBUNTU_MIRROR=https://mirrors.aliyun.com/ubuntu/
 #
-# 注意：相比 sharelatex-full，本镜像【不含】 TeXLive，体积显著更小。
-#       非沙箱模式（编译在主容器内）请继续用 sharelatex-full。
+# 注意：
+#   - 相比 sharelatex-full，本镜像【不含】TeXLive，体积显著更小。
+#   - 非沙箱模式（编译在主容器内）请继续用 sharelatex-full。
+#   - 本文件不使用 # syntax 指令，避免构建时额外拉取 Dockerfile frontend 镜像。
+#   - 缓存清理必须和缓存产生放在同一个 RUN layer，否则不会真正减少镜像体积。
 
 ARG TEXDOCK_VERSION=dev
 FROM phusion/baseimage:noble-1.0.3
+
 ARG TEXDOCK_VERSION
+
 LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
       texdock.version="${TEXDOCK_VERSION}" \
       org.opencontainers.image.title="TeXDock Web (sandbox host)" \
@@ -32,10 +37,18 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 
 # ===========================================================================
-# 系统依赖（原 Dockerfile-base 第 22-64 行，去掉 TeXLive 段）
+# 系统依赖（去掉 TeXLive）
+#
+# 说明：
+#   - 不运行 unattended-upgrade；Docker build 应该可复现，不应在构建中滚动升级。
+#   - 使用 --no-install-recommends，避免拉入不必要包。
+#   - apt/cache/tmp 清理放在同一个 RUN layer 内，避免缓存进入最终镜像层。
 # ===========================================================================
 ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu/
+
 RUN set -eux; \
+    rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; \
+    mkdir -p /etc/apt/sources.list.d; \
     cat > /etc/apt/sources.list.d/ubuntu.sources <<EOF
 Types: deb
 URIs: ${UBUNTU_MIRROR}
@@ -50,37 +63,87 @@ Components: main restricted universe multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 EOF
 
-RUN apt-get update \
- && apt-get install -y \
-      unattended-upgrades \
-      build-essential wget net-tools unzip time poppler-utils optipng strace nginx git python3 python-is-python3 zlib1g-dev libpcre3-dev gettext-base libwww-perl ca-certificates curl gnupg \
-      qpdf \
- && unattended-upgrade --verbose --no-minimal-upgrade-steps \
-# install Node.js https://github.com/nodesource/distributions#nodejs
- && mkdir -p /etc/apt/keyrings \
- && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
- && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
- && apt-get update \
- && apt-get install -y nodejs \
- && npm config set registry https://registry.npmmirror.com \
- && rm -f /etc/nginx/nginx.conf /etc/nginx/sites-enabled/default
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    set -eux; \
+    rm -f /etc/apt/apt.conf.d/docker-clean; \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      build-essential \
+      wget \
+      net-tools \
+      unzip \
+      time \
+      poppler-utils \
+      optipng \
+      strace \
+      nginx \
+      git \
+      python3 \
+      python-is-python3 \
+      zlib1g-dev \
+      libpcre3-dev \
+      gettext-base \
+      libwww-perl \
+      ca-certificates \
+      curl \
+      gnupg \
+      qpdf; \
+    \
+    mkdir -p /etc/apt/keyrings; \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+      | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+      > /etc/apt/sources.list.d/nodesource.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends nodejs; \
+    \
+    npm config set registry https://registry.npmmirror.com; \
+    rm -f /etc/nginx/nginx.conf /etc/nginx/sites-enabled/default; \
+    \
+    npm cache clean --force || true; \
+    apt-get clean; \
+    rm -rf \
+      /var/lib/apt/lists/* \
+      /tmp/* \
+      /var/tmp/* \
+      /root/.cache \
+      /root/.npm \
+      /root/.gnupg
 
-# Makes sure LuaTex cache is writable（原 Dockerfile-base:13）
+# Makes sure LuaTex cache is writable（虽然 web-only 不跑 TeXLive，但保留兼容变量）
 ENV TEXMFVAR=/var/lib/overleaf/tmp/texmf-var
 
 # ===========================================================================
-# overleaf 用户与目录（原 Dockerfile-base:109-115）
+# overleaf 用户与目录
+#
+# 注意：
+#   主容器里的 node 服务以 www-data(uid 33) 跑。
+#   sandbox sibling 也建议使用 TEXLIVE_IMAGE_USER="33:33"。
+#   compiles/output 目录要让 www-data 可写，避免 CLSI 写 main.tex 失败。
 # ===========================================================================
-RUN adduser --system --group --home /overleaf --no-create-home overleaf && \
-    mkdir -p /var/lib/overleaf && \
-    chown www-data:www-data /var/lib/overleaf && \
-    mkdir -p /var/log/overleaf && \
-    chown www-data:www-data /var/log/overleaf && \
-    mkdir -p /var/lib/overleaf/data/template_files && \
-    chown www-data:www-data /var/lib/overleaf/data/template_files
+RUN set -eux; \
+    adduser --system --group --home /overleaf --no-create-home overleaf; \
+    mkdir -p \
+      /var/lib/overleaf \
+      /var/lib/overleaf/data \
+      /var/lib/overleaf/data/template_files \
+      /var/lib/overleaf/data/compiles \
+      /var/lib/overleaf/data/output \
+      /var/lib/overleaf/tmp \
+      /var/log/overleaf; \
+    chown -R www-data:www-data \
+      /var/lib/overleaf \
+      /var/log/overleaf; \
+    chmod 2775 \
+      /var/lib/overleaf/data \
+      /var/lib/overleaf/data/compiles \
+      /var/lib/overleaf/data/output \
+      /var/lib/overleaf/tmp
 
 # ===========================================================================
-# 以下为原 server-ce/Dockerfile 全部内容（web 全栈），原样保留
+# 以下为原 server-ce/Dockerfile web 全栈内容
 # ===========================================================================
 WORKDIR /overleaf
 
@@ -94,23 +157,43 @@ COPY server-ce/genScript.js server-ce/services.js /overleaf/
 ENV PATH="/overleaf/node_modules/.bin:$PATH"
 ENV COREPACK_HOME=/opt/corepack
 
-RUN corepack enable && corepack install -g yarn@4.14.1
-RUN yarn config set npmRegistryServer https://registry.npmmirror.com
+RUN set -eux; \
+    corepack enable; \
+    corepack install -g yarn@4.14.1; \
+    yarn config set npmRegistryServer https://registry.npmmirror.com; \
+    rm -rf /root/.cache /root/.npm /tmp/* /var/tmp/*
+
 ENV COREPACK_ENABLE_NETWORK=0
 
 # Avoid old npm/git dependencies resolving GitHub URLs through SSH.
 # ----------------------------------------------------------------
-RUN git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
- && git config --global url."https://github.com/".insteadOf "git@github.com:" \
- && git config --global url."https://github.com/".insteadOf "git+ssh://git@github.com/"
+RUN set -eux; \
+    git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"; \
+    git config --global url."https://github.com/".insteadOf "git@github.com:"; \
+    git config --global url."https://github.com/".insteadOf "git+ssh://git@github.com/"; \
+    rm -rf /root/.cache /root/.npm /tmp/* /var/tmp/*
 
 # Install dependencies
 # --------------------
 # genScript install 会生成 npm install --omit=dev，这是正常的。
-RUN set -eux; \
+#
+# 清理点：
+#   - /root/.npm、/root/.cache：npm/node-gyp 下载缓存
+#   - /tmp、/var/tmp：npm/git/native build 临时文件
+#   - /overleaf/**/.cache：部分包会留下构建缓存
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    --mount=type=cache,target=/root/.cache,sharing=locked \
+    set -eux; \
     node genScript install > /tmp/install.sh; \
     bash -x /tmp/install.sh; \
-    rm -f /tmp/install.sh
+    rm -f /tmp/install.sh; \
+    npm cache clean --force || true; \
+    find /overleaf -type d -name ".cache" -prune -exec rm -rf {} +; \
+    rm -rf \
+      /root/.npm \
+      /root/.cache \
+      /tmp/* \
+      /var/tmp/*
 
 # Add actual source files
 # -----------------------
@@ -121,20 +204,48 @@ COPY --parents libraries/ services/ tools/migrations/ /overleaf/
 RUN set -eux; \
     test -f /overleaf/services/web/app/views/user/restricted.pug; \
     sed -i 's#a(href="/").material-symbols(aria-hidden="true")#a.material-symbols(href="/", aria-hidden="true")#g' \
-      /overleaf/services/web/app/views/user/restricted.pug
+      /overleaf/services/web/app/views/user/restricted.pug; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
 
 # Add local build patch scripts
 # -----------------------------
 COPY scripts/patch-pdfjs-worker-wasm.sh /usr/local/bin/patch-pdfjs-worker-wasm.sh
-RUN chmod +x /usr/local/bin/patch-pdfjs-worker-wasm.sh
+RUN set -eux; \
+    chmod +x /usr/local/bin/patch-pdfjs-worker-wasm.sh; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
 
 # Compile frontend/assets
 # -----------------------
-RUN set -eux; \
+#
+# 清理点：
+#   - webpack / vite / turbo / parcel 等前端缓存
+#   - npm/corepack/cache
+#   - /tmp、/var/tmp
+#   - /opt/corepack：runtime 不需要 yarn/corepack；编译完成后可删除
+#
+# 注意：
+#   不删除 /overleaf/node_modules，也不删除 compiled assets。
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    --mount=type=cache,target=/root/.cache,sharing=locked \
+    set -eux; \
     node genScript compile > /tmp/compile.sh; \
     sed -i 's#npm run webpack:production#patch-pdfjs-worker-wasm.sh \&\& npm run webpack:production#g' /tmp/compile.sh; \
     bash -x /tmp/compile.sh; \
-    rm -f /tmp/compile.sh
+    rm -f /tmp/compile.sh; \
+    npm cache clean --force || true; \
+    find /overleaf -type d \( \
+        -name ".cache" \
+        -o -name ".webpack-cache" \
+        -o -name ".vite" \
+        -o -name ".turbo" \
+        -o -name ".parcel-cache" \
+      \) -prune -exec rm -rf {} +; \
+    rm -rf \
+      /root/.npm \
+      /root/.cache \
+      /tmp/* \
+      /var/tmp/* \
+      /opt/corepack
 
 # Copy runit service startup scripts to its location
 # --------------------------------------------------
@@ -153,15 +264,21 @@ ADD server-ce/nginx/clsi-nginx.conf /etc/nginx/sites-enabled/clsi-nginx.conf
 # Configure log rotation
 # ----------------------
 ADD server-ce/logrotate/overleaf /etc/logrotate.d/overleaf
-RUN chmod 644 /etc/logrotate.d/overleaf
+RUN set -eux; \
+    chmod 644 /etc/logrotate.d/overleaf; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
 
 # Configure cron tasks
 # --------------------
 ADD server-ce/cron /overleaf/cron
 ADD server-ce/config/crontab-history /etc/cron.d/crontab-history
-RUN chmod 600 /etc/cron.d/crontab-history
+RUN set -eux; \
+    chmod 600 /etc/cron.d/crontab-history; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
 ADD server-ce/config/crontab-deletion /etc/cron.d/crontab-deletion
-RUN chmod 600 /etc/cron.d/crontab-deletion
+RUN set -eux; \
+    chmod 600 /etc/cron.d/crontab-deletion; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
 
 # Copy Phusion Image startup and shutdown scripts to their locations
 # ------------------------------------------------------------------
@@ -180,14 +297,20 @@ COPY server-ce/config/custom-environment-variables.json /overleaf/services/histo
 # Copy grunt thin wrapper
 # -----------------------
 ADD server-ce/bin/grunt /usr/local/bin/grunt
-RUN chmod +x /usr/local/bin/grunt
+RUN set -eux; \
+    chmod +x /usr/local/bin/grunt; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
 
 # Copy history helper scripts
 # ---------------------------
 ADD server-ce/bin/flush-history-queues /overleaf/bin/flush-history-queues
-RUN chmod +x /overleaf/bin/flush-history-queues
+RUN set -eux; \
+    chmod +x /overleaf/bin/flush-history-queues; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
 ADD server-ce/bin/force-history-resyncs /overleaf/bin/force-history-resyncs
-RUN chmod +x /overleaf/bin/force-history-resyncs
+RUN set -eux; \
+    chmod +x /overleaf/bin/force-history-resyncs; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
 
 # Copy Latexmkrc
 # --------------
@@ -196,7 +319,33 @@ COPY server-ce/config/latexmkrc /usr/local/share/latexmk/LatexMk
 # File that controls open|closed status of the site
 # -------------------------------------------------
 ENV SITE_MAINTENANCE_FILE="/etc/overleaf/site_status"
-RUN touch $SITE_MAINTENANCE_FILE
+RUN set -eux; \
+    touch "$SITE_MAINTENANCE_FILE"; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.npm
+
+# Final runtime cleanup
+# ---------------------
+#
+# 这里主要兜底清理 root/npm/corepack/tmp 缓存。
+# 注意：这只能删除当前 layer 可见内容；真正的大缓存仍应在产生它们的 RUN layer 内清理。
+RUN set -eux; \
+    npm cache clean --force || true; \
+    rm -rf \
+      /root/.npm \
+      /root/.cache \
+      /root/.config \
+      /root/.local \
+      /tmp/* \
+      /var/tmp/* \
+      /opt/corepack; \
+    find /overleaf -type d \( \
+        -name ".cache" \
+        -o -name ".webpack-cache" \
+        -o -name ".vite" \
+        -o -name ".turbo" \
+        -o -name ".parcel-cache" \
+      \) -prune -exec rm -rf {} +; \
+    chown -R www-data:www-data /var/lib/overleaf /var/log/overleaf
 
 # Set Environment Variables
 # -------------------------
