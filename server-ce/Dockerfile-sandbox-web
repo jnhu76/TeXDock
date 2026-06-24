@@ -1,0 +1,223 @@
+# Dockerfile-sandbox-web
+#
+# TeXDock Web-only 镜像（沙箱编译用主容器）
+#
+# 这是 sharelatex-base + server-ce/Dockerfile 的合并版，【去掉了所有 TeXLive】。
+# 沙箱编译模式下，主容器只跑 web 全栈，不负责编译——编译交给 sibling 容器
+# （见 Dockerfile-texlive-sibling）。
+#
+# 本镜像自包含：直接 FROM phusion/baseimage，不再依赖 sharelatex-base。
+#
+# 构建（在项目根目录执行）：
+#   DOCKER_BUILDKIT=1 docker build \
+#     -f server-ce/Dockerfile-sandbox-web \
+#     -t texdock/sharelatex-web:latest .
+#
+# 可选 build args：
+#   --build-arg UBUNTU_MIRROR=https://mirrors.aliyun.com/ubuntu/
+#
+# 注意：相比 sharelatex-full，本镜像【不含】 TeXLive，体积显著更小。
+#       非沙箱模式（编译在主容器内）请继续用 sharelatex-full。
+
+ARG TEXDOCK_VERSION=dev
+FROM phusion/baseimage:noble-1.0.3
+ARG TEXDOCK_VERSION
+LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
+      texdock.version="${TEXDOCK_VERSION}" \
+      org.opencontainers.image.title="TeXDock Web (sandbox host)" \
+      org.opencontainers.image.description="Web-only Overleaf image for sandboxed compiles (no TeX Live)"
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ===========================================================================
+# 系统依赖（原 Dockerfile-base 第 22-64 行，去掉 TeXLive 段）
+# ===========================================================================
+ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu/
+RUN set -eux; \
+    cat > /etc/apt/sources.list.d/ubuntu.sources <<EOF
+Types: deb
+URIs: ${UBUNTU_MIRROR}
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: ${UBUNTU_MIRROR}
+Suites: noble-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+
+RUN apt-get update \
+ && apt-get install -y \
+      unattended-upgrades \
+      build-essential wget net-tools unzip time poppler-utils optipng strace nginx git python3 python-is-python3 zlib1g-dev libpcre3-dev gettext-base libwww-perl ca-certificates curl gnupg \
+      qpdf \
+ && unattended-upgrade --verbose --no-minimal-upgrade-steps \
+# install Node.js https://github.com/nodesource/distributions#nodejs
+ && mkdir -p /etc/apt/keyrings \
+ && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+ && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+ && apt-get update \
+ && apt-get install -y nodejs \
+ && npm config set registry https://registry.npmmirror.com \
+ && rm -f /etc/nginx/nginx.conf /etc/nginx/sites-enabled/default
+
+# Makes sure LuaTex cache is writable（原 Dockerfile-base:13）
+ENV TEXMFVAR=/var/lib/overleaf/tmp/texmf-var
+
+# ===========================================================================
+# overleaf 用户与目录（原 Dockerfile-base:109-115）
+# ===========================================================================
+RUN adduser --system --group --home /overleaf --no-create-home overleaf && \
+    mkdir -p /var/lib/overleaf && \
+    chown www-data:www-data /var/lib/overleaf && \
+    mkdir -p /var/log/overleaf && \
+    chown www-data:www-data /var/log/overleaf && \
+    mkdir -p /var/lib/overleaf/data/template_files && \
+    chown www-data:www-data /var/lib/overleaf/data/template_files
+
+# ===========================================================================
+# 以下为原 server-ce/Dockerfile 全部内容（web 全栈），原样保留
+# ===========================================================================
+WORKDIR /overleaf
+
+# Add required source files for yarn/npm install
+# ----------------------------------------------
+COPY --parents libraries/*/package.json .yarn/patches/ services/*/package.json tools/migrations/ package.json yarn.lock .yarnrc.yml /overleaf/
+COPY server-ce/genScript.js server-ce/services.js /overleaf/
+
+# Corepack / Yarn
+# ---------------
+ENV PATH="/overleaf/node_modules/.bin:$PATH"
+ENV COREPACK_HOME=/opt/corepack
+
+RUN corepack enable && corepack install -g yarn@4.14.1
+RUN yarn config set npmRegistryServer https://registry.npmmirror.com
+ENV COREPACK_ENABLE_NETWORK=0
+
+# Avoid old npm/git dependencies resolving GitHub URLs through SSH.
+# ----------------------------------------------------------------
+RUN git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
+ && git config --global url."https://github.com/".insteadOf "git@github.com:" \
+ && git config --global url."https://github.com/".insteadOf "git+ssh://git@github.com/"
+
+# Install dependencies
+# --------------------
+# genScript install 会生成 npm install --omit=dev，这是正常的。
+RUN set -eux; \
+    node genScript install > /tmp/install.sh; \
+    bash -x /tmp/install.sh; \
+    rm -f /tmp/install.sh
+
+# Add actual source files
+# -----------------------
+COPY --parents libraries/ services/ tools/migrations/ /overleaf/
+
+# Patch old Pug syntax incompatible with current pug precompile.
+# --------------------------------------------------------------
+RUN set -eux; \
+    test -f /overleaf/services/web/app/views/user/restricted.pug; \
+    sed -i 's#a(href="/").material-symbols(aria-hidden="true")#a.material-symbols(href="/", aria-hidden="true")#g' \
+      /overleaf/services/web/app/views/user/restricted.pug
+
+# Add local build patch scripts
+# -----------------------------
+COPY scripts/patch-pdfjs-worker-wasm.sh /usr/local/bin/patch-pdfjs-worker-wasm.sh
+RUN chmod +x /usr/local/bin/patch-pdfjs-worker-wasm.sh
+
+# Compile frontend/assets
+# -----------------------
+RUN set -eux; \
+    node genScript compile > /tmp/compile.sh; \
+    sed -i 's#npm run webpack:production#patch-pdfjs-worker-wasm.sh \&\& npm run webpack:production#g' /tmp/compile.sh; \
+    bash -x /tmp/compile.sh; \
+    rm -f /tmp/compile.sh
+
+# Copy runit service startup scripts to its location
+# --------------------------------------------------
+ADD server-ce/runit /etc/service
+
+# Copy runit global settings to its location
+# ------------------------------------------
+ADD server-ce/config/env.sh /etc/overleaf/env.sh
+
+# Configure nginx
+# ---------------
+ADD server-ce/nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template
+ADD server-ce/nginx/overleaf.conf /etc/nginx/sites-enabled/overleaf.conf
+ADD server-ce/nginx/clsi-nginx.conf /etc/nginx/sites-enabled/clsi-nginx.conf
+
+# Configure log rotation
+# ----------------------
+ADD server-ce/logrotate/overleaf /etc/logrotate.d/overleaf
+RUN chmod 644 /etc/logrotate.d/overleaf
+
+# Configure cron tasks
+# --------------------
+ADD server-ce/cron /overleaf/cron
+ADD server-ce/config/crontab-history /etc/cron.d/crontab-history
+RUN chmod 600 /etc/cron.d/crontab-history
+ADD server-ce/config/crontab-deletion /etc/cron.d/crontab-deletion
+RUN chmod 600 /etc/cron.d/crontab-deletion
+
+# Copy Phusion Image startup and shutdown scripts to their locations
+# ------------------------------------------------------------------
+COPY server-ce/init_scripts/ /etc/my_init.d/
+COPY server-ce/init_preshutdown_scripts/ /etc/my_init.pre_shutdown.d/
+
+# Copy app settings files
+# -----------------------
+COPY server-ce/config/settings.js /etc/overleaf/settings.js
+
+# Copy history-v1 files
+# ---------------------
+COPY server-ce/config/production.json /overleaf/services/history-v1/config/production.json
+COPY server-ce/config/custom-environment-variables.json /overleaf/services/history-v1/config/custom-environment-variables.json
+
+# Copy grunt thin wrapper
+# -----------------------
+ADD server-ce/bin/grunt /usr/local/bin/grunt
+RUN chmod +x /usr/local/bin/grunt
+
+# Copy history helper scripts
+# ---------------------------
+ADD server-ce/bin/flush-history-queues /overleaf/bin/flush-history-queues
+RUN chmod +x /overleaf/bin/flush-history-queues
+ADD server-ce/bin/force-history-resyncs /overleaf/bin/force-history-resyncs
+RUN chmod +x /overleaf/bin/force-history-resyncs
+
+# Copy Latexmkrc
+# --------------
+COPY server-ce/config/latexmkrc /usr/local/share/latexmk/LatexMk
+
+# File that controls open|closed status of the site
+# -------------------------------------------------
+ENV SITE_MAINTENANCE_FILE="/etc/overleaf/site_status"
+RUN touch $SITE_MAINTENANCE_FILE
+
+# Set Environment Variables
+# -------------------------
+ENV OVERLEAF_CONFIG=/etc/overleaf/settings.js
+
+ENV WEB_API_USER="overleaf"
+ENV ADMIN_PRIVILEGE_AVAILABLE="true"
+
+ENV OVERLEAF_APP_NAME="Overleaf Community Edition"
+
+ENV OPTIMISE_PDF="true"
+
+# Phusion Image timeouts before sending SIGKILL to processes
+# ----------------------------------------------------------
+ENV KILL_PROCESS_TIMEOUT=55
+ENV KILL_ALL_PROCESSES_TIMEOUT=55
+ENV GRACEFUL_SHUTDOWN_DELAY_SECONDS=1
+
+ENV NODE_ENV="production"
+ENV LOG_LEVEL="info"
+
+EXPOSE 80
+
+ENTRYPOINT ["/sbin/my_init"]

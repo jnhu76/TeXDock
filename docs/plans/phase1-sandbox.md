@@ -1,297 +1,229 @@
 # Phase 1: 沙箱编译启用实施计划
 
-> **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
+**目标：** 启用 Docker 沙箱编译（Sandboxed Compiles），为 TeXDock 提供安全的 LaTeX 编译隔离环境
 
-**目标：** 启用 Docker 沙箱编译，提供安全的 LaTeX 编译环境
+**架构：** Sibling Containers（兄弟容器）模式，主容器通过宿主机 Docker socket 拉起独立的 TeXLive 容器执行编译，而非 Docker-in-Docker。
 
-**架构：** 复用现有 `DockerRunner` 实现，通过配置激活
+**涉及新文件：**
+- `server-ce/Dockerfile-sandbox-web` — web-only 主容器镜像（不含 TeXLive）
+- `server-ce/Dockerfile-sandbox-texlive` — 独立 TeXLive sibling 镜像（不含 web 栈）
+- `docker-compose.sandbox.yml` — 沙箱 override compose 文件
+- `.env.example` / `.env` — 路径变量配置
+- `scripts/init-sandbox-dirs.sh` — 宿主机编译目录初始化
 
-**技术栈：** Docker, Node.js, latexmk, Seccomp, Firejail
-
-**预计工期：** 1-2 天（配置 + 验证）
-
----
-
-### Task 1: 添加沙箱编译环境变量到 docker-compose.yml
-
-**目标：** 在 docker-compose.yml 中启用沙箱编译配置
-
-**文件：**
-- 修改: `docker-compose.yml:96-110`
-
-**步骤 1: 取消注释沙箱编译配置**
-
-```yaml
-      ## Community Edition 不支持沙箱编译，以下配置必须保持注释状态，否则会导致编译失败
-      ##
-      ## Sandboxed Compiles: https://docs.overleaf.com/on-premises/configuration/overleaf-toolkit/server-pro-only-configuration/sandboxed-compiles
-      SANDBOXED_COMPILES: "true"
-      ### Bind-mount source for /var/lib/overleaf/data/compiles inside the container.
-      SANDBOXED_COMPILES_HOST_DIR_COMPILES: "${HOME}/sharelatex_data/data/compiles"
-      ### Bind-mount source for /var/lib/overleaf/data/output inside the container.
-      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "${HOME}/sharelatex_data/data/output"
-      ### Backwards compatibility (before Server Pro 5.5)
-      DOCKER_RUNNER: "true"
-      SANDBOXED_COMPILES_SIBLING_CONTAINERS: "true"
-```
-
-**步骤 2: 挂载 Docker socket**
-
-```yaml
-    volumes:
-      # 用户数据持久化（项目文件、编译输出等）
-      - ~/sharelatex_data:/var/lib/overleaf
-      # Docker socket（仅 Server Pro 沙箱编译需要，Community Edition 无需挂载）
-      - /var/run/docker.sock:/var/run/docker.sock
-```
-
-**步骤 3: 验证配置语法**
-
-Run: `docker compose config --quiet`
-Expected: 无错误输出
-
-**步骤 4: 提交**
-
-```bash
-git add docker-compose.yml
-git commit -m "chore: enable sandboxed compiles in docker-compose"
-```
+**预计工期：** 1-2 天（构建镜像 + 验证）
 
 ---
-
-### Task 2: 创建编译目录结构
-
-**目标：** 创建沙箱编译所需的目录结构
-
-**文件：**
-- 创建: 脚本文件
-
-**步骤 1: 创建初始化脚本**
-
-```bash
-#!/bin/bash
-# scripts/init-sandbox-dirs.sh
-
-set -e
-
-DATA_DIR="${HOME}/sharelatex_data"
-COMPILES_DIR="${DATA_DIR}/data/compiles"
-OUTPUT_DIR="${DATA_DIR}/data/output"
-
-echo "Creating sandbox compile directories..."
-
-mkdir -p "${COMPILES_DIR}"
-mkdir -p "${OUTPUT_DIR}"
-
-# 设置权限（Docker 容器内用户 tex 需要访问）
-chmod 777 "${COMPILES_DIR}"
-chmod 777 "${OUTPUT_DIR}"
-
-echo "Sandbox directories created successfully."
-echo "  Compiles: ${COMPILES_DIR}"
-echo "  Output:   ${OUTPUT_DIR}"
-```
-
-**步骤 2: 运行初始化脚本**
-
-```bash
-chmod +x scripts/init-sandbox-dirs.sh
-./scripts/init-sandbox-dirs.sh
-```
-
-**步骤 3: 提交**
-
-```bash
-git add scripts/init-sandbox-dirs.sh
-git commit -m "chore: add sandbox directory initialization script"
-```
-
----
-
-### Task 3: 编写沙箱编译部署文档
-
-**目标：** 创建沙箱编译配置和部署指南
-
-**文件：**
-- 创建: `docs/plans/guides/sandbox-compiles-deployment.md`
-
-**步骤 1: 创建文档**
-
-```markdown
-# 沙箱编译配置指南
 
 ## 架构说明
 
-沙箱编译使用 Docker 容器隔离 LaTeX 编译过程，提供以下安全特性：
+### 非沙箱模式（现有，保持不动）
 
-- **网络隔离**：容器无网络访问
-- **能力移除**：移除所有 Linux capabilities
-- **Seccomp 白名单**：限制系统调用
-- **内存限制**：默认 1GB
-- **非 root 用户**：以 `tex` 用户运行
+```
+主容器 sharelatex-full (web + TeXLive scheme-full)
+  └─ LocalCommandRunner → 直接在容器内执行 latexmk
+```
 
-## 前置条件
+### 沙箱模式（新增）
 
-- Docker daemon 运行
-- Docker socket 可访问
-- 足够的磁盘空间（TeX Live 镜像约 5-10GB）
+```
+宿主机 Docker daemon
+  ├─ 主容器 texdock/sharelatex-web (仅 web 全栈，无 TeXLive)
+  │    └─ CLSI 通过 /var/run/docker.sock 请求 daemon
+  │         └─ daemon 创建 sibling 容器
+  │              └─ texdock/texlive:2026.1 (独立 TeXLive)
+  │                   └─ 执行 latexmk 编译
+  └─ ... (其他服务：mongo, redis)
+```
 
-## 配置步骤
+### 工作流程（一次编译）
 
-### 1. 启用沙箱编译
+1. CLSI 把项目源文件写入 `/var/lib/overleaf/data/compiles/<projectId-userId>`（容器内）
+2. CLSI 通过宿主机 Docker socket 创建新 sibling 容器
+3. 宿主机路径 `<OVERLEAF_DATA_PATH>/data/compiles/<projectId-userId>` bind-mount 到 sibling 容器的 `/compile`
+4. sibling 容器内执行 `latexmk`，产物落到 output 目录
+5. 容器用完即销毁（过期清理由 `DockerRunner.startContainerMonitor` 处理）
 
-修改 docker-compose.yml：
+> ⚠️ 关键：`SANDBOXED_COMPILES_HOST_DIR_*` 必须是宿主机绝对路径，因为 bind-mount 由宿主机 daemon 执行。
 
-\`\`\`yaml
-services:
-  sharelatex:
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      SANDBOXED_COMPILES: "true"
-      SANDBOXED_COMPILES_HOST_DIR_COMPILES: "${HOME}/sharelatex_data/data/compiles"
-      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "${HOME}/sharelatex_data/data/output"
-      DOCKER_RUNNER: "true"
-      TEXLIVE_IMAGE: "quay.io/sharelatex/texlive-full:2024.1"
-\`\`\`
+---
 
-### 2. 创建编译目录
+## 文件说明
 
-\`\`\`bash
+### Dockerfile-sandbox-web
+
+自包含的 web-only 主镜像，FROM `phusion/baseimage:noble-1.0.3`。
+
+- **合并自** `Dockerfile-base`（系统依赖部分）+ `Dockerfile`（web 全栈部分）
+- **去掉了** TeXLive 安装段（scheme-basic 和 scheme-full 都不装）
+- 编译全部委托给 sibling 容器，主容器不需要 TeXLive
+
+构建：
+```bash
+DOCKER_BUILDKIT=1 docker build \
+  -f server-ce/Dockerfile-sandbox-web \
+  -t texdock/sharelatex-web:latest .
+```
+
+### Dockerfile-sandbox-texlive
+
+独立 TeXLive 镜像，FROM `ubuntu:24.04`。
+
+- 用 `install-tl` 网络安装器装 `scheme-full`
+- 安装中文字体包（与 `Dockerfile-full` 字体层保持一致）
+- 创建 `tex` 用户（uid 1000，与主容器 `node` 用户同 uid，权限对齐）
+- 通过冒烟测试 `smoke-test-texlive-core.sh`（中文 XeLaTeX 编译验证）
+
+Tag 约定 `texdock/texlive:<YEAR>.1`（如 `texdock/texlive:2026.1`），`.1` 后缀匹配 `DockerRunner.js:235` 的年份推断正则 `/:([0-9]+)\.[0-9]+/`。
+
+构建：
+```bash
+DOCKER_BUILDKIT=1 docker build \
+  -f server-ce/Dockerfile-sandbox-texlive \
+  -t texdock/texlive:2026.1 .
+```
+
+### docker-compose.sandbox.yml
+
+Override 文件，叠加在 `docker-compose.yml` 之上使用：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+```
+
+覆盖点：
+1. 主容器镜像 → `texdock/sharelatex-web:latest`
+2. volumes 增加 `/var/run/docker.sock`
+3. 注入沙箱环境变量（`SANDBOXED_COMPILES`、`TEXLIVE_IMAGE`、`ALLOWED_IMAGES` 等）
+
+### scripts/init-sandbox-dirs.sh
+
+创建编译目录并设置 uid 1000 权限：
+```bash
 ./scripts/init-sandbox-dirs.sh
-\`\`\`
+```
 
-### 3. 重启服务
+### .env
 
-\`\`\`bash
-docker compose down
-docker compose up -d
-\`\`\`
+设置 `OVERLEAF_DATA_PATH` 为宿主机数据目录绝对路径。
 
-### 4. 验证
+---
 
-1. 创建一个简单的 LaTeX 项目
-2. 点击编译
-3. 检查日志：`docker compose logs clsi`
-4. 应该看到 Docker 容器创建和执行的日志
+## 实施步骤
 
-## 安全配置
+### Step 1: 构建两个新镜像
 
-### Seccomp 配置
+```bash
+cd TeXDock
 
-默认 Seccomp 配置位于 `services/clsi/seccomp/clsi-profile.json`，包含：
+# web-only 主镜像（~1.5GB，约 15-20 分钟）
+DOCKER_BUILDKIT=1 docker build \
+  -f server-ce/Dockerfile-sandbox-web \
+  -t texdock/sharelatex-web:latest .
 
-- 允许的系统调用：~130 个
-- 默认动作：阻止（SCMP_ACT_ERRNO）
-- 阻止的能力：网络、ptrace、mount 等
+# TeXLive sibling 镜像（~5GB，约 30-40 分钟，取决于网络）
+DOCKER_BUILDKIT=1 docker build \
+  -f server-ce/Dockerfile-sandbox-texlive \
+  -t texdock/texlive:2026.1 .
+```
 
-### 自定义 Seccomp
+> 构建时间主要在 TeXLive scheme-full 网络下载。可复用 `Dockerfile-base` / `Dockerfile-full` 的镜像源 `--build-arg TEXLIVE_REPOSITORY`。
 
-如需自定义，设置环境变量：
+### Step 2: 配置环境变量
 
-\`\`\`yaml
-SECCOMP_PROFILE: "/path/to/custom-profile.json"
-\`\`\`
+```bash
+cp .env.example .env
+# 编辑 .env，确认 OVERLEAF_DATA_PATH 是宿主机绝对路径
+# 必须与 docker-compose.yml 的 volume 挂载源 ~/sharelatex_data 一致
+```
 
-### AppArmor
+### Step 3: 初始化宿主机目录
 
-如需 AppArmor 支持：
+```bash
+./scripts/init-sandbox-dirs.sh
+```
 
-\`\`\`yaml
-APPARMOR_PROFILE: "docker-default"
-\`\`\`
+### Step 4: 启动
 
-## 编译组
+```bash
+docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+```
 
-| 编译组 | 说明 | 自动编译限制 |
-|--------|------|--------------|
-| `standard` | 默认 | 25 次/20 秒 |
-| `priority` | 高级用户 | 无限制 |
-| `alpha` | 管理员 | 无限制 + CLSI 缓存 |
+### Step 5: 验证
 
-## 资源限制
+```bash
+# 1. 查看日志，确认 CLSI 启动时选择 DockerRunner
+docker compose -f docker-compose.yml -f docker-compose.sandbox.yml logs sharelatex | grep -i "docker runner\|DockerRunner"
 
-| 资源 | 默认值 | 配置方式 |
-|------|--------|----------|
-| 内存 | 1GB | Docker 容器限制 |
-| CPU | 无限制 | 可通过 COMPILE_GROUP_DOCKER_CONFIGS 配置 |
-| 编译超时 | 180 秒 | `COMPILE_TIMEOUT` 环境变量 |
-| 看门狗超时 | 10 分钟 | `MAX_COMPILE_TIMEOUT_MINUTES` 环境变量 |
+# 2. 新建一个 LaTeX 项目，编译
+# 3. 观察 sibling 容器
+docker ps | grep project-
 
-## TeX Live 镜像
+# 4. 检查编译日志
+docker compose -f docker-compose.yml -f docker-compose.sandbox.yml logs sharelatex | grep "running docker container"
+```
 
-### 默认镜像
+---
 
-\`\`\`
-quay.io/sharelatex/texlive-full:2024.1
-\`\`\`
+## 安全特性
 
-### 自定义镜像
+Sibling 容器每次编译都有以下限制（由 `DockerRunner._getContainerOptions` 配置）：
 
-\`\`\`yaml
-TEXLIVE_IMAGE: "your-registry/texlive-custom:latest"
-\`\`\`
+| 特性 | 配置值 | 说明 |
+|------|--------|------|
+| 网络 | `NetworkDisabled: true` | 容器无网络访问 |
+| Linux capabilities | `CapDrop: ALL` | 移除所有 capabilities |
+| 非特权 | `SecurityOpt: ['no-new-privileges']` | 禁止提权 |
+| 内存 | 1GB | 默认限制 |
+| CPU | Ulimit: timeout + 5/10s | 编译超时 CPU 限制 |
+| Seccomp | 自定义 profile（~130 syscalls） | 限制系统调用 |
+| 用户 | `tex`（非 root） | 最小权限原则 |
 
-### 允许的镜像列表
-
-\`\`\`yaml
-ALLOWED_IMAGES: "quay.io/sharelatex/texlive-full:2024.1 your-registry/texlive-custom:latest"
-\`\`\`
+---
 
 ## 故障排除
 
 ### 编译失败
 
-1. 检查 Docker socket 权限：`ls -la /var/run/docker.sock`
-2. 检查 CLSI 日志：`docker compose logs clsi`
-3. 检查 Docker 容器：`docker ps -a | grep compile`
+1. 检查 Docker socket 可访问：
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.sandbox.yml exec sharelatex ls -l /var/run/docker.sock
+   ```
+2. 检查 sibling 镜像存在：
+   ```bash
+   docker images texdock/texlive
+   ```
+3. 检查 CLSI 日志：
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.sandbox.yml logs sharelatex | grep clsi
+   ```
 
 ### 权限错误
 
-确保编译目录权限正确：
-
-\`\`\`bash
-chmod -R 777 ~/sharelatex_data/data/compiles
-chmod -R 777 ~/sharelatex_data/data/output
-\`\`\`
-
-### 超时
-
-增加编译超时：
-
-\`\`\`yaml
-COMPILE_TIMEOUT: "300"  # 5 分钟
-MAX_COMPILE_TIMEOUT_MINUTES: "15"
-\`\`\`
-
-## 性能优化
-
-### 启用 CLSI 缓存
-
-\`\`\`yaml
-COMPILE_GROUP_DOCKER_CONFIGS: '{"priority": {"OptimiseInDocker": true}}'
-\`\`\`
-
-### 启用 PDF 优化
-
-\`\`\`yaml
-OPTIMISE_PDF: "true"
-\`\`\`
+确保编译目录属主为 uid 1000：
+```bash
+ls -ld ~/sharelatex_data/data/compiles
+# 应为 uid=1000 gid=1000
+sudo chown -R 1000:1000 ~/sharelatex_data/data/compiles ~/sharelatex_data/data/output
 ```
 
-**步骤 2: 提交**
+### 容器启动超时
 
+增加编译超时：
 ```bash
-git add docs/plans/guides/sandbox-compiles-deployment.md
-git commit -m "docs: add sandboxed compiles deployment guide"
+COMPILE_TIMEOUT: "300"
+MAX_COMPILE_TIMEOUT_MINUTES: "15"
 ```
 
 ---
 
 ## 验证清单
 
-- [ ] docker-compose.yml 包含沙箱编译配置
-- [ ] Docker socket 已挂载
-- [ ] 编译目录已创建
-- [ ] 部署文档完整且准确
-- [ ] 配置语法验证通过
+- [ ] `docker-compose.sandbox.yml` 配置正确（语法验证通过）
+- [ ] `.env` 中 `OVERLEAF_DATA_PATH` 为宿主机绝对路径
+- [ ] Docker socket 已挂载（`/var/run/docker.sock`）
+- [ ] 编译目录已创建且属主正确（uid 1000）
+- [ ] `texdock/sharelatex-web:latest` 镜像已构建
+- [ ] `texdock/texlive:2026.1` 镜像已构建
+- [ ] 新项目编译能成功创建 sibling 容器
+- [ ] 编译日志显示 `running docker container`

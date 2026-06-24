@@ -84,6 +84,31 @@ OVERLEAF_LDAP_BIND_CREDENTIALS: "your_ldap_password"
 
 📖 完整配置说明见 [**部署指南**](docs/deployment-guide.md)。
 
+### 🪟 沙箱编译（Sandboxed Compiles）
+
+沙箱编译让每次 LaTeX 编译都在一个独立的 Docker 容器（sibling container）中执行，实现编译隔离：
+
+- **隔离安全**：编译代码无法访问主容器的文件系统、网络和环境变量
+- **资源控制**：独立限制每个编译的内存、CPU 和系统调用
+- **清理保证**：编译容器用完即销毁，不留残留
+
+启用沙箱需要额外构建两个镜像，详见 [**沙箱编译部署指南**](docs/plans/guides/sandbox-compiles-deployment.md)。
+
+```bash
+# 构建 web-only 主镜像 + 独立 TeXLive 镜像
+DOCKER_BUILDKIT=1 docker build -f server-ce/Dockerfile-sandbox-web -t texdock/sharelatex-web:latest .
+DOCKER_BUILDKIT=1 docker build -f server-ce/Dockerfile-sandbox-texlive -t texdock/texlive:2026.1 .
+
+# 配置 + 初始化 + 启动（叠加 override）
+cp .env.example .env
+./scripts/init-sandbox-dirs.sh
+docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+```
+
+> 沙箱模式与默认的非沙箱模式**可共存**，切换只需在启动时是否叠加 `docker-compose.sandbox.yml`。两个模式使用完全不同的镜像链。默认的 `docker-compose.yml` 保持不动。
+
+---
+
 ### 📦 安装缺少的 LaTeX 宏包
 
 LaTeX 编译报错 `File 'xxx.sty' not found` 时：
@@ -137,14 +162,16 @@ docker build -f server-ce/Dockerfile-windows-fonts \
 | Admin 管理面板 | ✅ | ❌ | ✅ |
 | LDAP 登录 | ✅ | ❌ | ✅ |
 | SMTP 邮件 | ✅ | ✅ | ✅ |
-| 沙箱编译 | ❌ | ❌ | ✅ |
+| 沙箱编译 | ✅ | ❌ | ✅ |
 | SSO / SAML / OIDC | ❌ | ❌ | ✅ |
 
 ---
 
 ## 🔨 构建
 
-镜像分三级逐层构建，给后续维护者参考：
+镜像分两条链构建，互不干扰：
+
+### 非沙箱链（一体化，编译在主容器内）
 
 ```text
 Dockerfile-base  →  sharelatex-base    →  sharelatex       →  sharelatex-full
@@ -165,6 +192,21 @@ docker build -f server-ce/Dockerfile-full \
   --build-arg TEXDOCK_VERSION=$VERSION \
   --build-arg BASE_IMAGE=fred1653/sharelatex:$VERSION \
   -t fred1653/sharelatex-full:$VERSION -t fred1653/sharelatex-full:latest .
+```
+
+### 沙箱链（分离式，编译在 sibling 容器）
+
+```text
+Dockerfile-sandbox-web          Dockerfile-sandbox-texlive
+  web-only（不含 TeXLive）       独立 TeXLive（不含 web）
+```
+
+```bash
+docker build -f server-ce/Dockerfile-sandbox-web \
+  -t texdock/sharelatex-web:latest .
+docker build -f server-ce/Dockerfile-sandbox-texlive \
+  --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet \
+  -t texdock/texlive:2026.1 .
 ```
 
 📖 完整构建说明、字体策略、私有字体镜像见 [**构建指南**](docs/build-guide.md)。
@@ -212,17 +254,21 @@ docker compose up -d --force-recreate
 ## 📂 目录结构
 
 ```text
-docker-compose.yml                # 🚀 生产配置
+docker-compose.yml                # 🚀 生产配置（非沙箱，默认）
 docker-compose.dev.web.yml        # 💻 开发 overlay（挂载 web 源码）
+docker-compose.sandbox.yml        # 🪟 沙箱编译 overlay（叠加使用）
 
+scripts/init-sandbox-dirs.sh      # 🪟 沙箱编译目录初始化
 scripts/tlmgr-in-container.sh     # 📦 在运行中的容器内安装 TeX Live 宏包
 
 server-ce/
-  Dockerfile-base                 # 1️⃣ Ubuntu + Node.js + TeX Live basic
-  Dockerfile                      # 2️⃣ Overleaf CE 应用代码
-  Dockerfile-full                 # 3️⃣ 完整 TeX Live + 字体 + 辅助脚本
-  Dockerfile-full-web             # 3️⃣ web 代码覆盖（日常 rebuild）
-  Dockerfile-windows-fonts        # 🔒 私有字体镜像（本地构建使用）
+  ├── Dockerfile-base             # 1️⃣ [非沙箱] Ubuntu + Node.js + TeX Live basic
+  ├── Dockerfile                  # 2️⃣ [非沙箱] Overleaf CE 应用代码
+  ├── Dockerfile-full             # 3️⃣ [非沙箱] 完整 TeX Live + 字体 + 辅助脚本
+  ├── Dockerfile-full-web         #    [非沙箱] web 代码覆盖（日常 rebuild）
+  ├── Dockerfile-windows-fonts    # 🔒 私有字体镜像（本地构建使用）
+  ├── Dockerfile-sandbox-web      # 🪟 [沙箱] web-only 主镜像（无 TeX Live）
+  └── Dockerfile-sandbox-texlive  # 🪟 [沙箱] 独立 TeX Live 编译镜像
 ```
 
 ---
@@ -231,13 +277,14 @@ server-ce/
 
 ### 0.2.x
 
-- 沙箱编译支持（Sandboxed Compiles）
+- ✅ **沙箱编译支持（Sandboxed Compiles）** — 已完成，独立镜像链
 - 管理面板功能增强
 
 ### 0.3.x
 
 - 认证改进（SSO 研究）
 - 企业级部署特性
+- 沙箱编译性能优化（缓存、并行编译）
 
 ### 未来
 

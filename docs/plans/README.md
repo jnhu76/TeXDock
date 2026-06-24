@@ -16,7 +16,7 @@
 |------|------|--------|------|
 | **Phase 1** | LDAP 启用 | ⬜⬜⬜⬜⬜ 1 | [phase1-ldap.md](./phase1-ldap.md) |
 | **Phase 1** | SSO/SAML 启用 | ⬜⬜⬜⬜⬜ 1 | [phase1-sso.md](./phase1-sso.md) |
-| **Phase 1** | 沙箱编译启用 | ⬜⬜⬜⬜⬜ 1 | [phase1-sandbox.md](./phase1-sandbox.md) |
+| **Phase 1** | 沙箱编译启用 ✅ | ⬜⬜⬜⬜⬜ 1 | [phase1-sandbox.md](./phase1-sandbox.md) |
 | **Phase 2** | PostgreSQL/history-v1 (可选) | ⬛⬜⬜⬜⬜ 2 | [phase2-history-pg.md](./phase2-history-pg.md) |
 | **Phase 3** | 资源监控 | ⬛⬛⬜⬜⬜ 3 | [phase3-resource-monitor.md](./phase3-resource-monitor.md) |
 | **Phase 3** | 编译结果缓存增强 | ⬛⬛⬜⬜⬜ 3 | [phase3-compile-cache.md](./phase3-compile-cache.md) |
@@ -95,7 +95,8 @@ Phase 3 (增强模块)     ──→  Phase 4 (高级功能)
 | [SUMMARY.md](./SUMMARY.md) | 实施总结和快速开始 |
 | [phase1-ldap.md](./phase1-ldap.md) | LDAP 启用详细计划 |
 | [phase1-sso.md](./phase1-sso.md) | SSO/SAML 启用详细计划 |
-| [phase1-sandbox.md](./phase1-sandbox.md) | 沙箱编译启用详细计划 |
+| [phase1-sandbox.md](./phase1-sandbox.md) | 沙箱编译启用详细计划（含勘误与实施） |
+| [guides/sandbox-compiles-deployment.md](./guides/sandbox-compiles-deployment.md) | 沙箱编译部署指南（手顺） |
 | [phase2-history-pg.md](./phase2-history-pg.md) | PostgreSQL/history-v1 详细计划 |
 | [phase3-resource-monitor.md](./phase3-resource-monitor.md) | 资源监控详细计划 |
 | [phase3-compile-cache.md](./phase3-compile-cache.md) | 编译结果缓存增强详细计划 |

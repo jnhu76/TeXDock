@@ -1,0 +1,162 @@
+# Dockerfile-sandbox-texlive
+#
+# 沙箱编译（Sandboxed Compiles）sibling 镜像 — "texdock/texlive"。
+#
+# 这是一个【独立的】TeX Live 镜像，【不含】Overleaf web 全栈。
+# 启用沙箱编译时，CLSI 服务为每次编译拉起一个这样的 sibling 容器。
+#
+# 设计约束（必须满足 services/clsi/app/js/DockerRunner.js 的要求）：
+#   - TeX Live 安装在 /usr/local/texlive/<YEAR>/bin/x86_64-linux
+#     （DockerRunner.js:235 从镜像 tag ":<YEAR>.<n>" 推断年份，据此拼 PATH）
+#   - `latexmk` 在 PATH 中（CLSI 调用的是 latexmk，不是 pdflatex）
+#   - 一个非 root 用户来跑编译（默认 "tex"，可用 TEXLIVE_IMAGE_USER 覆盖；
+#     CLSI 会以 CapDrop:ALL、无网络运行该容器）
+#
+# Tag 约定：texdock/texlive:<YEAR>.1   例如 texdock/texlive:2026.1
+# ".1" 后缀是 CLSI 年份检测正则 /:([0-9]+)\.[0-9]+/ 所必需的。
+#
+# 构建（在项目根目录执行）：
+#   DOCKER_BUILDKIT=1 docker build \
+#     -f server-ce/Dockerfile-sandbox-texlive \
+#     -t texdock/texlive:2026.1 .
+#
+# 可选 build args：
+#   --build-arg UBUNTU_MIRROR=https://mirrors.aliyun.com/ubuntu
+#   --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
+#
+# 注意：本文件【不使用】 # syntax 指令和 --mount=type=cache，避免构建时
+#       向 auth.docker.io 拉取 frontend 镜像（在某些网络下会超时失败）。
+#       apt 缓存改为传统方式（不清理 lists，让同次构建内的后续层复用）。
+
+FROM ubuntu:24.04
+
+ARG TEXDOCK_VERSION=dev
+LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
+      texdock.version="${TEXDOCK_VERSION}" \
+      org.opencontainers.image.title="TeXDock TeX Live (sibling)" \
+      org.opencontainers.image.description="Standalone TeX Live image for sandboxed compiles"
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu
+ARG TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
+
+# ---------------------------------------------------------------------------
+# 1. 强制 Ubuntu apt 源指向选定镜像（与 Dockerfile-full 一致，保证两个
+#    镜像字体环境相同，沙箱/非沙箱编译产物一致）。
+# ---------------------------------------------------------------------------
+RUN . /etc/os-release \
+ && UBUNTU_CODENAME="${VERSION_CODENAME:-noble}" \
+ && rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources \
+ && mkdir -p /etc/apt/sources.list.d \
+ && printf 'Types: deb\nURIs: %s\nSuites: %s %s-updates %s-backports %s-security\nComponents: main restricted universe multiverse\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+      "${UBUNTU_MIRROR}" "${UBUNTU_CODENAME}" "${UBUNTU_CODENAME}" "${UBUNTU_CODENAME}" "${UBUNTU_CODENAME}" \
+      > /etc/apt/sources.list.d/ubuntu.sources \
+ && grep -RE "archive.ubuntu.com|security.ubuntu.com" /etc/apt/sources.list /etc/apt/sources.list.d \
+   && (echo "ERROR: official Ubuntu apt sources still exist." && exit 1) || true
+
+# ---------------------------------------------------------------------------
+# 2. 安装运行时工具 + 开源字体包（与 Dockerfile-full 的字体层保持一致，
+#    使沙箱编译与主容器内编译的中文字体输出一致）。
+# ---------------------------------------------------------------------------
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      fontconfig \
+      ghostscript \
+      make \
+      perl \
+      qpdf \
+      wget \
+      xz-utils \
+      zip \
+      fonts-noto \
+      fonts-noto-core \
+      fonts-noto-mono \
+      fonts-noto-cjk \
+      fonts-noto-cjk-extra \
+      fonts-wqy-microhei \
+      fonts-wqy-zenhei \
+      fonts-arphic-ukai \
+      fonts-arphic-uming \
+      fonts-dejavu \
+      fonts-dejavu-core \
+      fonts-dejavu-extra \
+      fonts-liberation \
+      fonts-liberation2 \
+      fonts-crosextra-carlito \
+      fonts-crosextra-caladea \
+      fonts-freefont-otf \
+      fonts-freefont-ttf \
+      fonts-ubuntu \
+ || apt-get install -y --no-install-recommends \
+      ca-certificates curl fontconfig ghostscript make perl wget xz-utils zip \
+      fonts-wqy-zenhei fonts-wqy-microhei fonts-dejavu fonts-liberation \
+ && fc-cache -r -v
+
+# ---------------------------------------------------------------------------
+# 3. 用官方网络安装器（install-tl）安装 TeX Live scheme-full。
+#
+#    安装到标准路径 /usr/local/texlive/<YEAR>，正是 DockerRunner.js:237
+#    期望的 /usr/local/texlive/<YEAR>/bin/x86_64-linux/。
+#    scheme-full = 全部包（与 Dockerfile-full 行为一致）。
+# ---------------------------------------------------------------------------
+RUN mkdir -p /install-tl-unx && cd /install-tl-unx \
+ && wget --quiet https://tug.org/texlive/files/texlive.asc \
+ && gpg --import texlive.asc && rm texlive.asc \
+ && wget --quiet ${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz \
+ && wget --quiet ${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz.sha512 \
+ && wget --quiet ${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz.sha512.asc \
+ && gpg --verify install-tl-unx.tar.gz.sha512.asc \
+ && sha512sum -c install-tl-unx.tar.gz.sha512 \
+ && tar -xz --strip-components=1 -f install-tl-unx.tar.gz \
+ && rm install-tl-unx.tar.gz* \
+ && printf 'selected_scheme scheme-full\ntlpdbopt_autobackup 0\ntlpdbopt_install_docfiles 0\ntlpdbopt_install_srcfiles 0\n' > texlive.profile \
+ && ./install-tl -profile texlive.profile -repository ${TEXLIVE_REPOSITORY} \
+ && "$(find /usr/local/texlive -name tlmgr)" path add \
+ && rm -rf /install-tl-unx
+
+# install-tl 从仓库内容推断年份，装到 /usr/local/texlive/<YEAR>。
+# 把该年份的二进制目录加入 PATH（供后续 smoke test 及容器内手动使用）。
+ENV PATH="/usr/local/texlive/2026/bin/x86_64-linux:${PATH}"
+
+# ---------------------------------------------------------------------------
+# 4. 刷新 TeX Live + fontconfig 缓存，让 XeLaTeX/LuaLaTeX 字体发现可用。
+# ---------------------------------------------------------------------------
+COPY scripts/fonts/scripts/refresh-texlive-font-cache /usr/local/bin/refresh-texlive-font-cache
+RUN chmod +x /usr/local/bin/refresh-texlive-font-cache \
+ && refresh-texlive-font-cache
+
+# ---------------------------------------------------------------------------
+# 5. 创建 "tex" 用户（uid 1000），CLSI 默认以该用户跑编译
+#    （DockerRunner.js:245，可用 TEXLIVE_IMAGE_USER 覆盖）。
+#
+#    uid 1000 与主 sharelatex 镜像的 node 用户同 uid，因此 bind-mount 进来的
+#    文件属主相同，无需 world-writable 权限即可读写。
+# ---------------------------------------------------------------------------
+RUN if id -u 1000 >/dev/null 2>&1; then \
+      EXISTING_USER="$(getent passwd 1000 | cut -d: -f1)"; \
+      if [ "${EXISTING_USER}" != "tex" ]; then \
+        usermod -l tex -d /home/tex -m "${EXISTING_USER}" 2>/dev/null || true; \
+      fi; \
+    else \
+      useradd --uid 1000 --create-home --shell /bin/bash tex; \
+    fi \
+ && mkdir -p /home/tex \
+ && chown -R tex:tex /home/tex \
+ && chmod 1777 /tmp
+
+# ---------------------------------------------------------------------------
+# 6. 核心 TeX Live 冒烟测试（复用 Dockerfile-full 用的同一脚本）。
+# ---------------------------------------------------------------------------
+COPY scripts/texlive/smoke-test-texlive-core.sh /usr/local/bin/smoke-test-texlive-core
+RUN chmod +x /usr/local/bin/smoke-test-texlive-core \
+ && smoke-test-texlive-core
+
+# sibling 容器生命周期短，只跑一条 latexmk 命令；无需 entrypoint/cmd。
+# CLSI 会按次编译设置 Cmd、WorkingDir、User、Env。
+USER tex
+WORKDIR /compile

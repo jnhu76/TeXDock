@@ -14,6 +14,7 @@ TeXDock 是基于 Overleaf Community Edition 的中文本地化版本，支持�
   - [管理面板](#管理面板)
   - [邮件配置](#邮件配置)
   - [LDAP 登录](#ldap-登录可选)
+  - [沙箱编译](#沙箱编译可选)
   - [安全设置](#安全设置可选)
   - [高级配置](#高级配置可选)
 - [启动与初始化](#启动与初始化)
@@ -205,6 +206,30 @@ environment:
 ```
 
 > 启用 LDAP 后，用户可通过 LDAP 账户登录，首次登录时自动创建本地账户。
+
+### 沙箱编译（可选）
+
+沙箱编译让每次 LaTeX 编译都在一个独立的 Docker 容器（sibling container）中执行，提供编译隔离。详见 [**沙箱编译部署指南**](docs/plans/guides/sandbox-compiles-deployment.md)。
+
+**快速启用（需先构建镜像）：**
+
+```yaml
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+  environment:
+    SANDBOXED_COMPILES: "true"
+    DOCKER_RUNNER: "true"
+    SANDBOXED_COMPILES_SIBLING_CONTAINERS: "true"
+    TEXLIVE_IMAGE: "texdock/texlive:2026.1"
+    TEX_LIVE_DOCKER_IMAGE: "texdock/texlive:2026.1"
+    TEXLIVE_IMAGE_USER: "tex"
+    SANDBOXED_COMPILES_HOST_DIR_COMPILES: "${OVERLEAF_DATA_PATH}/data/compiles"
+    SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "${OVERLEAF_DATA_PATH}/data/output"
+```
+
+推荐使用 `docker-compose.sandbox.yml` override 文件而非直接修改 `docker-compose.yml`，方便在两模式间切换。
+
+> 沙箱编译在 TeXDock 的 Community Edition 代码中可正常启用（无许可证门控），但无官方支持。沙箱解决的是「编译与主容器的隔离」，不提供整体安全。
 
 ### 安全设置（可选）
 

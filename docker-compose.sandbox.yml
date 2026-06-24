@@ -1,0 +1,75 @@
+# 沙箱编译（Sandboxed Compiles）override 文件
+#
+# 用法（叠加在 docker-compose.yml 之上）：
+#   docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+#
+# 本 override 做三件事：
+#   1. 把主容器镜像换成 web-only 镜像 texdock/sharelatex-web（不含 TeX Live）
+#   2. 挂载宿主机 Docker socket（CLSI 通过它拉起 sibling TeX Live 容器）
+#   3. 注入沙箱编译所需的环境变量
+#
+# ---------------------------------------------------------------------------
+# 前提条件（必须先完成，否则启动后编译会失败）：
+#
+#   a) 构建两个新镜像（在项目根目录）：
+#        # web-only 主镜像
+#        DOCKER_BUILDKIT=1 docker build \
+#          -f server-ce/Dockerfile-sandbox-web \
+#          -t texdock/sharelatex-web:latest .
+#
+#        # 独立 TeX Live sibling 镜像
+#        DOCKER_BUILDKIT=1 docker build \
+#          -f server-ce/Dockerfile-sandbox-texlive \
+#          -t texdock/texlive:2026.1 .
+#
+#   b) 创建宿主机编译目录：
+#        ./scripts/init-sandbox-dirs.sh
+#
+#   c) 配置 .env（复制 .env.example），设置 OVERLEAF_DATA_PATH 为
+#      【宿主机绝对路径】，且必须与 docker-compose.yml 的 volume 挂载源一致。
+#
+# 注意：SANDBOXED_COMPILES_HOST_DIR_* 必须是【宿主机绝对路径】，因为真正执行
+#       bind-mount 的是宿主机 Docker daemon，它看不到容器内路径。
+
+services:
+  sharelatex:
+    # 覆盖主 compose 的镜像：用 web-only 镜像（不含 TeX Live）。
+    # 沙箱模式下编译全部在 sibling 容器内，主容器不需要 TeX Live。
+    image: texdock/sharelatex-web:latest
+
+    volumes:
+      # 挂载宿主机 Docker socket，让 CLSI 能创建 sibling 容器。
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    environment:
+      # ===== 沙箱编译开关 =====
+      # 启用 sibling 容器隔离编译。CLSI 的 CommandRunner.js 只看这两个变量切换
+      # 到 DockerRunner，不依赖许可证（CE 也能用）。
+      SANDBOXED_COMPILES: "true"
+      DOCKER_RUNNER: "true"
+      SANDBOXED_COMPILES_SIBLING_CONTAINERS: "true"
+
+      # ===== TeX Live sibling 镜像 =====
+      # tag 必须是 :<YEAR>.<n> 格式（如 2026.1），DockerRunner.js:235 据此推断
+      # TeX Live 二进制路径 /usr/local/texlive/<YEAR>/bin/x86_64-linux/。
+      # TEXLIVE_IMAGE：CLSI 在项目未指定 imageName 时的 fallback（settings.defaults.js:106）。
+      # TEX_LIVE_DOCKER_IMAGE：web 服务给【新项目】写入的默认 imageName（server-ce/config/settings.js:266）。
+      TEXLIVE_IMAGE: "texdock/texlive:2026.1"
+      TEX_LIVE_DOCKER_IMAGE: "texdock/texlive:2026.1"
+
+      # sibling 容器内执行编译的用户。
+      # texdock/texlive 镜像内置 tex 用户（uid 1000），与主容器 node 用户同 uid，
+      # 权限天然对齐。如改用其他镜像，按需调整。
+      TEXLIVE_IMAGE_USER: "tex"
+
+      # ===== 宿主机编译目录（必须是绝对路径）=====
+      # 默认用 ${OVERLEAF_DATA_PATH} 变量，在 .env 中设置。
+      # CLSI 把源文件写到 compiles 目录，sibling 容器从这里 bind-mount 读取；
+      # 编译产物落到 output 目录。
+      SANDBOXED_COMPILES_HOST_DIR_COMPILES: "${OVERLEAF_DATA_PATH}/data/compiles"
+      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "${OVERLEAF_DATA_PATH}/data/output"
+
+      # ===== 镜像白名单（安全加固，可选但推荐）=====
+      # 限制 CLSI 只能拉起白名单内的镜像，防止任意镜像注入。
+      # 必须与上面的 TEXLIVE_IMAGE 完全一致。
+      ALLOWED_IMAGES: "texdock/texlive:2026.1"
