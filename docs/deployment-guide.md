@@ -1,5 +1,7 @@
 # TeXDock 部署指南
 
+> **Archived.** This guide is for reference only. Canonical deployment files are maintained in [`texdock-deploy`](https://github.com/jnhu76/texdock-deploy). Commands and paths in this document may be outdated.
+
 TeXDock 是基于 Overleaf Community Edition 的中文本地化版本，支持用户自注册、中文界面和中文邮件通知。
 
 ## 目录
@@ -227,7 +229,7 @@ environment:
     SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "${OVERLEAF_DATA_PATH}/data/output"
 ```
 
-推荐使用 `docker-compose.sandbox.yml` override 文件而非直接修改 `docker-compose.yml`，方便在两模式间切换。
+Sandbox mode is a standalone deployment, not an override on top of the full image compose. See `texdock-deploy/sandbox` for the canonical deployment files.
 
 > 沙箱编译在 TeXDock 的 Community Edition 代码中可正常启用（无许可证门控），但无官方支持。沙箱解决的是「编译与主容器的隔离」，不提供整体安全。
 
@@ -497,9 +499,9 @@ docker exec sharelatex cat /etc/texdock-version
 
 | 目录 | 容器路径 | 说明 |
 |------|---------|------|
-| `~/mongo_data` | `/data/db` | MongoDB 数据库 |
-| `~/redis_data` | `/data` | Redis 持久化数据 |
-| `~/sharelatex_data` | `/var/lib/overleaf` | 用户项目文件、编译输出 |
+| `${TEXDOCK_MONGO_DATA_DIR}` | `/data/db` | MongoDB 数据库 |
+| `${TEXDOCK_REDIS_DATA_DIR}` | `/data` | Redis 持久化数据 |
+| `${TEXDOCK_OVERLEAF_DATA_DIR}` | `/var/lib/overleaf` | 用户项目文件、编译输出 |
 
 ### 使用 rsync 硬链接增量备份
 
@@ -571,15 +573,15 @@ bash scripts/backup.sh --tar
 docker compose stop
 
 # 从最新快照恢复
-rsync -av /mnt/usb/texdock/latest/mongo_data/ ~/mongo_data/
-rsync -av /mnt/usb/texdock/latest/redis_data/ ~/redis_data/
-rsync -av /mnt/usb/texdock/latest/sharelatex_data/ ~/sharelatex_data/
+rsync -av /mnt/usb/texdock/latest/mongo_data/ "${TEXDOCK_MONGO_DATA_DIR}/"
+rsync -av /mnt/usb/texdock/latest/redis_data/ "${TEXDOCK_REDIS_DATA_DIR}/"
+rsync -av /mnt/usb/texdock/latest/sharelatex_data/ "${TEXDOCK_OVERLEAF_DATA_DIR}/"
 
 # 从 tar.gz 包恢复（异地备份场景）
 # tar -xzf texdock-20260614.tar.gz -C /tmp/restore
-# rsync -av /tmp/restore/mongo_data/ ~/mongo_data/
-# rsync -av /tmp/restore/redis_data/ ~/redis_data/
-# rsync -av /tmp/restore/sharelatex_data/ ~/sharelatex_data/
+# rsync -av /tmp/restore/mongo_data/ "${TEXDOCK_MONGO_DATA_DIR}/"
+# rsync -av /tmp/restore/redis_data/ "${TEXDOCK_REDIS_DATA_DIR}/"
+# rsync -av /tmp/restore/sharelatex_data/ "${TEXDOCK_OVERLEAF_DATA_DIR}/"
 
 # 重启服务
 docker compose up -d
@@ -647,7 +649,7 @@ Track Changes 需要项目所有协作者都使用支持该功能的编辑器版
 services:
   sharelatex:
     restart: always
-    image: fred1653/sharelatex-full:latest
+    image: texdock/sharelatex-full:latest
     container_name: sharelatex
     depends_on:
       mongo:
@@ -657,7 +659,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ~/sharelatex_data:/var/lib/overleaf
+      - "${TEXDOCK_OVERLEAF_DATA_DIR}:/var/lib/overleaf"
     environment:
       OVERLEAF_APP_NAME: "TeXDock"
       OVERLEAF_SITE_URL: "http://your-server-ip"
@@ -687,7 +689,7 @@ services:
     container_name: mongo
     command: "--replSet overleaf"
     volumes:
-      - ~/mongo_data:/data/db
+      - "${TEXDOCK_MONGO_DATA_DIR}:/data/db"
       - ./bin/shared/mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js
     environment:
       MONGO_INITDB_DATABASE: sharelatex
@@ -704,5 +706,5 @@ services:
     image: redis:6.2
     container_name: redis
     volumes:
-      - ~/redis_data:/data
+      - "${TEXDOCK_REDIS_DATA_DIR}:/data"
 ```

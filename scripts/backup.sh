@@ -1,14 +1,18 @@
 #!/bin/bash
-# TeXDock 数据备份
+# TeXDock data backup
 #
-# 用法:
-#   bash scripts/backup.sh                          # 备份到 ~/texdock-backups/
-#   bash scripts/backup.sh /mnt/usb/texdock         # 备份到指定目录
-#   bash scripts/backup.sh /mnt/usb/texdock --tar   # 备份 + 打 tar.gz 包
+# Usage:
+#   bash scripts/backup.sh [TARGET_DIR] [--tar]
 #
-# 参数:
-#   $1  备份目标目录（默认 ~/texdock-backups/）
-#   $2  --tar   额外打 tar.gz 压缩包，适合拷贝到异地/U盘/NAS
+# Environment variables (or pass via .env):
+#   TEXDOCK_OVERLEAF_DATA_DIR  - Overleaf data directory
+#   TEXDOCK_MONGO_DATA_DIR     - MongoDB data directory
+#   TEXDOCK_REDIS_DATA_DIR     - Redis data directory
+#
+# Examples:
+#   bash scripts/backup.sh                          # backup to ~/texdock-backups/
+#   bash scripts/backup.sh /mnt/usb/texdock         # backup to specified dir
+#   bash scripts/backup.sh /mnt/usb/texdock --tar   # backup + tar.gz
 
 set -eo pipefail
 
@@ -18,8 +22,21 @@ if [ "$2" = "--tar" ] || [ "$1" = "--tar" ]; then
   TAR_MODE=true
 fi
 
-# 如果 --tar 是第一个参数，备份目录用默认值
+# If --tar is the first argument, use default backup dir
 [ "$1" = "--tar" ] && DEST="$HOME/texdock-backups"
+
+# Load env file if present
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . .env
+  set +a
+fi
+
+# Require data directory env vars
+OVERLEAF_DATA="${TEXDOCK_OVERLEAF_DATA_DIR:?Set TEXDOCK_OVERLEAF_DATA_DIR in .env or environment}"
+MONGO_DATA="${TEXDOCK_MONGO_DATA_DIR:?Set TEXDOCK_MONGO_DATA_DIR in .env or environment}"
+REDIS_DATA="${TEXDOCK_REDIS_DATA_DIR:?Set TEXDOCK_REDIS_DATA_DIR in .env or environment}"
 
 LATEST="$DEST/latest"
 SNAPSHOT="$DEST/$(date +%Y%m%d_%H%M%S)"
@@ -27,28 +44,28 @@ LOG_FILE="$DEST/backup.log"
 
 mkdir -p "$DEST"
 
-echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] 开始备份 → $DEST" >> "$LOG_FILE"
+echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] Starting backup -> $DEST" >> "$LOG_FILE"
 
-# rsync 增量同步，--link-dest 对未变更文件创建硬链接（不额外占空间）
+# rsync incremental sync with --link-dest for hardlinks (no extra space for unchanged files)
 LINK_OPT=""
 [ -d "$LATEST" ] && LINK_OPT="--link-dest=$LATEST"
 
 rsync -av --delete $LINK_OPT \
-  ~/mongo_data/       "$SNAPSHOT/mongo_data/" \
-  ~/redis_data/       "$SNAPSHOT/redis_data/" \
-  ~/sharelatex_data/  "$SNAPSHOT/sharelatex_data/" \
+  "$MONGO_DATA/"       "$SNAPSHOT/mongo_data/" \
+  "$REDIS_DATA/"       "$SNAPSHOT/redis_data/" \
+  "$OVERLEAF_DATA/"    "$SNAPSHOT/sharelatex_data/" \
   2>&1 | tee -a "$LOG_FILE"
 
-# 更新 latest 软链接
+# Update latest symlink
 rm -f "$LATEST"
 ln -s "${SNAPSHOT##*/}" "$LATEST"
 
-echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] 快照完成" >> "$LOG_FILE"
-echo "✅ 快照 → $SNAPSHOT"
+echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] Snapshot complete" >> "$LOG_FILE"
+echo "Snapshot -> $SNAPSHOT"
 
-# --tar: 打 tar.gz 压缩包（适合异地/冷备/U盘拷贝）
+# --tar: create tar.gz archive (for offsite/cold backup)
 if $TAR_MODE; then
   TAR_FILE="$DEST/texdock-${SNAPSHOT##*/}.tar.gz"
   tar -czf "$TAR_FILE" -C "$SNAPSHOT" mongo_data redis_data sharelatex_data
-  echo "📦 压缩包 → $TAR_FILE"
+  echo "Archive -> $TAR_FILE"
 fi

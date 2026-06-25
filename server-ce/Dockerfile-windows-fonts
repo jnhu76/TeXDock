@@ -21,8 +21,8 @@
 # Build without private Windows fonts, only public aliases/fallbacks:
 #   DOCKER_BUILDKIT=1 docker build \
 #     -f server-ce/Dockerfile-windows-fonts \
-#     --build-arg BASE_IMAGE=fred1653/sharelatex-full:latest \
-#     -t fred1653/sharelatex-full-fonts:latest .
+#     --build-arg BASE_IMAGE=texdock/sharelatex-full:latest \
+#     -t texdock/sharelatex-full-fonts:latest .
 #
 # Build with private Windows fonts:
 #   1. Put your local font bundle at:
@@ -32,7 +32,7 @@
 # If scripts/fonts/private/fonts.zip exists, it will be imported and exact Windows
 # font smoke checks will run. If it does not exist, private font import is skipped.
 
-ARG BASE_IMAGE=fred1653/sharelatex-full:latest
+ARG BASE_IMAGE=texdock/sharelatex-full:latest
 
 FROM ${BASE_IMAGE}
 

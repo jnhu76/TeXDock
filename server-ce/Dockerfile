@@ -2,7 +2,7 @@
 # Overleaf Community Edition (overleaf/overleaf)
 # ---------------------------------------------
 
-ARG OVERLEAF_BASE_TAG=fred1653/sharelatex-base:latest
+ARG OVERLEAF_BASE_TAG=texdock/sharelatex-base:latest
 FROM $OVERLEAF_BASE_TAG
 
 ARG TEXDOCK_VERSION=dev

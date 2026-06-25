@@ -80,7 +80,7 @@ git checkout -b feat/web-branding-admin-email
 services:
   sharelatex:
     volumes:
-      - ~/sharelatex_data:/var/lib/overleaf
+      - "${TEXDOCK_OVERLEAF_DATA_DIR}:/var/lib/overleaf"
       - ./services/web:/overleaf/services/web
       - ./libraries:/overleaf/libraries
 ```
@@ -92,7 +92,7 @@ services:
   sharelatex:
     image: texdock:dev
     volumes:
-      - ~/sharelatex_data:/var/lib/overleaf
+      - "${TEXDOCK_OVERLEAF_DATA_DIR}:/var/lib/overleaf"
       - ./services/web:/overleaf/services/web
       - ./libraries:/overleaf/libraries
 ```
@@ -429,18 +429,18 @@ git commit -m "feat(register): customize registration flow"
 TeXDock 采用三层镜像结构，避免每次改 web 都重新安装完整 TeX Live：
 
 ```
-1. fred1653/sharelatex-base:latest
+1. texdock/sharelatex-base:latest
    ← Ubuntu + Node.js + TeX Live basic
-   ← 对应 Dockerfile: server-ce/Dockerfile-base
+   ← Dockerfile: server-ce/Dockerfile-base
 
-2. fred1653/sharelatex:latest
-   ← Overleaf CE 应用代码
-   ← 对应 Dockerfile: server-ce/Dockerfile
+2. texdock/sharelatex:latest
+   ← Overleaf CE application code
+   ← Dockerfile: server-ce/Dockerfile
 
-3. fred1653/sharelatex-full:latest
-   ← 完整 TeX Live + CJK 字体 + 辅助脚本
-   ← 对应 Dockerfile: server-ce/Dockerfile-full
-   ← 日常 web 修改后可通过 Dockerfile-full-web 只覆盖 web 代码
+3. texdock/sharelatex-full:latest
+   ← Full TeX Live + CJK fonts + helper scripts
+   ← Dockerfile: server-ce/Dockerfile-full
+   ← Daily web changes: Dockerfile-full-web overlays web code only
 ```
 
 ### 构建 sharelatex-full（TeX Live 变更时才需要）
@@ -448,7 +448,7 @@ TeXDock 采用三层镜像结构，避免每次改 web 都重新安装完整 TeX
 ```bash
 docker build \
   -f server-ce/Dockerfile-full \
-  -t fred1653/sharelatex-full:latest \
+  -t texdock/sharelatex-full:latest \
   .
 ```
 
@@ -458,7 +458,7 @@ docker build \
 docker build \
   --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet \
   -f server-ce/Dockerfile-full \
-  -t fred1653/sharelatex-full:latest \
+  -t texdock/sharelatex-full:latest \
   .
 ```
 
@@ -467,7 +467,7 @@ docker build \
 ```bash
 docker build \
   -f server-ce/Dockerfile-full-web \
-  -t fred1653/sharelatex-full:latest \
+  -t texdock/sharelatex-full:latest \
   .
 ```
 
@@ -493,7 +493,7 @@ docker compose \
 ```bash
 docker build \
   -f server-ce/Dockerfile-full-web \
-  -t fred1653/sharelatex-full:latest \
+  -t texdock/sharelatex-full:latest \
   .
 ```
 
@@ -502,7 +502,7 @@ docker build \
 如果修改了 web 之外的内容（如 libraries）：
 
 ```bash
-docker build -f server-ce/Dockerfile -t fred1653/sharelatex:latest .
+docker build -f server-ce/Dockerfile -t texdock/sharelatex:latest .
 ```
 
 然后需要重新构建 full 和 full-web。
@@ -510,7 +510,7 @@ docker build -f server-ce/Dockerfile -t fred1653/sharelatex:latest .
 ### 方案 C：完整重建（含 TeX Live）
 
 ```bash
-docker build -f server-ce/Dockerfile-full -t fred1653/sharelatex-full:latest .
+docker build -f server-ce/Dockerfile-full -t texdock/sharelatex-full:latest .
 ```
 
 如果想带版本号：
@@ -518,7 +518,7 @@ docker build -f server-ce/Dockerfile-full -t fred1653/sharelatex-full:latest .
 ```bash
 docker build \
   -f server-ce/Dockerfile-full-web \
-  -t fred1653/sharelatex-full:$(date +%Y%m%d-%H%M) \
+  -t texdock/sharelatex-full:$(date +%Y%m%d-%H%M) \
   .
 ```
 
@@ -531,7 +531,7 @@ docker build \
 ```yaml
 services:
   sharelatex:
-    image: fred1653/sharelatex-full:latest
+    image: texdock/sharelatex-full:latest
 ```
 
 然后**不带** dev overlay 启动：
@@ -604,7 +604,7 @@ docker images | grep -E 'sharelatex|texdock'
 ```yaml
 services:
   sharelatex:
-    image: fred1653/sharelatex-full:previous
+    image: texdock/sharelatex-full:previous
 ```
 
 然后：
@@ -639,8 +639,8 @@ docker exec sharelatex bash -lc 'sv restart /etc/service/web-overleaf'
 | 前端构建 | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run webpack:production'` |
 | lint | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run lint'` |
 | type-check | `docker exec sharelatex bash -lc 'cd /overleaf/services/web && npm run type-check'` |
-| 构建 full（少做） | `docker build -f server-ce/Dockerfile-full -t fred1653/sharelatex-full:latest .` |
-| 构建 full-web（常用） | `docker build -f server-ce/Dockerfile-full-web -t fred1653/sharelatex-full:latest .` |
+| 构建 full（少做） | `docker build -f server-ce/Dockerfile-full -t texdock/sharelatex-full:latest .` |
+| 构建 full-web（常用） | `docker build -f server-ce/Dockerfile-full-web -t texdock/sharelatex-full:latest .` |
 | 使用新 image 启动 | `docker compose up -d --force-recreate` |
 
 ---
