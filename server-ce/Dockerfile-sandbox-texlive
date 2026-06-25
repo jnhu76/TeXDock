@@ -9,8 +9,9 @@
 #   - TeX Live 安装在 /usr/local/texlive/<YEAR>/bin/x86_64-linux
 #   - image tag 必须是 :<YEAR>.<n>，例如 texdock/texlive:2026.1
 #   - latexmk 必须在 PATH 中
-#   - sibling 容器建议由主 compose 设置 TEXLIVE_IMAGE_USER="33:33"
+#   - sibling 容器由主 compose 设置 TEXLIVE_IMAGE_USER="33:33"
 #     这样它和主容器 CLSI 的 www-data(uid 33) 写同一份 compiles/output 时不会权限打架。
+#   - 不创建 tex(uid 1000) 用户；手工调试用 docker run --user root 即可。
 #
 # 构建：
 #   DOCKER_BUILDKIT=1 docker build \
@@ -169,6 +170,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # scheme-full = 全量包；不安装 doc/source 以降低体积。
 # 后面显式 tlmgr install 一批高频包，主要用于把能力边界写清楚。
 # ---------------------------------------------------------------------------
+# 3a. Install the base TeX Live distribution.
+#
+# Keep this expensive scheme-full install in its own layer. If a later optional
+# tlmgr package name changes or fails, Docker can reuse this 20-minute layer.
 RUN set -eux; \
     mkdir -p /install-tl-unx; \
     cd /install-tl-unx; \
@@ -185,9 +190,26 @@ RUN set -eux; \
     printf 'selected_scheme scheme-full\ntlpdbopt_autobackup 0\ntlpdbopt_install_docfiles 0\ntlpdbopt_install_srcfiles 0\n' > texlive.profile; \
     ./install-tl -profile texlive.profile -repository "${TEXLIVE_REPOSITORY}"; \
     "$(find /usr/local/texlive -name tlmgr)" path add; \
-    export TL_BIN="$(find /usr/local/texlive -path '*/bin/x86_64-linux' -type d | head -n1)"; \
-    export PATH="${TL_BIN}:${PATH}"; \
     test -d "/usr/local/texlive/${TEXLIVE_YEAR}/bin/x86_64-linux"; \
+    rm -rf \
+      /install-tl-unx \
+      /root/.gnupg \
+      /root/.cache \
+      /tmp/* \
+      /var/tmp/* \
+      /usr/local/texlive/*/tlpkg/backups
+
+ENV PATH="/usr/local/texlive/${TEXLIVE_YEAR}/bin/x86_64-linux:${PATH}"
+
+# 3b. Optional/high-frequency TeX packages.
+#
+# This is deliberately separated from scheme-full for cacheability. Most entries
+# are already present after scheme-full; the list documents expected capabilities
+# and acts as a small repair layer if the selected scheme ever changes.
+#
+# Do not list shellesc here: TL2026 provides shell escape support, but "shellesc"
+# is not a standalone tlmgr package in current repositories.
+RUN set -eux; \
     tlmgr option repository "${TEXLIVE_REPOSITORY}"; \
     tlmgr install \
       latexmk \
@@ -201,7 +223,6 @@ RUN set -eux; \
       framed \
       float \
       ifplatform \
-      shellesc \
       pythontex \
       latexindent \
       xindy \
@@ -221,14 +242,10 @@ RUN set -eux; \
       collection-langkorean \
       collection-langcjk; \
     rm -rf \
-      /install-tl-unx \
-      /root/.gnupg \
       /root/.cache \
       /tmp/* \
       /var/tmp/* \
       /usr/local/texlive/*/tlpkg/backups
-
-ENV PATH="/usr/local/texlive/${TEXLIVE_YEAR}/bin/x86_64-linux:${PATH}"
 
 # ---------------------------------------------------------------------------
 # 4. 安装中文 / Windows 字体名兼容 alias
@@ -236,7 +253,7 @@ ENV PATH="/usr/local/texlive/${TEXLIVE_YEAR}/bin/x86_64-linux:${PATH}"
 # 这个文件是 TeXDock 自定义兼容层，不是 TeX Live 自带文件。
 # 它不安装私有字体，只把常见 Windows 字体名映射到开源替代字体。
 # ---------------------------------------------------------------------------
-COPY scripts/fonts/conf/64-chinese-latex-aliases.conf /etc/fonts/conf.avail/64-chinese-latex-aliases.conf
+COPY scripts/fonts/fontconfig/64-chinese-latex-aliases.conf /etc/fonts/conf.avail/64-chinese-latex-aliases.conf
 
 RUN set -eux; \
     mkdir -p /etc/fonts/conf.d; \
@@ -279,12 +296,12 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 COPY scripts/fonts/scripts/import-private-fonts-zip /usr/local/bin/import-private-fonts-zip
 
-RUN --mount=type=bind,source=scripts/fonts/private,target=/tmp/private-fonts-input,readonly \
+RUN --mount=type=bind,source=scripts/fonts/private,target=/mnt/private-fonts-input,readonly \
     set -eux; \
     chmod +x /usr/local/bin/import-private-fonts-zip; \
-    if [ -s /tmp/private-fonts-input/fonts.zip ]; then \
+    if [ -s /mnt/private-fonts-input/fonts.zip ]; then \
       echo "== Import private fonts from scripts/fonts/private/fonts.zip =="; \
-      import-private-fonts-zip /tmp/private-fonts-input/fonts.zip; \
+      import-private-fonts-zip /mnt/private-fonts-input/fonts.zip; \
     else \
       echo "== No scripts/fonts/private/fonts.zip found; skipped =="; \
     fi; \
@@ -293,13 +310,13 @@ RUN --mount=type=bind,source=scripts/fonts/private,target=/tmp/private-fonts-inp
     rm -rf /tmp/* /var/tmp/* /root/.cache /root/.texlive*
 
 # ---------------------------------------------------------------------------
-# 7. 创建用户
+# 7. 创建运行用户
 #
 # 说明：
-#   - compose 中正式使用 TEXLIVE_IMAGE_USER="33:33"，与主容器 CLSI 的 www-data 对齐。
-#   - 这里仍保留 tex(uid 1000) 用户，便于手工调试：
-#       docker run --user tex ...
-#   - 同时确保 uid/gid 33 存在；Ubuntu/Phusion 默认有 www-data(33)。
+#   - 生产 sandbox 统一使用 uid/gid 33。
+#   - 主容器 CLSI 是 www-data(uid 33)，sibling TeXLive 也用 33:33。
+#   - 不再创建 tex(uid 1000) 用户；手工调试时直接用 root：
+#       docker run --rm -it --user root texdock/texlive:2026.1 bash
 # ---------------------------------------------------------------------------
 RUN set -eux; \
     if ! getent group www-data >/dev/null 2>&1; then \
@@ -308,33 +325,9 @@ RUN set -eux; \
     if ! getent passwd www-data >/dev/null 2>&1; then \
       useradd --uid 33 --gid 33 --home-dir /var/www --shell /usr/sbin/nologin www-data; \
     fi; \
-    if getent group tex >/dev/null 2>&1; then \
-      echo "== group tex already exists =="; \
-    elif getent group 1000 >/dev/null 2>&1; then \
-      EXISTING_GROUP="$(getent group 1000 | cut -d: -f1)"; \
-      echo "== rename existing gid 1000 group ${EXISTING_GROUP} to tex =="; \
-      groupmod -n tex "${EXISTING_GROUP}" || true; \
-    else \
-      echo "== create group tex gid 1000 =="; \
-      groupadd --gid 1000 tex; \
-    fi; \
-    if getent passwd tex >/dev/null 2>&1; then \
-      echo "== user tex already exists =="; \
-      usermod -g tex tex || true; \
-    elif getent passwd 1000 >/dev/null 2>&1; then \
-      EXISTING_USER="$(getent passwd 1000 | cut -d: -f1)"; \
-      echo "== rename existing uid 1000 user ${EXISTING_USER} to tex =="; \
-      usermod -l tex "${EXISTING_USER}"; \
-      usermod -d /home/tex -g tex tex; \
-    else \
-      echo "== create user tex uid 1000 gid tex =="; \
-      useradd --uid 1000 --gid tex --create-home --shell /bin/bash tex; \
-    fi; \
-    mkdir -p /home/tex /compile /tmp/texlive-smoke /usr/local/share/fonts/private; \
-    chown -R tex:tex /home/tex; \
+    mkdir -p /compile /tmp/texlive-smoke /usr/local/share/fonts/private; \
     chown -R 33:33 /compile /tmp/texlive-smoke; \
     chmod 1777 /tmp; \
-    id tex; \
     id www-data; \
     rm -rf /tmp/* /var/tmp/* /root/.cache /root/.texlive*
 
@@ -368,13 +361,23 @@ ENV PRIVATE_FONT_COMPILE_SMOKE=true
 #
 # 注意：
 #   - 使用 uid 33 跑 core/complete smoke，验证正式 compose 的 TEXLIVE_IMAGE_USER="33:33"。
-#   - 仍保留 tex 用户用于手工调试，但生产 sandbox 走 33:33。
+#   - 不保留 tex 用户；手工调试使用 --user root。
 # ---------------------------------------------------------------------------
-RUN --mount=type=cache,target=/tmp/font-cache,sharing=locked \
-    set -eux; \
-    mkdir -p /tmp/font-cache/tmp /tmp/texlive-smoke; \
-    chown -R 33:33 /tmp/font-cache /tmp/texlive-smoke; \
-    export TMPDIR=/tmp/font-cache/tmp; \
+ARG RUN_TEXLIVE_SMOKE=false
+
+RUN set -eux; \
+    if [ "${RUN_TEXLIVE_SMOKE}" != "true" ]; then \
+      echo "== Skip TeXLive smoke tests during image build =="; \
+      echo "== Use --build-arg RUN_TEXLIVE_SMOKE=true to enable =="; \
+      exit 0; \
+    fi; \
+    mkdir -p \
+      /tmp/texlive-cache/texmf-var \
+      /tmp/texlive-cache/texmf-config \
+      /tmp/texlive-cache/texmf-cache \
+      /tmp/texlive-smoke; \
+    chown -R 33:33 /tmp/texlive-cache /tmp/texlive-smoke; \
+    chmod -R u+rwX,g+rwX /tmp/texlive-cache /tmp/texlive-smoke; \
     if find /usr/local/share/fonts/private -type f 2>/dev/null | grep -q .; then \
       echo "== Run exact private Windows font smoke check =="; \
       smoke-check-private-fonts; \
@@ -384,10 +387,10 @@ RUN --mount=type=cache,target=/tmp/font-cache,sharing=locked \
     echo "== Run public CJK/font alias smoke test =="; \
     smoke-test-texlive-fonts; \
     echo "== Run core TeX Live smoke test as uid 33 =="; \
-    su -s /bin/bash www-data -c "export PATH=\"/usr/local/texlive/${TEXLIVE_YEAR}/bin/x86_64-linux:\${PATH}\"; export TMPDIR=/tmp/font-cache/tmp; cd /tmp/texlive-smoke; smoke-test-texlive-core"; \
+    su -s /bin/bash www-data -c "cd /tmp/texlive-smoke && smoke-test-texlive-core"; \
     echo "== Run complete TeX Live smoke test as uid 33 =="; \
-    su -s /bin/bash www-data -c "export PATH=\"/usr/local/texlive/${TEXLIVE_YEAR}/bin/x86_64-linux:\${PATH}\"; export TMPDIR=/tmp/font-cache/tmp; cd /tmp/texlive-smoke; smoke-test-texlive-complete"; \
-    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.texlive* /home/tex/.cache /home/tex/.texlive*
+    su -s /bin/bash www-data -c "cd /tmp/texlive-smoke && smoke-test-texlive-complete"; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.texlive*
 
 # Final cleanup
 # -------------
@@ -408,6 +411,6 @@ RUN set -eux; \
 #
 # 默认 USER 设成 www-data(uid 33)，与 docker-compose.sandbox.yml 的
 # TEXLIVE_IMAGE_USER="33:33" 保持一致。即使 DockerRunner 未显式设置 User，
-# 也不会回退到 root。
+# 也不会回退到 root。手工调试请显式使用 --user root。
 USER 33:33
 WORKDIR /compile

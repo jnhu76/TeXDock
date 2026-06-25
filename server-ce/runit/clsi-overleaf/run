@@ -8,13 +8,21 @@ fi
 
 # Set permissions on docker.sock if present,
 # To enable sibling-containers (see entrypoint.sh in clsi project)
-if [ -e '/var/run/docker.sock' ]; then
+if [ -S '/var/run/docker.sock' ]; then
   echo ">> Setting permissions on docker socket"
   DOCKER_GROUP=$(stat -c '%g' /var/run/docker.sock)
-  groupadd --non-unique --gid "${DOCKER_GROUP}" dockeronhost
-  usermod -aG dockeronhost www-data
-fi
 
+  if getent group dockeronhost >/dev/null 2>&1; then
+    CURRENT_GID="$(getent group dockeronhost | cut -d: -f3)"
+    if [ "$CURRENT_GID" != "$DOCKER_GROUP" ]; then
+      groupmod --non-unique --gid "$DOCKER_GROUP" dockeronhost 2>/dev/null || true
+    fi
+  else
+    groupadd --non-unique --gid "$DOCKER_GROUP" dockeronhost
+  fi
+
+  usermod -aG dockeronhost www-data 2>/dev/null || true
+fi
 source /etc/overleaf/env.sh
 export LISTEN_ADDRESS=127.0.0.1
 

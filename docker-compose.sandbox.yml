@@ -1,43 +1,26 @@
 # docker-compose.sandbox.yml
 #
-# TeXDock / Overleaf 沙箱编译独立 compose 文件
+# TeXDock / Overleaf sandbox compose.
 #
-# 用法：
-#   docker compose -f docker-compose.sandbox.yml up -d
+# Usage:
+#   cp .env.sandbox.example .env.sandbox
+#   # edit .env.sandbox
+#   docker compose --env-file .env.sandbox -f docker-compose.sandbox.yml up -d
 #
-# 停止：
-#   docker compose -f docker-compose.sandbox.yml down
+# Stop:
+#   docker compose --env-file .env.sandbox -f docker-compose.sandbox.yml down
 #
-# 注意：
-#   这是独立 compose 文件，不是 override。
-#   不要再叠加 docker-compose.yml。
-#
-# 前提：
-#   1. 构建 web-only 主镜像：
-#        DOCKER_BUILDKIT=1 docker build \
-#          -f server-ce/Dockerfile-sandbox-web \
-#          -t texdock/sharelatex-web:latest .
-#
-#   2. 构建 TeX Live sibling 镜像：
-#        DOCKER_BUILDKIT=1 docker build \
-#          -f server-ce/Dockerfile-sandbox-texlive \
-#          -t texdock/texlive:2026.1 .
-#
-#   3. 创建宿主机编译目录：
-#        mkdir -p /home/hoo/sharelatex_data/data/compiles
-#        mkdir -p /home/hoo/sharelatex_data/data/output
-#        sudo chown -R 33:33 /home/hoo/sharelatex_data/data/compiles /home/hoo/sharelatex_data/data/output
-#
-# 重要：
-#   - 本文件使用宿主机绝对路径，不依赖 .env / ~ / ${HOME}。
-#   - 本文件和普通 docker-compose.yml 使用相同 container_name 和端口，不要同时启动。
-#   - sibling TeXLive 容器使用 33:33 跑编译，与主容器 CLSI 的 www-data(uid 33) 对齐。
+# Notes:
+#   - This is a standalone compose file, not an override.
+#   - Do not combine it with another docker-compose.yml.
+#   - Host paths must be absolute paths visible to the Docker daemon.
+#   - Do not commit .env.sandbox.
 
 services:
   sharelatex:
     restart: always
-    image: texdock/sharelatex-web:latest
-    container_name: sharelatex
+    image: "${TEXDOCK_WEB_IMAGE:-texdock/sharelatex-web:latest}"
+    container_name: "${TEXDOCK_SHARELATEX_CONTAINER:-sharelatex}"
 
     depends_on:
       mongo:
@@ -46,145 +29,74 @@ services:
         condition: service_started
 
     ports:
-      - 80:80
+      - "${TEXDOCK_HTTP_PORT:-80}:80"
 
     stop_grace_period: 60s
 
     volumes:
-      # 用户数据持久化（项目文件、编译输出等）
-      - /home/hoo/sharelatex_data:/var/lib/overleaf
+      # All Overleaf persistent data, including data/compiles and data/output.
+      - "${TEXDOCK_OVERLEAF_DATA_DIR:?set TEXDOCK_OVERLEAF_DATA_DIR in .env.sandbox}:/var/lib/overleaf"
 
-      # Docker socket：CLSI 通过宿主机 Docker daemon 拉起 sibling TeX Live 容器。
+      # Docker socket: CLSI uses host Docker daemon to start sibling TeXLive containers.
       - /var/run/docker.sock:/var/run/docker.sock
 
     environment:
-      OVERLEAF_APP_NAME: Overleaf Community Edition
+      OVERLEAF_APP_NAME: "${OVERLEAF_APP_NAME:-Overleaf Community Edition}"
 
-      OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex
+      OVERLEAF_MONGO_URL: "mongodb://mongo/sharelatex"
 
-      # Redis 连接（两个变量名都需要设置）
-      OVERLEAF_REDIS_HOST: redis
-      REDIS_HOST: redis
+      # Redis connection. Both names are kept for compatibility.
+      OVERLEAF_REDIS_HOST: "redis"
+      REDIS_HOST: "redis"
 
-      # 允许的链接文件类型
-      ENABLED_LINKED_FILE_TYPES: "project_file,project_output_file"
+      ENABLED_LINKED_FILE_TYPES: "${ENABLED_LINKED_FILE_TYPES:-project_file,project_output_file}"
+      ENABLE_CONVERSIONS: "${ENABLE_CONVERSIONS:-true}"
+      EMAIL_CONFIRMATION_DISABLED: "${EMAIL_CONFIRMATION_DISABLED:-true}"
+      OVERLEAF_SITE_LANGUAGE: "${OVERLEAF_SITE_LANGUAGE:-zh-CN}"
+      MAX_COMPILE_TIMEOUT_MINUTES: "${MAX_COMPILE_TIMEOUT_MINUTES:-10}"
+      TZ: "${TZ:-Asia/Shanghai}"
 
-      # 启用缩略图生成（ImageMagick）
-      ENABLE_CONVERSIONS: "true"
-
-      # 是否显示确认邮箱的提醒横幅，不控制任何流程。
-      EMAIL_CONFIRMATION_DISABLED: "true"
-
-      # 站点语言（zh-CN=简体中文, en=English）
-      OVERLEAF_SITE_LANGUAGE: "zh-CN"
-
-      # 编译看门狗超时（分钟）：超过此时间的编译进程会被自动终止。
-      MAX_COMPILE_TIMEOUT_MINUTES: "10"
-
-      # 时区设置：控制 Node.js 进程的时区，影响 toLocaleString() 等时间显示。
-      TZ: Asia/Shanghai
+      # Optional public URL/session settings.
+      OVERLEAF_SITE_URL: "${OVERLEAF_SITE_URL:-}"
+      OVERLEAF_SESSION_SECRET: "${OVERLEAF_SESSION_SECRET:-}"
 
       # ---------------------------------------------------------------------
-      # 沙箱编译配置
+      # Sandbox compile configuration
       # ---------------------------------------------------------------------
+      SANDBOXED_COMPILES: "${SANDBOXED_COMPILES:-true}"
+      DOCKER_RUNNER: "${DOCKER_RUNNER:-true}"
+      SANDBOXED_COMPILES_SIBLING_CONTAINERS: "${SANDBOXED_COMPILES_SIBLING_CONTAINERS:-true}"
 
-      # 启用 sibling 容器隔离编译。
-      SANDBOXED_COMPILES: "true"
-      DOCKER_RUNNER: "true"
-      SANDBOXED_COMPILES_SIBLING_CONTAINERS: "true"
+      # Disable Overleaf legacy seccomp profile for modern Docker/runc compatibility.
+      # Keep no-new-privileges + cap-drop ALL in DockerRunner.
+      SANDBOXED_COMPILES_DISABLE_SECCOMP: "${SANDBOXED_COMPILES_DISABLE_SECCOMP:-true}"
 
-      # Docker Desktop / WSL / modern runc compatibility:
-      # Overleaf legacy seccomp profile is too narrow and can prevent sibling
-      # containers from starting. Keep no-new-privileges + cap-drop ALL.
-      SANDBOXED_COMPILES_DISABLE_SECCOMP: "true"
+      # TeXLive sibling image.
+      TEXLIVE_IMAGE: "${TEXDOCK_TEXLIVE_IMAGE:-texdock/texlive:2026.1}"
+      TEX_LIVE_DOCKER_IMAGE: "${TEXDOCK_TEXLIVE_IMAGE:-texdock/texlive:2026.1}"
+      TEXLIVE_IMAGE_USER: "${TEXLIVE_IMAGE_USER:-33:33}"
+      ALLOWED_IMAGES: "${TEXDOCK_TEXLIVE_IMAGE:-texdock/texlive:2026.1}"
 
-      # TeX Live sibling 镜像。
-      # tag 必须是 :<YEAR>.<n> 格式，例如 2026.1。
-      TEXLIVE_IMAGE: "texdock/texlive:2026.1"
-      TEX_LIVE_DOCKER_IMAGE: "texdock/texlive:2026.1"
-
-      # sibling 容器内执行编译的用户。
-      # 必须与主容器 CLSI 的 www-data(uid 33) 对齐，避免 compiles/output 权限互相污染。
-      TEXLIVE_IMAGE_USER: "33:33"
-
-      # 宿主机编译目录。
-      # 必须是宿主机绝对路径，因为真正执行 bind mount 的是宿主机 Docker daemon。
-      SANDBOXED_COMPILES_HOST_DIR_COMPILES: "/home/hoo/sharelatex_data/data/compiles"
-      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "/home/hoo/sharelatex_data/data/output"
-
-      # 镜像白名单：限制 CLSI 只能拉起指定 sibling 镜像。
-      ALLOWED_IMAGES: "texdock/texlive:2026.1"
-
-      # ---------------------------------------------------------------------
-      # 可选配置保留区
-      # ---------------------------------------------------------------------
-
-      # 管理员面板 - 启用后可访问 /admin 管理界面
-      # ADMIN_PRIVILEGE_AVAILABLE: "true"
-
-      # 管理员域名（可选，用于多域名部署）
-      # ADMIN_URL: "https://admin.example.com"
-
-      # 访问地址（影响邮件链接、Cookie 等，外网访问时必须设置）
-      # OVERLEAF_SITE_URL: http://overleaf.example.com
-
-      # 会话密钥（生产环境务必设置，否则每次重启会丢失所有登录状态）
-      # 生成随机字符串：openssl rand -hex 32
-      # OVERLEAF_SESSION_SECRET: "change-this-to-a-random-string"
-
-      # 邮件发件人地址
-      # OVERLEAF_EMAIL_FROM_ADDRESS: "hello@example.com"
-
-      # SMTP 邮件配置（用于注册确认、密码重置、项目邀请等）
-      # OVERLEAF_EMAIL_SMTP_HOST: smtp.example.com
-      # OVERLEAF_EMAIL_SMTP_PORT: 587
-      # OVERLEAF_EMAIL_SMTP_SECURE: false
-      # OVERLEAF_EMAIL_SMTP_USER:
-      # OVERLEAF_EMAIL_SMTP_PASS:
-      # OVERLEAF_EMAIL_SMTP_TLS_REJECT_UNAUTH: true
-      # OVERLEAF_EMAIL_SMTP_IGNORE_TLS: false
-      # OVERLEAF_EMAIL_SMTP_NAME: '127.0.0.1'
-      # OVERLEAF_EMAIL_SMTP_LOGGER: true
-      # OVERLEAF_CUSTOM_EMAIL_FOOTER: "This system is run by department x"
-
-      # 资源删除安全阀：cron 触发后是否真的执行项目清理/过期删除操作。
-      # ENABLE_CRON_RESOURCE_DELETION: true
-
-      # LDAP 登录配置
-      # OVERLEAF_LDAP_URL: 'ldap://ldap:389'
-      # OVERLEAF_LDAP_SEARCH_BASE: 'ou=people,dc=planetexpress,dc=com'
-      # OVERLEAF_LDAP_SEARCH_FILTER: '(uid={{username}})'
-      # OVERLEAF_LDAP_BIND_DN: 'cn=admin,dc=planetexpress,dc=com'
-      # OVERLEAF_LDAP_BIND_CREDENTIALS: 'GoodNewsEveryone'
-      # OVERLEAF_LDAP_EMAIL_ATT: 'mail'
-      # OVERLEAF_LDAP_NAME_ATT: 'cn'
-      # OVERLEAF_LDAP_LAST_NAME_ATT: 'sn'
-      # OVERLEAF_LDAP_UPDATE_USER_DETAILS_ON_LOGIN: 'true'
-
-      # OVERLEAF_TEMPLATES_USER_ID: "578773160210479700917ee5"
-      # OVERLEAF_NEW_PROJECT_TEMPLATE_LINKS: '[ {"name":"All Templates","url":"/templates/all"}]'
-
-      # OVERLEAF_PROXY_LEARN: "true"
+      # Critical: these paths are from the host Docker daemon's perspective.
+      # They must match the same host directory mounted to /var/lib/overleaf.
+      SANDBOXED_COMPILES_HOST_DIR_COMPILES: "${TEXDOCK_OVERLEAF_DATA_DIR:?set TEXDOCK_OVERLEAF_DATA_DIR in .env.sandbox}/data/compiles"
+      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "${TEXDOCK_OVERLEAF_DATA_DIR:?set TEXDOCK_OVERLEAF_DATA_DIR in .env.sandbox}/data/output"
 
   mongo:
     restart: always
-    image: mongo:8.0
-    container_name: mongo
+    image: "${TEXDOCK_MONGO_IMAGE:-mongo:8.0}"
+    container_name: "${TEXDOCK_MONGO_CONTAINER:-mongo}"
 
     command: "--replSet overleaf"
 
     volumes:
-      # 数据库数据持久化
-      - ~/mongo_data:/data/db
-
-      # 初始化副本集
-      - ./bin/shared/mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js
+      - "${TEXDOCK_MONGO_DATA_DIR:?set TEXDOCK_MONGO_DATA_DIR in .env.sandbox}:/data/db"
+      - "${TEXDOCK_MONGO_INIT_SCRIPT:-./bin/shared/mongodb-init-replica-set.js}:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js:ro"
 
     environment:
-      MONGO_INITDB_DATABASE: sharelatex
+      MONGO_INITDB_DATABASE: "${MONGO_INITDB_DATABASE:-sharelatex}"
 
     extra_hosts:
-      # 初始化副本集时需要将 mongo 指向本机
       - mongo:127.0.0.1
 
     healthcheck:
@@ -195,9 +107,8 @@ services:
 
   redis:
     restart: always
-    image: redis:6.2
-    container_name: redis
+    image: "${TEXDOCK_REDIS_IMAGE:-redis:6.2}"
+    container_name: "${TEXDOCK_REDIS_CONTAINER:-redis}"
 
     volumes:
-      # Redis 数据持久化
-      - ~/redis_data:/data
+      - "${TEXDOCK_REDIS_DATA_DIR:?set TEXDOCK_REDIS_DATA_DIR in .env.sandbox}:/data"
