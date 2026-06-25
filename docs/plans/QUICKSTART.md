@@ -1,3 +1,4 @@
+> **Archived.** This document is for reference only. Canonical deployment files are maintained in [texdock-deploy](https://github.com/jnhu76/texdock-deploy). Commands and paths may be outdated.
 # TeXDock 功能模块快速开始指南
 
 ## 概述
@@ -56,7 +57,9 @@ docker compose up -d
 OVERLEAF_SAML_ENABLED: "true"
 OVERLEAF_SAML_ENTRY_POINT: "http://idp.example.com/sso/saml"
 OVERLEAF_SAML_ISSUER: "http://localhost"
-OVERLEAF_SAML_CERTIFICATE: "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+OVERLEAF_SAML_CERTIFICATE: "-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----"
 OVERLEAF_SAML_USER_ID_ATTRIBUTE: "uid"
 OVERLEAF_SAML_USER_FIRST_NAME_ATTRIBUTE: "cn"
 OVERLEAF_SAML_USER_LAST_NAME_ATTRIBUTE: "sn"

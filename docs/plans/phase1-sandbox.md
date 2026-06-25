@@ -1,3 +1,4 @@
+> **Archived.** This document is for reference only. Canonical deployment files are maintained in [texdock-deploy](https://github.com/jnhu76/texdock-deploy). Commands and paths may be outdated.
 # Phase 1: 沙箱编译启用实施计划
 
 **目标：** 启用 Docker 沙箱编译（Sandboxed Compiles），为 TeXDock 提供安全的 LaTeX 编译隔离环境

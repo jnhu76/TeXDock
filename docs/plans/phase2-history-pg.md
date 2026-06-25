@@ -1,3 +1,4 @@
+> **Archived.** This document is for reference only. Canonical deployment files are maintained in [texdock-deploy](https://github.com/jnhu76/texdock-deploy). Commands and paths may be outdated.
 # Phase 2: PostgreSQL/history-v1 启用实施计划（可选）
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
@@ -76,7 +77,7 @@
 ```yaml
   sharelatex:
     restart: always
-    image: fred1653/sharelatex-full:latest
+    image: texdock/sharelatex-full:latest
     container_name: sharelatex
     depends_on:
       mongo:

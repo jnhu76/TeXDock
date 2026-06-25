@@ -1,3 +1,4 @@
+> **Archived.** This document is for reference only. Canonical deployment files are maintained in [texdock-deploy](https://github.com/jnhu76/texdock-deploy). Commands and paths may be outdated.
 # 沙箱编译部署指南
 
 > 本文档针对**新部署场景**。已运行 TeXDock 的服务器请先阅读 [从非沙箱迁移到沙箱](#从非沙箱迁移到沙箱)。
@@ -184,9 +185,9 @@ docker compose -f docker-compose.yml -f docker-compose.sandbox.yml exec sharelat
 
 ```latex
 \documentclass{ctexart}
-\begin{document}
+egin{document}
 你好，沙箱编译！$E = mc^2$
-\end{document}
+nd{document}
 ```
 
 ### 5.4 观察 sibling 容器
@@ -335,7 +336,7 @@ sudo chown -R 1000:1000 ~/sharelatex_data/data/compiles ~/sharelatex_data/data/o
 
 ```bash
 # 查看当前运行的编译容器
-watch -n 1 'docker ps --filter name=project- --format "table {{.Names}}\t{{.CreatedAt}}\t{{.Status}}"'
+watch -n 1 'docker ps --filter name=project- --format "table {{.Names}}	{{.CreatedAt}}	{{.Status}}"'
 ```
 
 ### 清理残留容器
