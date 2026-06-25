@@ -1,0 +1,114 @@
+# docker-compose.sandbox.yml
+#
+# TeXDock / Overleaf sandbox compose.
+#
+# Usage:
+#   cp .env.sandbox.example .env.sandbox
+#   # edit .env.sandbox
+#   docker compose --env-file .env.sandbox -f docker-compose.sandbox.yml up -d
+#
+# Stop:
+#   docker compose --env-file .env.sandbox -f docker-compose.sandbox.yml down
+#
+# Notes:
+#   - This is a standalone compose file, not an override.
+#   - Do not combine it with another docker-compose.yml.
+#   - Host paths must be absolute paths visible to the Docker daemon.
+#   - Do not commit .env.sandbox.
+
+services:
+  sharelatex:
+    restart: always
+    image: "${TEXDOCK_WEB_IMAGE:-texdock/sharelatex-web:latest}"
+    container_name: "${TEXDOCK_SHARELATEX_CONTAINER:-sharelatex}"
+
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+    ports:
+      - "${TEXDOCK_HTTP_PORT:-80}:80"
+
+    stop_grace_period: 60s
+
+    volumes:
+      # All Overleaf persistent data, including data/compiles and data/output.
+      - "${TEXDOCK_OVERLEAF_DATA_DIR:?set TEXDOCK_OVERLEAF_DATA_DIR in .env.sandbox}:/var/lib/overleaf"
+
+      # Docker socket: CLSI uses host Docker daemon to start sibling TeXLive containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    environment:
+      OVERLEAF_APP_NAME: "${OVERLEAF_APP_NAME:-Overleaf Community Edition}"
+
+      OVERLEAF_MONGO_URL: "mongodb://mongo/sharelatex"
+
+      # Redis connection. Both names are kept for compatibility.
+      OVERLEAF_REDIS_HOST: "redis"
+      REDIS_HOST: "redis"
+
+      ENABLED_LINKED_FILE_TYPES: "${ENABLED_LINKED_FILE_TYPES:-project_file,project_output_file}"
+      ENABLE_CONVERSIONS: "${ENABLE_CONVERSIONS:-true}"
+      EMAIL_CONFIRMATION_DISABLED: "${EMAIL_CONFIRMATION_DISABLED:-true}"
+      OVERLEAF_SITE_LANGUAGE: "${OVERLEAF_SITE_LANGUAGE:-zh-CN}"
+      MAX_COMPILE_TIMEOUT_MINUTES: "${MAX_COMPILE_TIMEOUT_MINUTES:-10}"
+      TZ: "${TZ:-Asia/Shanghai}"
+
+      # Optional public URL/session settings.
+      OVERLEAF_SITE_URL: "${OVERLEAF_SITE_URL:-}"
+      OVERLEAF_SESSION_SECRET: "${OVERLEAF_SESSION_SECRET:-}"
+
+      # ---------------------------------------------------------------------
+      # Sandbox compile configuration
+      # ---------------------------------------------------------------------
+      SANDBOXED_COMPILES: "${SANDBOXED_COMPILES:-true}"
+      DOCKER_RUNNER: "${DOCKER_RUNNER:-true}"
+      SANDBOXED_COMPILES_SIBLING_CONTAINERS: "${SANDBOXED_COMPILES_SIBLING_CONTAINERS:-true}"
+
+      # Disable Overleaf legacy seccomp profile for modern Docker/runc compatibility.
+      # Keep no-new-privileges + cap-drop ALL in DockerRunner.
+      SANDBOXED_COMPILES_DISABLE_SECCOMP: "${SANDBOXED_COMPILES_DISABLE_SECCOMP:-true}"
+
+      # TeXLive sibling image.
+      TEXLIVE_IMAGE: "${TEXDOCK_TEXLIVE_IMAGE:-texdock/texlive:2026.1}"
+      TEX_LIVE_DOCKER_IMAGE: "${TEXDOCK_TEXLIVE_IMAGE:-texdock/texlive:2026.1}"
+      TEXLIVE_IMAGE_USER: "${TEXLIVE_IMAGE_USER:-33:33}"
+      ALLOWED_IMAGES: "${TEXDOCK_TEXLIVE_IMAGE:-texdock/texlive:2026.1}"
+
+      # Critical: these paths are from the host Docker daemon's perspective.
+      # They must match the same host directory mounted to /var/lib/overleaf.
+      SANDBOXED_COMPILES_HOST_DIR_COMPILES: "${TEXDOCK_OVERLEAF_DATA_DIR:?set TEXDOCK_OVERLEAF_DATA_DIR in .env.sandbox}/data/compiles"
+      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "${TEXDOCK_OVERLEAF_DATA_DIR:?set TEXDOCK_OVERLEAF_DATA_DIR in .env.sandbox}/data/output"
+
+  mongo:
+    restart: always
+    image: "${TEXDOCK_MONGO_IMAGE:-mongo:8.0}"
+    container_name: "${TEXDOCK_MONGO_CONTAINER:-mongo}"
+
+    command: "--replSet overleaf"
+
+    volumes:
+      - "${TEXDOCK_MONGO_DATA_DIR:?set TEXDOCK_MONGO_DATA_DIR in .env.sandbox}:/data/db"
+      - "${TEXDOCK_MONGO_INIT_SCRIPT:-./bin/shared/mongodb-init-replica-set.js}:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js:ro"
+
+    environment:
+      MONGO_INITDB_DATABASE: "${MONGO_INITDB_DATABASE:-sharelatex}"
+
+    extra_hosts:
+      - mongo:127.0.0.1
+
+    healthcheck:
+      test: echo 'db.stats().ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    restart: always
+    image: "${TEXDOCK_REDIS_IMAGE:-redis:6.2}"
+    container_name: "${TEXDOCK_REDIS_CONTAINER:-redis}"
+
+    volumes:
+      - "${TEXDOCK_REDIS_DATA_DIR:?set TEXDOCK_REDIS_DATA_DIR in .env.sandbox}:/data"

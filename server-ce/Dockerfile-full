@@ -146,10 +146,6 @@ install_if_available \
   fonts-freefont-ttf \
   fonts-ubuntu
 
-install_if_available \
-  ttf-wqy-zenhei \
-  ttf-wqy-microhei
-
 # Do not remove /var/lib/apt/lists here: it is a BuildKit cache mount.
 fc-cache -r -v
 BASH

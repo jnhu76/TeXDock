@@ -256,12 +256,19 @@ const DockerRunner = {
             Hard: timeoutInSeconds + 10,
           },
         ],
-        CapDrop: 'ALL',
+        CapDrop: ['ALL'],
         SecurityOpt: ['no-new-privileges'],
       },
     }
 
-    if (Settings.clsi.docker.seccomp_profile != null) {
+    const disableSeccompProfile =
+      process.env.SANDBOXED_COMPILES_DISABLE_SECCOMP === 'true' ||
+      process.env.DISABLE_DOCKER_SECCOMP_PROFILE === 'true'
+
+    if (
+      Settings.clsi.docker.seccomp_profile != null &&
+      !disableSeccompProfile
+    ) {
       options.HostConfig.SecurityOpt.push(
         `seccomp=${Settings.clsi.docker.seccomp_profile}`
       )

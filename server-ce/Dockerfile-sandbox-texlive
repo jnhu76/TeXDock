@@ -1,0 +1,416 @@
+# Dockerfile-sandbox-texlive
+#
+# TeXDock / Overleaf 沙箱编译 TeX Live sibling 镜像。
+#
+# 这是一个【独立的】TeX Live 镜像，【不含】Overleaf web 全栈。
+# 启用沙箱编译后，CLSI 会通过宿主机 Docker daemon 为每次编译拉起一个 sibling 容器。
+#
+# 设计约束：
+#   - TeX Live 安装在 /usr/local/texlive/<YEAR>/bin/x86_64-linux
+#   - image tag 必须是 :<YEAR>.<n>，例如 texdock/texlive:2026.1
+#   - latexmk 必须在 PATH 中
+#   - sibling 容器由主 compose 设置 TEXLIVE_IMAGE_USER="33:33"
+#     这样它和主容器 CLSI 的 www-data(uid 33) 写同一份 compiles/output 时不会权限打架。
+#   - 不创建 tex(uid 1000) 用户；手工调试用 docker run --user root 即可。
+#
+# 构建：
+#   DOCKER_BUILDKIT=1 docker build \
+#     -f server-ce/Dockerfile-sandbox-texlive \
+#     -t texdock/texlive:2026.1 .
+#
+# 可选 build args：
+#   --build-arg UBUNTU_MIRROR=https://mirrors.aliyun.com/ubuntu
+#   --build-arg TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
+#   --build-arg TEXLIVE_YEAR=2026
+#
+# 注意：
+#   - 本文件不使用 # syntax 指令，避免构建时向 auth.docker.io 拉取 frontend 镜像。
+#   - 目标是“完整编译环境”，不是 extreme slim runtime。
+#   - scheme-full 本身很大，体积主要来自 TeX Live 和 CJK/字体。
+#   - private fonts 使用 BuildKit bind mount 导入，避免 fonts.zip 本体进入镜像 layer。
+#   - 如果使用 private fonts，请确保 scripts/fonts/private/ 目录存在；没有 fonts.zip 会跳过导入。
+
+FROM phusion/baseimage:noble-1.0.3
+
+ARG TEXDOCK_VERSION=dev
+ARG TEXLIVE_YEAR=2026
+
+LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
+      texdock.version="${TEXDOCK_VERSION}" \
+      org.opencontainers.image.title="TeXDock TeX Live (sibling)" \
+      org.opencontainers.image.description="Standalone TeX Live image for sandboxed compiles"
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV REBUILT_AFTER="2026-05-21"
+ENV TEXLIVE_YEAR="${TEXLIVE_YEAR}"
+
+ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu
+ARG TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet
+
+# ---------------------------------------------------------------------------
+# 1. 配置 apt 源
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; \
+    mkdir -p /etc/apt/sources.list.d; \
+    cat > /etc/apt/sources.list.d/ubuntu.sources <<EOF
+Types: deb
+URIs: ${UBUNTU_MIRROR}
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: ${UBUNTU_MIRROR}
+Suites: noble-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+
+# ---------------------------------------------------------------------------
+# 2. 安装完整 LaTeX 编译运行依赖 + 字体 + shell-escape 常用工具
+#
+# 不装 unattended-upgrades：Docker build 中不做滚动升级，避免不可复现和体积膨胀。
+# ---------------------------------------------------------------------------
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    set -eux; \
+    rm -f /etc/apt/apt.conf.d/docker-clean; \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      wget \
+      gnupg \
+      git \
+      build-essential \
+      make \
+      pkg-config \
+      zlib1g-dev \
+      perl \
+      libwww-perl \
+      libyaml-tiny-perl \
+      libfile-homedir-perl \
+      libfile-which-perl \
+      libunicode-linebreak-perl \
+      liblog-log4perl-perl \
+      libxml-libxml-perl \
+      libxml-libxslt-perl \
+      libtext-unidecode-perl \
+      libipc-system-simple-perl \
+      libcapture-tiny-perl \
+      libjson-xs-perl \
+      python3 \
+      python-is-python3 \
+      python3-pygments \
+      python3-pil \
+      python3-numpy \
+      python3-matplotlib \
+      fontconfig \
+      cabextract \
+      ghostscript \
+      imagemagick \
+      inkscape \
+      librsvg2-bin \
+      graphviz \
+      gnuplot-nox \
+      asymptote \
+      pdf2svg \
+      optipng \
+      poppler-utils \
+      qpdf \
+      net-tools \
+      strace \
+      time \
+      unzip \
+      zip \
+      xz-utils \
+      file \
+      less \
+      fonts-noto \
+      fonts-noto-core \
+      fonts-noto-extra \
+      fonts-noto-mono \
+      fonts-noto-ui-core \
+      fonts-noto-ui-extra \
+      fonts-noto-color-emoji \
+      fonts-noto-cjk \
+      fonts-noto-cjk-extra \
+      fonts-wqy-microhei \
+      fonts-wqy-zenhei \
+      fonts-arphic-ukai \
+      fonts-arphic-uming \
+      fonts-droid-fallback \
+      fonts-dejavu \
+      fonts-dejavu-core \
+      fonts-dejavu-extra \
+      fonts-liberation \
+      fonts-liberation2 \
+      fonts-crosextra-carlito \
+      fonts-crosextra-caladea \
+      fonts-freefont-otf \
+      fonts-freefont-ttf \
+      fonts-ubuntu \
+      fonts-urw-base35; \
+    fc-cache -r -v; \
+    apt-get clean; \
+    rm -rf \
+      /var/lib/apt/lists/* \
+      /tmp/* \
+      /var/tmp/* \
+      /root/.cache \
+      /root/.gnupg
+
+# ---------------------------------------------------------------------------
+# 3. 用 install-tl 安装 TeX Live scheme-full
+#
+# scheme-full = 全量包；不安装 doc/source 以降低体积。
+# 后面显式 tlmgr install 一批高频包，主要用于把能力边界写清楚。
+# ---------------------------------------------------------------------------
+# 3a. Install the base TeX Live distribution.
+#
+# Keep this expensive scheme-full install in its own layer. If a later optional
+# tlmgr package name changes or fails, Docker can reuse this 20-minute layer.
+RUN set -eux; \
+    mkdir -p /install-tl-unx; \
+    cd /install-tl-unx; \
+    wget --quiet https://tug.org/texlive/files/texlive.asc; \
+    gpg --import texlive.asc; \
+    rm texlive.asc; \
+    wget --quiet "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz"; \
+    wget --quiet "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz.sha512"; \
+    wget --quiet "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz.sha512.asc"; \
+    gpg --verify install-tl-unx.tar.gz.sha512.asc; \
+    sha512sum -c install-tl-unx.tar.gz.sha512; \
+    tar -xz --strip-components=1 -f install-tl-unx.tar.gz; \
+    rm install-tl-unx.tar.gz*; \
+    printf 'selected_scheme scheme-full\ntlpdbopt_autobackup 0\ntlpdbopt_install_docfiles 0\ntlpdbopt_install_srcfiles 0\n' > texlive.profile; \
+    ./install-tl -profile texlive.profile -repository "${TEXLIVE_REPOSITORY}"; \
+    "$(find /usr/local/texlive -name tlmgr)" path add; \
+    test -d "/usr/local/texlive/${TEXLIVE_YEAR}/bin/x86_64-linux"; \
+    rm -rf \
+      /install-tl-unx \
+      /root/.gnupg \
+      /root/.cache \
+      /tmp/* \
+      /var/tmp/* \
+      /usr/local/texlive/*/tlpkg/backups
+
+ENV PATH="/usr/local/texlive/${TEXLIVE_YEAR}/bin/x86_64-linux:${PATH}"
+
+# 3b. Optional/high-frequency TeX packages.
+#
+# This is deliberately separated from scheme-full for cacheability. Most entries
+# are already present after scheme-full; the list documents expected capabilities
+# and acts as a small repair layer if the selected scheme ever changes.
+#
+# Do not list shellesc here: TL2026 provides shell escape support, but "shellesc"
+# is not a standalone tlmgr package in current repositories.
+RUN set -eux; \
+    tlmgr option repository "${TEXLIVE_REPOSITORY}"; \
+    tlmgr install \
+      latexmk \
+      biber \
+      biblatex \
+      minted \
+      fvextra \
+      upquote \
+      catchfile \
+      xstring \
+      framed \
+      float \
+      ifplatform \
+      pythontex \
+      latexindent \
+      xindy \
+      glossaries \
+      glossaries-extra \
+      asymptote \
+      dvisvgm \
+      svg \
+      transparent \
+      import \
+      standalone \
+      preview \
+      collection-fontsrecommended \
+      collection-fontsextra \
+      collection-langchinese \
+      collection-langjapanese \
+      collection-langkorean \
+      collection-langcjk; \
+    rm -rf \
+      /root/.cache \
+      /tmp/* \
+      /var/tmp/* \
+      /usr/local/texlive/*/tlpkg/backups
+
+# ---------------------------------------------------------------------------
+# 4. 安装中文 / Windows 字体名兼容 alias
+#
+# 这个文件是 TeXDock 自定义兼容层，不是 TeX Live 自带文件。
+# 它不安装私有字体，只把常见 Windows 字体名映射到开源替代字体。
+# ---------------------------------------------------------------------------
+COPY scripts/fonts/fontconfig/64-chinese-latex-aliases.conf /etc/fonts/conf.avail/64-chinese-latex-aliases.conf
+
+RUN set -eux; \
+    mkdir -p /etc/fonts/conf.d; \
+    ln -sf ../conf.avail/64-chinese-latex-aliases.conf /etc/fonts/conf.d/64-chinese-latex-aliases.conf; \
+    ls -l /etc/fonts/conf.d/64-chinese-latex-aliases.conf; \
+    fc-cache -r -v; \
+    echo "== Chinese LaTeX aliases quick check =="; \
+    fc-match "SimSun"; \
+    fc-match "NSimSun"; \
+    fc-match "SimHei"; \
+    fc-match "KaiTi"; \
+    fc-match "FangSong"; \
+    fc-match "Microsoft YaHei"; \
+    fc-match "Microsoft JhengHei"; \
+    fc-match "PMingLiU"; \
+    fc-match "MingLiU"; \
+    fc-match "Arial"; \
+    fc-match "Times New Roman"; \
+    fc-match "Courier New"; \
+    fc-match "Calibri"; \
+    fc-match "Cambria"; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache
+
+# ---------------------------------------------------------------------------
+# 5. 刷新 TeX Live + fontconfig 缓存
+# ---------------------------------------------------------------------------
+COPY scripts/fonts/scripts/refresh-texlive-font-cache /usr/local/bin/refresh-texlive-font-cache
+
+RUN set -eux; \
+    chmod +x /usr/local/bin/refresh-texlive-font-cache; \
+    fc-cache -r -v; \
+    refresh-texlive-font-cache; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.texlive*
+
+# ---------------------------------------------------------------------------
+# 6. 可选：导入私有字体包 scripts/fonts/private/fonts.zip
+#
+# 用 BuildKit bind mount，而不是 COPY scripts/fonts/private/。
+# 这样 fonts.zip 本体不会进入镜像 layer，只留下导入后的字体文件。
+# ---------------------------------------------------------------------------
+COPY scripts/fonts/scripts/import-private-fonts-zip /usr/local/bin/import-private-fonts-zip
+
+RUN --mount=type=bind,source=scripts/fonts/private,target=/mnt/private-fonts-input,readonly \
+    set -eux; \
+    chmod +x /usr/local/bin/import-private-fonts-zip; \
+    if [ -s /mnt/private-fonts-input/fonts.zip ]; then \
+      echo "== Import private fonts from scripts/fonts/private/fonts.zip =="; \
+      import-private-fonts-zip /mnt/private-fonts-input/fonts.zip; \
+    else \
+      echo "== No scripts/fonts/private/fonts.zip found; skipped =="; \
+    fi; \
+    fc-cache -r -v; \
+    refresh-texlive-font-cache; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.texlive*
+
+# ---------------------------------------------------------------------------
+# 7. 创建运行用户
+#
+# 说明：
+#   - 生产 sandbox 统一使用 uid/gid 33。
+#   - 主容器 CLSI 是 www-data(uid 33)，sibling TeXLive 也用 33:33。
+#   - 不再创建 tex(uid 1000) 用户；手工调试时直接用 root：
+#       docker run --rm -it --user root texdock/texlive:2026.1 bash
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    if ! getent group www-data >/dev/null 2>&1; then \
+      groupadd --gid 33 www-data; \
+    fi; \
+    if ! getent passwd www-data >/dev/null 2>&1; then \
+      useradd --uid 33 --gid 33 --home-dir /var/www --shell /usr/sbin/nologin www-data; \
+    fi; \
+    mkdir -p /compile /tmp/texlive-smoke /usr/local/share/fonts/private; \
+    chown -R 33:33 /compile /tmp/texlive-smoke; \
+    chmod 1777 /tmp; \
+    id www-data; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.texlive*
+
+# ---------------------------------------------------------------------------
+# 8. Install smoke-test scripts
+# ---------------------------------------------------------------------------
+COPY scripts/texlive/smoke-test-texlive-core.sh /usr/local/bin/smoke-test-texlive-core
+COPY scripts/texlive/smoke-test-texlive-complete.sh /usr/local/bin/smoke-test-texlive-complete
+COPY scripts/fonts/smoke-test-texlive-fonts.sh /usr/local/bin/smoke-test-texlive-fonts
+COPY scripts/fonts/scripts/smoke-check-private-fonts /usr/local/bin/smoke-check-private-fonts
+
+RUN set -eux; \
+    chmod +x /usr/local/bin/smoke-test-texlive-core; \
+    chmod +x /usr/local/bin/smoke-test-texlive-complete; \
+    chmod +x /usr/local/bin/smoke-test-texlive-fonts; \
+    chmod +x /usr/local/bin/smoke-check-private-fonts; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache
+
+# ---------------------------------------------------------------------------
+# 9. Smoke-test configuration
+# ---------------------------------------------------------------------------
+ARG REQUIRED_PRIVATE_FONT_FAMILIES="SimSun|SimHei|FangSong|KaiTi"
+ARG OPTIONAL_PRIVATE_FONT_FAMILIES="NSimSun|Microsoft YaHei|Microsoft JhengHei|PMingLiU|MingLiU|DengXian|Arial|Times New Roman|Courier New|Calibri|Cambria|Consolas"
+
+ENV REQUIRED_PRIVATE_FONT_FAMILIES="${REQUIRED_PRIVATE_FONT_FAMILIES}"
+ENV OPTIONAL_PRIVATE_FONT_FAMILIES="${OPTIONAL_PRIVATE_FONT_FAMILIES}"
+ENV PRIVATE_FONT_COMPILE_SMOKE=true
+
+# ---------------------------------------------------------------------------
+# 10. Font + complete compile smoke tests
+#
+# 注意：
+#   - 使用 uid 33 跑 core/complete smoke，验证正式 compose 的 TEXLIVE_IMAGE_USER="33:33"。
+#   - 不保留 tex 用户；手工调试使用 --user root。
+# ---------------------------------------------------------------------------
+ARG RUN_TEXLIVE_SMOKE=false
+
+RUN set -eux; \
+    if [ "${RUN_TEXLIVE_SMOKE}" != "true" ]; then \
+      echo "== Skip TeXLive smoke tests during image build =="; \
+      echo "== Use --build-arg RUN_TEXLIVE_SMOKE=true to enable =="; \
+      exit 0; \
+    fi; \
+    mkdir -p \
+      /tmp/texlive-cache/texmf-var \
+      /tmp/texlive-cache/texmf-config \
+      /tmp/texlive-cache/texmf-cache \
+      /tmp/texlive-smoke; \
+    chown -R 33:33 /tmp/texlive-cache /tmp/texlive-smoke; \
+    chmod -R u+rwX,g+rwX /tmp/texlive-cache /tmp/texlive-smoke; \
+    if find /usr/local/share/fonts/private -type f 2>/dev/null | grep -q .; then \
+      echo "== Run exact private Windows font smoke check =="; \
+      smoke-check-private-fonts; \
+    else \
+      echo "== No private fonts installed; skipped exact private Windows font smoke check =="; \
+    fi; \
+    echo "== Run public CJK/font alias smoke test =="; \
+    smoke-test-texlive-fonts; \
+    echo "== Run core TeX Live smoke test as uid 33 =="; \
+    su -s /bin/bash www-data -c "cd /tmp/texlive-smoke && smoke-test-texlive-core"; \
+    echo "== Run complete TeX Live smoke test as uid 33 =="; \
+    su -s /bin/bash www-data -c "cd /tmp/texlive-smoke && smoke-test-texlive-complete"; \
+    rm -rf /tmp/* /var/tmp/* /root/.cache /root/.texlive*
+
+# Final cleanup
+# -------------
+RUN set -eux; \
+    rm -rf \
+      /tmp/* \
+      /var/tmp/* \
+      /root/.cache \
+      /root/.gnupg \
+      /root/.texlive* \
+      /home/tex/.cache \
+      /home/tex/.texlive* \
+      /usr/local/texlive/*/tlpkg/backups; \
+    find /usr/local/texlive -type d -name "__pycache__" -prune -exec rm -rf {} + || true
+
+# sibling 容器生命周期短，只跑一条 latexmk 命令；无需 entrypoint/cmd。
+# CLSI 会按次编译设置 Cmd、WorkingDir、User、Env。
+#
+# 默认 USER 设成 www-data(uid 33)，与 docker-compose.sandbox.yml 的
+# TEXLIVE_IMAGE_USER="33:33" 保持一致。即使 DockerRunner 未显式设置 User，
+# 也不会回退到 root。手工调试请显式使用 --user root。
+USER 33:33
+WORKDIR /compile
