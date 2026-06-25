@@ -1,16 +1,17 @@
-# 开发环境 override 文件
-# 用法：docker compose -f docker-compose.yml -f docker-compose.dev.web.yml up
-# 挂载本地 web 和 clsi 源码，用于前端/后端开发调试
+# docker-compose.dev.web.yml
 #
-# 注意：不要挂载整个 services/web 目录，否则会覆盖镜像中 public/ 下的 webpack 编译产物，
-# 导致 manifest.json 缺失、前端 502 错误。
-# 只挂载后端源码（app/）、配置（config/）和模块（modules/），前端改动需在容器内运行 webpack 编译。
+# Development overlay for web/code changes.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.web.yml up -d
+#
+# Mounts local source into the container for live development.
+# Do NOT mount the entire services/web directory — it overwrites compiled assets.
 
 services:
   sharelatex:
-    image: fred1653/sharelatex-full:latest
+    image: "${TEXDOCK_FULL_IMAGE:-texdock/sharelatex-full:latest}"
     volumes:
-      - ~/sharelatex_data:/var/lib/overleaf
+      - "${TEXDOCK_OVERLEAF_DATA_DIR:?set TEXDOCK_OVERLEAF_DATA_DIR in .env}:/var/lib/overleaf"
       - ./services/web/app:/overleaf/services/web/app
       - ./services/web/config:/overleaf/services/web/config
       - ./services/web/modules:/overleaf/services/web/modules

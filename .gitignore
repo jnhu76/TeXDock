@@ -4,14 +4,21 @@
 # build logs
 build.log
 
-# user defined files
+# env files (real .env is private, only .env.example is tracked)
 .env
+.env.*
+!.env.example
+!*/.env.example
+
+# compose overrides
 docker-compose.override.yml
 docker-compose.test.yml
+
+# hermes agent plans (not public)
+.hermes/
 
 # local docs (not tracked in repo)
 docs/complete-features-guide.md
 docs/features-implementation-status.md
 docs/project-inventory.md
 docs/review-panel-permissions.md
-.hermes/

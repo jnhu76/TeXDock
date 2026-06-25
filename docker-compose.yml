@@ -1,9 +1,7 @@
 services:
   sharelatex:
     restart: always
-    # Server Pro users:
-    # image: quay.io/sharelatex/sharelatex-pro
-    image: fred1653/sharelatex-full:latest
+    image: "${TEXDOCK_FULL_IMAGE:-texdock/sharelatex-full:latest}"
     container_name: sharelatex
     depends_on:
       mongo:
@@ -11,133 +9,67 @@ services:
       redis:
         condition: service_started
     ports:
-      - 80:80
+      - "${TEXDOCK_HTTP_PORT:-80}:80"
     stop_grace_period: 60s
     volumes:
-      # 用户数据持久化（项目文件、编译输出等）
-      - ~/sharelatex_data:/var/lib/overleaf
-      # Docker socket（仅 Server Pro 沙箱编译需要，Community Edition 无需挂载）
-      # - /var/run/docker.sock:/var/run/docker.sock
+      - "${TEXDOCK_OVERLEAF_DATA_DIR:?set TEXDOCK_OVERLEAF_DATA_DIR in .env}:/var/lib/overleaf"
     environment:
-      OVERLEAF_APP_NAME: Overleaf Community Edition
+      OVERLEAF_APP_NAME: "${OVERLEAF_APP_NAME:-Overleaf Community Edition}"
 
-      OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex
+      OVERLEAF_MONGO_URL: "mongodb://mongo/sharelatex"
 
-      # Redis 连接（两个变量名都需要设置）
-      OVERLEAF_REDIS_HOST: redis
-      REDIS_HOST: redis
+      OVERLEAF_REDIS_HOST: "redis"
+      REDIS_HOST: "redis"
 
-      # 允许的链接文件类型
-      ENABLED_LINKED_FILE_TYPES: "project_file,project_output_file"
+      ENABLED_LINKED_FILE_TYPES: "${ENABLED_LINKED_FILE_TYPES:-project_file,project_output_file}"
+      ENABLE_CONVERSIONS: "${ENABLE_CONVERSIONS:-true}"
+      EMAIL_CONFIRMATION_DISABLED: "${EMAIL_CONFIRMATION_DISABLED:-true}"
+      OVERLEAF_SITE_LANGUAGE: "${OVERLEAF_SITE_LANGUAGE:-zh-CN}"
+      MAX_COMPILE_TIMEOUT_MINUTES: "${MAX_COMPILE_TIMEOUT_MINUTES:-10}"
+      TZ: "${TZ:-Asia/Shanghai}"
 
-      # 启用缩略图生成（ImageMagick）
-      ENABLE_CONVERSIONS: "true"
-
-      # 是否显示确认邮箱的提醒横幅，不控制任何流程。
-      EMAIL_CONFIRMATION_DISABLED: "true"
-
-      # 站点语言（zh-CN=简体中文, en=English）
-      OVERLEAF_SITE_LANGUAGE: "zh-CN"
-
-      # 管理员面板 - 启用后可访问 /admin 管理界面
-      # ADMIN_PRIVILEGE_AVAILABLE: "true"
-
-      # 管理员域名（可选，用于多域名部署）
-      # ADMIN_URL: "https://admin.example.com"
-
-      ## 访问地址（影响邮件链接、Cookie 等，外网访问时必须设置）
-      # OVERLEAF_SITE_URL: http://overleaf.example.com
-
-      # 会话密钥（生产环境务必设置，否则每次重启会丢失所有登录状态）
-      # 生成随机字符串：openssl rand -hex 32
+      # Optional settings.
+      # OVERLEAF_SITE_URL: "http://your-server-ip"
       # OVERLEAF_SESSION_SECRET: "change-this-to-a-random-string"
-
-      # OVERLEAF_NAV_TITLE: Overleaf Community Edition
-      # OVERLEAF_HEADER_IMAGE_URL: http://example.com/mylogo.png
-      # OVERLEAF_ADMIN_EMAIL: support@it.com
-
-      # OVERLEAF_LEFT_FOOTER: '[{"text": "Another page I want to link to can be found <a href=\"here\">here</a>"} ]'
-      # OVERLEAF_RIGHT_FOOTER: '[{"text": "Hello I am on the Right"} ]'
-
-      ## 邮件发件人地址
-      # OVERLEAF_EMAIL_FROM_ADDRESS: "hello@example.com"
-
-      # OVERLEAF_EMAIL_AWS_SES_ACCESS_KEY_ID:
-      # OVERLEAF_EMAIL_AWS_SES_SECRET_KEY:
-
-      ## SMTP 邮件配置（用于注册确认、密码重置、项目邀请等）
-      ## SMTP 端口需要注意，465 或 587
+      # OVERLEAF_NAV_TITLE: "TeXDock"
+      # OVERLEAF_ADMIN_EMAIL: "admin@example.com"
+      # OVERLEAF_HEADER_IMAGE_URL: "https://example.com/logo.png"
+      # OVERLEAF_LEFT_FOOTER: '[{"text": "Link <a href=\"https://example.com\">here</a>"}]'
+      # OVERLEAF_RIGHT_FOOTER: '[{"text": "&copy; 2025 TeXDock"}]'
+      # OVERLEAF_EMAIL_FROM_ADDRESS: "texdock@example.com"
       # OVERLEAF_EMAIL_SMTP_HOST: smtp.example.com
       # OVERLEAF_EMAIL_SMTP_PORT: 587
       # OVERLEAF_EMAIL_SMTP_SECURE: false
       # OVERLEAF_EMAIL_SMTP_USER:
       # OVERLEAF_EMAIL_SMTP_PASS:
-      ## 控制是否严格校验 SMTP 服务器的 TLS 证书，建议
-      ## OVERLEAF_EMAIL_SMTP_TLS_REJECT_UNAUTH 为 false或者注释掉。
       # OVERLEAF_EMAIL_SMTP_TLS_REJECT_UNAUTH: true
       # OVERLEAF_EMAIL_SMTP_IGNORE_TLS: false
       # OVERLEAF_EMAIL_SMTP_NAME: '127.0.0.1'
       # OVERLEAF_EMAIL_SMTP_LOGGER: true
       # OVERLEAF_CUSTOM_EMAIL_FOOTER: "This system is run by department x"
-
-      # 资源删除安全阀：cron 触发后是否真的执行项目清理/过期删除操作。
-      # 不控制 cron 是否运行，仅控制是否执行破坏性操作。默认关闭更安全。
-      # 仅在明确需要自动清理旧项目时设为 true。
       # ENABLE_CRON_RESOURCE_DELETION: true
-
-      # 编译看门狗超时（分钟）：超过此时间的编译进程会被自动终止。
-      # 默认 10 分钟。设为 0 可禁用看门狗。
-      MAX_COMPILE_TIMEOUT_MINUTES: "10"
-
-      # 时区设置：控制 Node.js 进程的时区，影响 toLocaleString() 等时间显示。
-      # 默认 UTC。中国用户可设为 Asia/Shanghai。
-      TZ: Asia/Shanghai
-
-      ################
-      ## Server Pro ##
-      ################
-
-      ## Community Edition 不支持沙箱编译，以下配置必须保持注释状态，否则会导致编译失败
-      ##
-      ## Sandboxed Compiles: https://docs.overleaf.com/on-premises/configuration/overleaf-toolkit/server-pro-only-configuration/sandboxed-compiles
-      # SANDBOXED_COMPILES: "false"
-      # ### Bind-mount source for /var/lib/overleaf/data/compiles inside the container.
-      # SANDBOXED_COMPILES_HOST_DIR_COMPILES: "/home/user/sharelatex_data/data/compiles"
-      # ### Bind-mount source for /var/lib/overleaf/data/output inside the container.
-      # SANDBOXED_COMPILES_HOST_DIR_OUTPUT: "/home/user/sharelatex_data/data/output"
-      # ### Backwards compatibility (before Server Pro 5.5)
-      # DOCKER_RUNNER: "true"
-      # SANDBOXED_COMPILES_SIBLING_CONTAINERS: "true"
-
-      ## LDAP 登录配置（需要配合 LDAP 服务器使用）
+      # ADMIN_PRIVILEGE_AVAILABLE: "true"
       # OVERLEAF_LDAP_URL: 'ldap://ldap:389'
-      # OVERLEAF_LDAP_SEARCH_BASE: 'ou=people,dc=planetexpress,dc=com'
+      # OVERLEAF_LDAP_SEARCH_BASE: 'ou=people,dc=example,dc=com'
       # OVERLEAF_LDAP_SEARCH_FILTER: '(uid={{username}})'
-      # OVERLEAF_LDAP_BIND_DN: 'cn=admin,dc=planetexpress,dc=com'
-      # OVERLEAF_LDAP_BIND_CREDENTIALS: 'GoodNewsEveryone'
+      # OVERLEAF_LDAP_BIND_DN: 'cn=admin,dc=example,dc=com'
+      # OVERLEAF_LDAP_BIND_CREDENTIALS: 'your_ldap_password'
       # OVERLEAF_LDAP_EMAIL_ATT: 'mail'
       # OVERLEAF_LDAP_NAME_ATT: 'cn'
       # OVERLEAF_LDAP_LAST_NAME_ATT: 'sn'
       # OVERLEAF_LDAP_UPDATE_USER_DETAILS_ON_LOGIN: 'true'
 
-      # OVERLEAF_TEMPLATES_USER_ID: "578773160210479700917ee5"
-      # OVERLEAF_NEW_PROJECT_TEMPLATE_LINKS: '[ {"name":"All Templates","url":"/templates/all"}]'
-
-      # OVERLEAF_PROXY_LEARN: "true"
-
   mongo:
     restart: always
-    image: mongo:8.0
+    image: "${TEXDOCK_MONGO_IMAGE:-mongo:8.0}"
     container_name: mongo
     command: "--replSet overleaf"
     volumes:
-      # 数据库数据持久化
-      - ~/mongo_data:/data/db
+      - "${TEXDOCK_MONGO_DATA_DIR:?set TEXDOCK_MONGO_DATA_DIR in .env}:/data/db"
       - ./bin/shared/mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js
     environment:
       MONGO_INITDB_DATABASE: sharelatex
     extra_hosts:
-      # 初始化副本集时需要将 mongo 指向本机
       - mongo:127.0.0.1
     healthcheck:
       test: echo 'db.stats().ok' | mongosh localhost:27017/test --quiet
@@ -147,25 +79,7 @@ services:
 
   redis:
     restart: always
-    image: redis:6.2
+    image: "${TEXDOCK_REDIS_IMAGE:-redis:6.2}"
     container_name: redis
     volumes:
-      # Redis 数据持久化
-      - ~/redis_data:/data
-
-  # ldap:
-  #    restart: always
-  #    image: rroemhild/test-openldap
-  #    container_name: ldap
-
-  # Nginx 反向代理（可选，用于 HTTPS 或自定义域名）
-  # 参考文档：https://github.com/jwilder/nginx-proxy
-  # nginx-proxy:
-  #     image: jwilder/nginx-proxy
-  #     container_name: nginx-proxy
-  #     ports:
-  #       - "80:80"
-  #       - "443:443"
-  #     volumes:
-  #       - /var/run/docker.sock:/tmp/docker.sock:ro
-  #       - /home/overleaf/tmp:/etc/nginx/certs
+      - "${TEXDOCK_REDIS_DATA_DIR:?set TEXDOCK_REDIS_DATA_DIR in .env}:/data"
