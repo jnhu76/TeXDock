@@ -15,7 +15,7 @@
 # Build:
 #   DOCKER_BUILDKIT=1 docker build \
 #     -f server-ce/Dockerfile-full \
-#     -t fred1653/sharelatex-full:latest .
+#     -t texdock/sharelatex-full:latest .
 #
 # Optional build args:
 #   --build-arg UBUNTU_MIRROR=https://mirrors.aliyun.com/ubuntu
@@ -32,7 +32,8 @@
 #   but scheme-full already includes it. We verify the actual file with:
 #     kpsewhich xeCJK.sty
 
-FROM fred1653/sharelatex:latest
+ARG BASE_IMAGE=texdock/sharelatex:latest
+FROM ${BASE_IMAGE}
 
 ARG TEXDOCK_VERSION=dev
 LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \

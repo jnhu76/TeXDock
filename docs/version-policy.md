@@ -1,69 +1,66 @@
-# TeXDock 版本策略与发布纪律
+# TeXDock Version Policy
 
-## 版本号规则
+## Versioning
 
-TeXDock 使用 [语义化版本](https://semver.org/lang/zh-CN/)（SemVer）：`MAJOR.MINOR.PATCH`
+TeXDock follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
-- **MAJOR**: 不兼容的架构变更（如 Overleaf 大版本升级）
-- **MINOR**: 新增功能（如新增字体、宏包、构建流程改进）
-- **PATCH**: 问题修复
+- **MAJOR**: Breaking architectural changes (e.g. Overleaf major upgrade)
+- **MINOR**: New features (fonts, macros, build improvements)
+- **PATCH**: Bug fixes
 
-版本号记录在项目根目录的 `VERSION` 文件中。
+The version is stored in the `VERSION` file at the project root.
 
-## Docker Tag 策略
+## Docker Tag Strategy
 
-| Tag | 说明 |
-|-----|------|
-| `latest` | 跟随最新开发版本，适合本地开发和测试 |
-| `0.2.1` | 固定版本，适合生产部署 |
+| Tag | Description |
+|-----|-------------|
+| `latest` | Points to the latest build; use for development/testing |
+| `0.2.1` | Pinned version; recommended for production |
 
-- `latest` 始终指向最新构建
-- 每次发布新版本时同步推送版本号 tag（如 `0.2.1`）
+- `latest` always tracks the latest build
+- Each release pushes both the version tag and `latest`
 
-## 生产部署建议
+## Production Deployment
 
-正式部署**推荐使用固定版本号 tag**（如 `0.2.1`），避免 `latest` 带来的不可预期变更。
+Always use a **pinned version tag** (e.g. `0.2.1`) to avoid unexpected changes from `latest`.
 
 ```yaml
-# docker-compose.yml 示例
-image: fred1653/sharelatex-full:0.2.1
+image: texdock/sharelatex-full:0.2.1
 ```
 
 ---
 
-## 升级兼容性
+## Upgrade Compatibility
 
-### 版本兼容性承诺
+| Change | Compatibility | Notes |
+|--------|--------------|-------|
+| PATCH (0.2.0 → 0.2.1) | Fully compatible | No data format changes |
+| MINOR (0.2.x → 0.3.x) | May have new config | Check docs; existing config usually works |
+| MAJOR (0.x → 1.x) | Breaking changes possible | Read migration guide carefully |
 
-| 版本变更 | 兼容性 | 说明 |
-|---------|--------|------|
-| PATCH (0.2.0 → 0.2.1) | ✅ 完全兼容 | 数据格式不变，配置无需修改 |
-| MINOR (0.2.x → 0.3.x) | ⚠️ 可能有新配置项 | 需检查文档，现有配置通常无需修改 |
-| MAJOR (0.x → 1.x) | ❌ 可能有破坏性变更 | 需仔细阅读迁移指南 |
-
-### 升级步骤
+### Upgrade Steps
 
 ```bash
-# 1. 备份数据
-bash scripts/backup.sh              # 详见部署指南 → 备份策略
+# 1. Backup data
+bash scripts/backup.sh
 
-# 2. 拉取新镜像并重启
+# 2. Pull new image and restart
 docker compose pull sharelatex
 docker compose up -d
 
-# 3. 验证版本
+# 3. Verify version
 docker exec sharelatex cat /etc/texdock-version
 ```
 
-> 完整升级说明（含回滚、注意事项）详见 [**部署指南 → 升级指南**](deployment-guide.md#升级指南)。
+> Full upgrade instructions (rollback, caveats) in [Deployment Guide → Upgrade](deployment-guide.md#upgrade-guide).
 
 ---
 
-## 发布纪律
+## Release Discipline
 
-### 1. 版本号由 `--build-arg TEXDOCK_VERSION` 注入
+### 1. Version injected via `--build-arg TEXDOCK_VERSION`
 
-所有 Dockerfile 通过 `ARG TEXDOCK_VERSION=dev` 接收版本号，写入 OCI label：
+All Dockerfiles accept `ARG TEXDOCK_VERSION=dev` and write it to OCI labels:
 
 ```dockerfile
 ARG TEXDOCK_VERSION=dev
@@ -71,74 +68,71 @@ LABEL org.opencontainers.image.version="${TEXDOCK_VERSION}" \
       texdock.version="${TEXDOCK_VERSION}"
 ```
 
-**禁止在 Dockerfile 中硬编码版本号。** 版本号的唯一来源是 `VERSION` 文件。
+**Never hardcode version numbers in Dockerfiles.** The single source of truth is the `VERSION` file.
 
-### 2. 发布前检查清单
+### 2. Pre-release Checklist
 
-发布新版本前，按顺序完成：
+1. Update `VERSION` file
+2. Confirm all tests pass
+3. Execute the three-tier build (no skipping levels)
+4. Update docs (README, build guide, version policy)
+5. Write changelog entry below
 
-1. **更新 `VERSION` 文件** — 写入新版本号（如 `0.3.0`）
-2. **确认所有测试通过** — 冒烟测试、中文编译测试
-3. **按顺序执行三级构建** — 不得跳级、不得用 `latest` 做中间 tag
-4. **更新文档** — README、部署指南、构建指南中的版本号
-5. **编写变更日志** — 在下方「版本变更记录」中添加新条目
-
-### 3. 标准构建命令
-
-每次发布使用以下命令（以 `0.3.0` 为例）：
+### 3. Standard Build Commands
 
 ```bash
-VERSION=0.3.0
+export IMAGE_NAMESPACE=texdock
+export VERSION=$(cat VERSION)
 
-# 第 1 级：基础镜像
+# Level 1: base image
 docker build -f server-ce/Dockerfile-base \
-  --build-arg TEXDOCK_VERSION=$VERSION \
-  -t fred1653/sharelatex-base:$VERSION \
-  -t fred1653/sharelatex-base:latest .
+  --build-arg TEXDOCK_VERSION="$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-base:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-base:latest" .
 
-# 第 2 级：应用代码
+# Level 2: application code
 docker build -f server-ce/Dockerfile \
-  --build-arg TEXDOCK_VERSION=$VERSION \
-  --build-arg OVERLEAF_BASE_TAG=fred1653/sharelatex-base:$VERSION \
-  -t fred1653/sharelatex:$VERSION \
-  -t fred1653/sharelatex:latest .
+  --build-arg TEXDOCK_VERSION="$VERSION" \
+  --build-arg OVERLEAF_BASE_TAG="$IMAGE_NAMESPACE/sharelatex-base:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex:latest" .
 
-# 第 3 级：完整 TeX Live + 字体
+# Level 3: full TeX Live + fonts
 docker build -f server-ce/Dockerfile-full \
-  --build-arg TEXDOCK_VERSION=$VERSION \
-  --build-arg BASE_IMAGE=fred1653/sharelatex:$VERSION \
-  -t fred1653/sharelatex-full:$VERSION \
-  -t fred1653/sharelatex-full:latest .
+  --build-arg TEXDOCK_VERSION="$VERSION" \
+  --build-arg BASE_IMAGE="$IMAGE_NAMESPACE/sharelatex:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-full:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-full:latest" .
 ```
 
-关键规则：
+Key rules:
 
-- **每一级必须使用上一级的版本号 tag**（`$VERSION`），不得使用 `latest`
-- **同时打版本号 tag 和 `latest` tag** — 双 tag 推送到 Docker Hub
-- `TEXDOCK_VERSION` 通过 `--build-arg` 传入，与 `VERSION` 文件保持一致
+- Each level must use the **version tag** (`$VERSION`) of the previous level — never `latest`
+- Push both version and `latest` tags
+- `TEXDOCK_VERSION` is passed via `--build-arg`, matching the `VERSION` file
 
-### 4. 私有字体镜像（可选）
+### 4. Private Font Image (optional)
 
 ```bash
 docker build -f server-ce/Dockerfile-windows-fonts \
-  --build-arg TEXDOCK_VERSION=$VERSION \
-  --build-arg BASE_IMAGE=fred1653/sharelatex-full:$VERSION \
-  -t fred1653/sharelatex-full-private:$VERSION \
-  -t fred1653/sharelatex-full-private:latest .
+  --build-arg TEXDOCK_VERSION="$VERSION" \
+  --build-arg BASE_IMAGE="$IMAGE_NAMESPACE/sharelatex-full:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-full-private:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-full-private:latest" .
 ```
 
-### 5. 推送到 Docker Hub
+### 5. Push to Docker Hub
 
 ```bash
-docker push fred1653/sharelatex-base:$VERSION
-docker push fred1653/sharelatex-base:latest
-docker push fred1653/sharelatex:$VERSION
-docker push fred1653/sharelatex:latest
-docker push fred1653/sharelatex-full:$VERSION
-docker push fred1653/sharelatex-full:latest
+docker push "$IMAGE_NAMESPACE/sharelatex-base:$VERSION"
+docker push "$IMAGE_NAMESPACE/sharelatex-base:latest"
+docker push "$IMAGE_NAMESPACE/sharelatex:$VERSION"
+docker push "$IMAGE_NAMESPACE/sharelatex:latest"
+docker push "$IMAGE_NAMESPACE/sharelatex-full:$VERSION"
+docker push "$IMAGE_NAMESPACE/sharelatex-full:latest"
 ```
 
-### 6. Git 提交与 tag
+### 6. Git Commit and Tag
 
 ```bash
 git add VERSION
@@ -149,9 +143,9 @@ git push --tags
 
 ---
 
-## 版本变更记录
+## Changelog
 
-| 版本 | 日期 | 说明 |
-|------|------|------|
-| 0.2.1 | 2026-06 | 新增管理面板、审计日志、Track Changes、审阅面板；完善 LDAP 文档；新增升级指南和备份策略 |
-| 0.2.0 | 2026-06 | 基于 Overleaf CE，TeX Live 2026，内置 CJK 字体支持 |
+| Version | Date | Notes |
+|---------|------|-------|
+| 0.2.1 | 2026-06 | Admin panel, audit log, Track Changes, review panel; LDAP docs; upgrade guide and backup strategy |
+| 0.2.0 | 2026-06 | Based on Overleaf CE, TeX Live 2026, built-in CJK font support |

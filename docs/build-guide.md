@@ -1,106 +1,110 @@
-# TeXDock 镜像构建指南
+# TeXDock Build Guide
 
-镜像构建、字体策略、TeX Live 宏包安装。
+Image building, font strategy, TeX Live package installation.
 
-> 当前版本 **0.2.1**。`latest` tag 等价于 `0.2.1`。正式部署推荐使用固定版本号 tag（如 `fred1653/sharelatex-full:0.2.1`），开发可以使用 `latest`。详见 [**版本策略**](version-policy.md)。
+> Current version **0.2.1**. The `latest` tag is equivalent to `0.2.1`. For production, use a pinned version tag (e.g. `texdock/sharelatex-full:0.2.1`). See [Version Policy](version-policy.md).
 
 ---
 
-## 1. 构建流程
+## 1. Build Flow
 
 ```text
-第 1 级  Dockerfile-base   →  fred1653/sharelatex-base:latest
+Level 1  Dockerfile-base   →  texdock/sharelatex-base:latest
          Ubuntu + Node.js + TeX Live basic
 
-第 2 级  Dockerfile        →  fred1653/sharelatex:latest
-         Overleaf CE 应用代码（yarn install + 编译）
+Level 2  Dockerfile        →  texdock/sharelatex:latest
+         Overleaf CE application code (yarn install + compile)
 
-第 3 级  Dockerfile-full   →  fred1653/sharelatex-full:latest
-         完整 TeX Live (scheme-full) + CJK 字体 + 辅助脚本 + 冒烟测试
+Level 3  Dockerfile-full   →  texdock/sharelatex-full:latest
+         Full TeX Live (scheme-full) + CJK fonts + helper scripts + smoke tests
 ```
 
-日常 web 修改只需 rebuild `Dockerfile-full-web`（基于 `sharelatex-full`，仅覆盖 web 代码）：
+For日常 web changes, rebuild `Dockerfile-full-web` only (no TeX Live reinstall):
 
 ```text
-Dockerfile-full-web  →  fred1653/sharelatex-full:latest
-  覆盖 web 代码（无需重新安装 TeX Live）
+Dockerfile-full-web  →  texdock/sharelatex-full:latest
+  Web code overlay (no TeX Live reinstall)
 ```
 
 ---
 
-## 2. 构建命令
+## 2. Build Commands
 
-### 完整三级构建
+Set the image namespace first:
 
 ```bash
-VERSION=$(cat VERSION)
+export IMAGE_NAMESPACE=texdock
+export VERSION=$(cat VERSION)
+```
 
+### Full Three-Tier Build
+
+```bash
 docker build -f server-ce/Dockerfile-base \
-  --build-arg TEXDOCK_VERSION=$VERSION \
-  -t fred1653/sharelatex-base:$VERSION \
-  -t fred1653/sharelatex-base:latest .
+  --build-arg TEXDOCK_VERSION="$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-base:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-base:latest" .
 
 docker build -f server-ce/Dockerfile \
-  --build-arg TEXDOCK_VERSION=$VERSION \
-  --build-arg OVERLEAF_BASE_TAG=fred1653/sharelatex-base:$VERSION \
-  -t fred1653/sharelatex:$VERSION \
-  -t fred1653/sharelatex:latest .
+  --build-arg TEXDOCK_VERSION="$VERSION" \
+  --build-arg OVERLEAF_BASE_TAG="$IMAGE_NAMESPACE/sharelatex-base:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex:latest" .
 
 docker build -f server-ce/Dockerfile-full \
-  --build-arg TEXDOCK_VERSION=$VERSION \
-  --build-arg BASE_IMAGE=fred1653/sharelatex:$VERSION \
-  -t fred1653/sharelatex-full:$VERSION \
-  -t fred1653/sharelatex-full:latest .
+  --build-arg TEXDOCK_VERSION="$VERSION" \
+  --build-arg BASE_IMAGE="$IMAGE_NAMESPACE/sharelatex:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-full:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-full:latest" .
 ```
 
-> 每一级必须使用上一级的版本号 tag（`$VERSION`），不得使用 `latest`。详见 [**版本策略**](version-policy.md)。
+> Each level must use the version tag of the previous level. See [Version Policy](version-policy.md).
 
-### 日常 web 修改
+### Daily Web Changes
 
 ```bash
-docker build -f server-ce/Dockerfile-full-web -t fred1653/sharelatex-full:latest .
+docker build -f server-ce/Dockerfile-full-web \
+  -t "$IMAGE_NAMESPACE/sharelatex-full:latest" .
 ```
 
-### 构建私有字体镜像
+### Private Font Image
 
 ```bash
-VERSION=$(cat VERSION)
-
 docker build -f server-ce/Dockerfile-windows-fonts \
-  --build-arg TEXDOCK_VERSION=$VERSION \
-  --build-arg BASE_IMAGE=fred1653/sharelatex-full:$VERSION \
-  -t fred1653/sharelatex-full-private:$VERSION \
-  -t fred1653/sharelatex-full-private:latest .
+  --build-arg TEXDOCK_VERSION="$VERSION" \
+  --build-arg BASE_IMAGE="$IMAGE_NAMESPACE/sharelatex-full:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-full-private:$VERSION" \
+  -t "$IMAGE_NAMESPACE/sharelatex-full-private:latest" .
 ```
 
-### 可选构建参数
+### Optional Build Args
 
-| 参数 | 适用 Dockerfile | 默认值 | 说明 |
-|------|----------------|--------|------|
-| `TEXDOCK_VERSION` | 全部 | `dev` | 版本号，写入 OCI label |
-| `UBUNTU_MIRROR` | base, full | `https://mirrors.tuna.tsinghua.edu.cn/ubuntu` | Ubuntu apt 镜像 |
-| `TEXLIVE_MIRROR` | base | `https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet` | TeX Live 安装源 |
-| `TEXLIVE_REPOSITORY` | full | `https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet` | CTAN 镜像（tlmgr） |
-| `BASE_IMAGE` | windows-fonts | `fred1653/sharelatex-full:latest` | 私有字体基础镜像 |
+| Argument | Applies to | Default | Description |
+|----------|-----------|---------|-------------|
+| `TEXDOCK_VERSION` | All | `dev` | Version string, written to OCI label |
+| `UBUNTU_MIRROR` | base, full | `https://mirrors.tuna.tsinghua.edu.cn/ubuntu` | Ubuntu apt mirror |
+| `TEXLIVE_MIRROR` | base | `https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet` | TeX Live install source |
+| `TEXLIVE_REPOSITORY` | full | `https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet` | CTAN mirror (tlmgr) |
+| `BASE_IMAGE` | windows-fonts | `texdock/sharelatex-full:latest` | Base image for font overlay |
 
 ---
 
-## 3. 字体策略
+## 3. Font Strategy
 
-### 3.1 已内置字体
+### 3.1 Built-in Fonts
 
-`sharelatex-full` 镜像包含：
+`sharelatex-full` includes:
 
-- **开源 CJK 字体**: Noto CJK SC、WenQuanYi Micro Hei、AR PL UKai/UMing
-- **TeX Live 内置**: Fandol (Song/Hei/Kai/Fang)
-- **西文字体**: Liberation、DejaVu、Carlito、Caladea
+- **Open-source CJK**: Noto CJK SC, WenQuanYi Micro Hei, AR PL UKai/UMing
+- **TeX Live built-in**: Fandol (Song/Hei/Kai/Fang)
+- **Western**: Liberation, DejaVu, Carlito, Caladea
 
-### 3.2 fontconfig 别名
+### 3.2 fontconfig Aliases
 
-镜像通过 `/etc/fonts/conf.d/64-chinese-latex-aliases.conf` 将 Windows 字体名映射到开源替代：
+`/etc/fonts/conf.d/64-chinese-latex-aliases.conf` maps Windows font names to open-source alternatives:
 
-| Windows 字体名 | → 替代字体 |
-|----------------|-----------|
+| Windows Font Name | → Alternative |
+|-------------------|---------------|
 | SimSun / NSimSun | Noto Serif CJK SC → FandolSong → AR PL UMing CN |
 | SimHei | Noto Sans CJK SC → FandolHei → WenQuanYi Zen Hei |
 | KaiTi | FandolKai → AR PL UKai CN |
@@ -110,28 +114,28 @@ docker build -f server-ce/Dockerfile-windows-fonts \
 | Times New Roman | Liberation Serif → Tinos |
 | Courier New | Liberation Mono → Cousine |
 
-使用 `\setCJKmainfont{SimSun}` 的 LaTeX 模板即使在没有 Windows 字体的环境下也能编译。
+LaTeX templates using `\setCJKmainfont{SimSun}` compile even without Windows fonts.
 
-### 3.3 构建私有字体镜像
+### 3.3 Private Font Image
 
-由于中文字体（SimSun、SimHei、KaiTi、FangSong 等）存在版权限制，公开镜像通过 fontconfig 别名映射到开源替代字体。如需使用真实 Windows 字体，可通过 `Dockerfile-windows-fonts` 构建私有镜像。
+Real Windows fonts (SimSun, SimHei, KaiTi, FangSong) have copyright restrictions. The public image uses fontconfig aliases. For real fonts, build a private image:
 
-1. 在项目根目录准备 `fonts.zip`，内含 `.ttf` / `.ttc` / `.otf` / `.otc` 字体文件
-2. 构建私有镜像：
+1. Place `fonts.zip` in the project root (contains `.ttf`/`.ttc`/`.otf`/`.otc` files)
+2. Build:
 
 ```bash
 docker build -f server-ce/Dockerfile-windows-fonts \
-  --build-arg BASE_IMAGE=fred1653/sharelatex-full:latest \
-  -t fred1653/sharelatex-full-private:latest .
+  --build-arg BASE_IMAGE=texdock/sharelatex-full:latest \
+  -t texdock/sharelatex-full-private:latest .
 ```
 
-3. 修改 `docker-compose.yml` 使用私有镜像：
+3. Update compose to use the private image:
 
 ```yaml
-image: fred1653/sharelatex-full-private:latest
+image: texdock/sharelatex-full-private:latest
 ```
 
-> **注意**: `fonts.zip` 不应提交到公开仓库。构建产物仅限本地或私有环境使用，不可公开发布。
+> **Note**: `fonts.zip` must NOT be committed to a public repository.
 
 也可以在运行中的容器内临时导入字体（容器重建后丢失）：
 
@@ -140,161 +144,115 @@ docker cp fonts.zip sharelatex:/tmp/fonts.zip
 docker exec sharelatex import-private-fonts-zip /tmp/fonts.zip
 ```
 
-导入后 fontconfig 优先匹配真实字体（精确 family 名优先于别名）。
+### 3.4 Refresh Font Cache
 
-### 3.4 刷新字体缓存
-
-手动添加字体后运行：
+After manually adding fonts:
 
 ```bash
 docker exec sharelatex refresh-texlive-font-cache
 ```
 
-该脚本会刷新 fontconfig、TeX filename database、font maps 和 luaotfload 缓存。
+Refreshes fontconfig, TeX filename database, font maps, and luaotfload cache.
 
 ---
 
-## 4. 安装 TeX Live 宏包
+## 4. Installing TeX Live Packages
 
-当 LaTeX 编译报错缺少 `.sty` / `.cls` / `.bst` 文件时，使用 `scripts/tlmgr-in-container.sh` 在运行中的容器内临时安装。
+When LaTeX compilation fails with missing `.sty`/`.cls`/`.bst` files, use `scripts/tlmgr-in-container.sh`:
 
-> **注意**: 容器重建后安装的包会丢失。如需永久生效，请将包添加到 `server-ce/Dockerfile-full` 后重新构建镜像。
+> **Note**: Packages installed this way are lost on container rebuild. For permanent additions, add them to `server-ce/Dockerfile-full` and rebuild.
 
-### 搜索缺少的包
+### Search for Missing Packages
 
 ```bash
-# LaTeX Error: File `enumitem.sty' not found.
 scripts/tlmgr-in-container.sh search enumitem.sty
-
-# LaTeX Error: File `ctexart.cls' not found.
 scripts/tlmgr-in-container.sh search ctexart.cls
 ```
 
-### 安装包
+### Install Packages
 
 ```bash
 scripts/tlmgr-in-container.sh install enumitem
 scripts/tlmgr-in-container.sh install minted fvextra upquote
 ```
 
-安装后自动刷新 TeX 缓存，可立即重新编译。
-
-### 环境变量
+### Environment Variables
 
 ```bash
-# 指定容器名（默认 sharelatex）
+# Custom container name (default: sharelatex)
 CONTAINER=my-sharelatex scripts/tlmgr-in-container.sh install enumitem
 
-# 指定 CTAN 镜像
+# Custom CTAN mirror
 TEXLIVE_REPOSITORY=https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet \
   scripts/tlmgr-in-container.sh install enumitem
 ```
 
-### 典型流程
-
-```bash
-# 1. LaTeX 报错: File `minted.sty' not found
-# 2. 搜索
-scripts/tlmgr-in-container.sh search minted.sty
-# 3. 安装
-scripts/tlmgr-in-container.sh install minted
-# 4. 在页面上重新编译
-```
-
 ---
 
-## 5. Upstream 同步策略
+## 5. Upstream Sync Strategy
 
-TeXDock 基于 Overleaf Community Edition，需要定期同步上游更新。
+TeXDock is based on Overleaf Community Edition and needs periodic upstream sync.
 
-### 5.1 同步流程
+### 5.1 Sync Flow
 
 ```text
-上游 Overleaf CE 发布新版本
+Upstream Overleaf CE releases new version
         ↓
-1. 更新 Dockerfile-base 中的 Overleaf 版本引用
+1. Update Dockerfile-base with new Overleaf version
         ↓
-2. 重新执行三级构建
+2. Rebuild three-tier chain
         ↓
-3. 运行冒烟测试
+3. Run smoke tests
         ↓
-4. 更新 VERSION 文件
+4. Update VERSION file
         ↓
-5. 发布新版本
+5. Release new version
 ```
 
-### 5.2 Patch 管理
+### 5.2 Patch Management
 
-TeXDock 的自定义修改集中在以下位置：
+TeXDock customizations are concentrated in:
 
-| 文件 | 修改内容 |
+| File | Changes |
 |------|---------|
-| `Dockerfile-base` | Ubuntu 基础镜像、TeX Live 安装 |
-| `Dockerfile` | Overleaf CE 代码集成 |
-| `Dockerfile-full` | 字体、辅助脚本、冒烟测试 |
-| `docker-compose.yml` | 默认配置、环境变量 |
-| `services/web/` | 中文化、功能定制 |
+| `Dockerfile-base` | Ubuntu base image, TeX Live install |
+| `Dockerfile` | Overleaf CE code integration |
+| `Dockerfile-full` | Fonts, helper scripts, smoke tests |
+| `docker-compose.yml` | Default config, environment variables |
+| `services/web/` | Localization, feature customization |
 
-### 5.3 上游更新检查
+### 5.3 Checking for Upstream Updates
 
 ```bash
-# 检查上游 Overleaf CE 版本
 git remote add upstream https://github.com/overleaf/overleaf.git
 git fetch upstream
-
-# 查看上游变更
 git log HEAD..upstream/master --oneline
 ```
 
-### 5.4 冲突解决策略
-
-当上游有重大变更时：
-
-1. **评估影响**：检查变更是否影响 TeXDock 的自定义修改
-2. **创建分支**：从当前版本创建升级分支
-3. **逐步合并**：先合并基础层（Dockerfile-base），再合并应用层
-4. **测试验证**：运行完整冒烟测试
-5. **发布更新**：通过新版本号发布
-
-> 建议在上游发布新版本后 1-2 周内完成同步，避免积累过多变更。
-
 ---
 
-## 6. 构建验证
+## 6. Build Verification
 
-构建完成后验证：
+After building, verify:
 
 ```bash
-# 检查 ctex 是否可用
 docker exec sharelatex kpsewhich ctex.sty
-
-# 检查中文字体
 docker exec sharelatex fc-list | grep -i "Noto Sans CJK" | head
-
-# 检查 xelatex
 docker exec sharelatex xelatex --version
-
-# 检查 Windows 字体别名
 docker exec sharelatex fc-match SimSun
 docker exec sharelatex fc-match SimHei
-
-# 检查版本号
 docker exec sharelatex cat /etc/texdock-version
-# 应输出当前版本号（如 0.2.1）
 ```
 
-### 冒烟测试
-
-构建完成后运行冒烟测试脚本：
+### Smoke Tests
 
 ```bash
-# 在容器内执行
 docker exec sharelatex texdock-smoke-test
 ```
 
-冒烟测试包括：
+Includes:
 
-- TeX Live 基础编译测试
-- 中文编译测试（XeLaTeX + ctex）
-- 字体别名测试
-- 辅助脚本可用性测试
+- TeX Live basic compilation
+- Chinese compilation (XeLaTeX + ctex)
+- Font alias tests
+- Helper script availability
